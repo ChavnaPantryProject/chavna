@@ -1,0 +1,24 @@
+{
+    "users": [
+        {
+            "username": "user1",
+            "salt": "1234567890",
+            "password_hash": 9818845459525682409,
+            "actual_password": "password"
+        },
+        
+        {
+            "username": "user2",
+            "salt": "0987654321",
+            "password_hash": 8728049290940301432,
+            "actual_password": "hunter2"
+        },
+        
+        {
+            "username": "user3",
+            "salt": "7264813594",
+            "password_hash": 9756139483135807951,
+            "actual_password": "drowssap"
+        }
+    ] 
+}
