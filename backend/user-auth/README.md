@@ -1,1 +1,1 @@
-This is a proof of concept REST API written in Rust. This current iteration is obviously not secure. This branch will likely never even be merged into main.
+This is a proof of concept REST API written in Rust. This current iteration is obviously not secure. This branch will likely be deleted.
