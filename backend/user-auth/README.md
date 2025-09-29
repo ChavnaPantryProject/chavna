@@ -3,7 +3,7 @@ This is a proof of concept REST API written in Rust. This current iteration is o
 
 ## How to run the code
 1. Install Rust at https://rust-lang.org/tools/install/
-2. Set your working directory to ```backend/user-auth```
+2. Set your working directory to ```./backend/user-auth/```
 ### Run in debug mode
     cargo run
 ### Run in release mode

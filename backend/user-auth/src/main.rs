@@ -1,12 +1,13 @@
-use std::{cell::RefCell, collections::HashMap, fs::File, hash::{DefaultHasher, Hash, Hasher}, sync::Mutex};
+use std::{cell::RefCell, collections::HashMap, fs::File, hash::{DefaultHasher, Hash, Hasher}};
 
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
 use serde::Deserialize;
+use tokio::sync::Mutex;
 
 // Rust is really strict about mutability, so mutable global variables
 // need to be thread safe, hence the mutex.
 // The RefCell makes it mutable without it being unsafe.
-static STATE: Mutex<RefCell<Option<State>>> = Mutex::new(RefCell::new(None));
+static STATE: Mutex<RefCell<Option<State>>> = Mutex::const_new(RefCell::new(None));
 
 // Struct defining user data
 #[derive(Debug)]
@@ -35,7 +36,7 @@ struct LoginRequest {
 // 
 #[post("/login")]
 async fn login(req_body: web::Json<LoginRequest>) -> impl Responder {
-    let state = STATE.lock().unwrap();
+    let state = STATE.lock().await;
     let state = state.borrow();
     let state = state.as_ref();
 
@@ -107,7 +108,7 @@ async fn main() -> std::io::Result<()> {
     };
 
     // Load the state struct into global variable
-    let lock = STATE.lock().unwrap();
+    let lock = STATE.lock().await;
     lock.replace(Some(state));
     drop(lock); // Explicit drop to unlcok the mutex before the server gets started.
 
