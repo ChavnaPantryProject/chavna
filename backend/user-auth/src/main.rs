@@ -1,13 +1,9 @@
 use std::{cell::RefCell, collections::HashMap, fs::File, hash::{DefaultHasher, Hash, Hasher}};
 
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
+use rand::Rng;
 use serde::Deserialize;
-use tokio::sync::Mutex;
-
-// Rust is really strict about mutability, so mutable global variables
-// need to be thread safe, hence the mutex.
-// The RefCell makes it mutable without it being unsafe.
-static STATE: Mutex<RefCell<Option<State>>> = Mutex::const_new(RefCell::new(None));
+use sqlx::{postgres::PgPoolOptions, Database, Pool, Postgres};
 
 // Struct defining user data
 #[derive(Debug)]
@@ -19,9 +15,47 @@ struct User {
 // A struct that we will use to store global state.
 // It uses a hash map to allow searching by username.
 // With a proper database, this would be unnecessary.
-#[derive(Default, Debug)]
+#[derive(Debug)]
 struct State {
-    users: HashMap<String, User>
+    users: HashMap<String, User>,
+    pool: Pool<Postgres>
+}
+
+fn hash_password(password: &str, salt: &[u8; 16]) -> Result<[u8; 64], Box<dyn std::error::Error>> {
+    let hash = bcrypt::hash_with_salt(password, 8, *salt).map_err(|_| "Hash error.")?.format_for_version(bcrypt::Version::TwoB);
+    let bytes = hash.as_bytes();
+
+    Ok(bytes.try_into()?)
+}
+
+// Define the structure for a create account request.
+// actix_web automatically converts back and forth between
+// this struct and a matching JSON object
+#[derive(Deserialize)]
+struct CreateAccountRequest {
+    email: String,
+    password: String
+}
+
+#[post("/create-account")]
+async fn create_account(req_body: web::Json<CreateAccountRequest>, state: web::Data<State>) -> Result<impl Responder, Box<dyn std::error::Error>> {
+    // I think this is *technically* not a cryptographically secure way to generate random numbers, but it's probably fine.
+    let mut rng = rand::rng();
+    let mut salt = [0u8; 16];
+
+    for byte in &mut salt {
+        *byte = rng.random_range(33..126); // limit to printable characters just in case (it probably doesn't actually matter)
+    }
+
+    let hash = hash_password(&req_body.password, &salt)?;
+    sqlx::query(r#"
+        INSERT INTO public."Users" (email, salt, password_hash)
+            VALUES ($1, $2, $3)
+        "#)
+        .bind((req_body.email, salt, hash))
+        .execute(&state.pool).await?;
+
+    Ok(HttpResponse::Ok().body("ok"))
 }
 
 // Define the structure for a login request.
@@ -29,37 +63,51 @@ struct State {
 // this struct and a matching JSON object
 #[derive(Deserialize)]
 struct LoginRequest {
-    username: String,
+    email: String,
     password: String
 }
 
 // 
 #[post("/login")]
-async fn login(req_body: web::Json<LoginRequest>) -> impl Responder {
-    let state = STATE.lock().await;
-    let state = state.borrow();
-    let state = state.as_ref();
+async fn login(req_body: web::Json<LoginRequest>, state: web::Data<State>) -> Result<impl Responder, Box<dyn std::error::Error>> {
+    let query: Result<(String, String), _> = sqlx::query_as(r#"SELECT password_hash, salt FROM public."Users" where email = $1"#)
+        .bind(&req_body.email)
+        .fetch_one(&state.pool).await;
 
-    // Get a reference to the user struct if it exists within the HashMap.
-    // If it doesn't, send invalid credentials response.
-    let user = match state.unwrap().users.get(&req_body.username) {
-        Some(user) => user,
-        None => return HttpResponse::Ok().body("Invalid login credentials")
-    };
+    match query {
+        Ok((password_hash, salt)) => {
+            let password_hash: [u8; 64] = password_hash.as_bytes().try_into().map_err(|_| "Bad password hash.")?;
+            let salt: [u8; 16] = salt.as_bytes().try_into().map_err(|_| "Bad salt.")?;
 
-    let salted_password = req_body.password.to_owned() + &user.salt;
+            let request_password_hash = hash_password(&req_body.password, &salt)?;
 
-    // A 64-bit hash is not good enough, this is just a proof of concept
-    let mut hasher = DefaultHasher::new();
-    salted_password.hash(&mut hasher);
-    let hash = hasher.finish();
-
-    // If the credentials match, send success response.
-    if user.password_hash == hash {
-        return HttpResponse::Ok().body("login successful");
+            if request_password_hash == password_hash {
+                Ok(HttpResponse::Ok().body("Successful login."))
+            } else {
+                Ok(HttpResponse::Ok().body("Invalid login credentials."))
+            }
+        },
+        Err(_) => Ok(HttpResponse::Ok().body("Invalid login credentials."))
     }
 
-    HttpResponse::Ok().body("Invalid login credentials")
+    // // Get a reference to the user struct if it exists within the HashMap.
+    // // If it doesn't, send invalid credentials response.
+    // let user = match state.unwrap().users.get(&req_body.username) {
+    //     Some(user) => user,
+    //     None => return HttpResponse::Ok().body("Invalid login credentials")
+    // };
+
+    // let salted_password = req_body.password.to_owned() + &user.salt;
+
+    // // A 64-bit hash is not good enough, this is just a proof of concept
+    // let mut hasher = DefaultHasher::new();
+    // salted_password.hash(&mut hasher);
+    // let hash = hasher.finish();
+
+    // // If the credentials match, send success response.
+    // if user.password_hash == hash {
+    //     return HttpResponse::Ok().body("login successful");
+    // }
 }
 
 #[get("/")]
@@ -102,19 +150,21 @@ async fn main() -> std::io::Result<()> {
         )
     }).collect();
 
+    let pool = PgPoolOptions::new()
+        .max_connections(20)
+        .connect("postgres://postgres:chavnatest@localhost/chavna").await
+        .unwrap();
+
     // Create state struct 
-    let state = State {
-        users
-    };
+    let state = web::Data::new(State {
+        users,
+        pool
+    });
 
-    // Load the state struct into global variable
-    let lock = STATE.lock().await;
-    lock.replace(Some(state));
-    drop(lock); // Explicit drop to unlcok the mutex before the server gets started.
-
-    HttpServer::new(|| {
+    HttpServer::new(move || {
         App::new()
             .service(login) // Register login service
+            .app_data(state.clone())
     })
     // Bind to localhost when built with debug mode
     .bind((
