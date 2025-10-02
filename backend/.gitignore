@@ -1,0 +1,61 @@
+# --- env/secrets ---
+.env
+.env.*
+!.env.example          # keep a template checked in
+*.local
+
+# --- dependencies ---
+node_modules/
+
+# --- package managers (keep lockfiles tracked) ---
+# DO NOT ignore package-lock.json / yarn.lock / pnpm-lock.yaml
+
+# --- build output / caches ---
+dist/
+build/
+coverage/
+.nyc_output/
+*.tsbuildinfo
+
+# --- logs ---
+logs/
+*.log
+npm-debug.log*
+yarn-error.log*
+
+# --- OS / editors ---
+.DS_Store
+Thumbs.db
+.vscode/
+*.swp
+
+# --- React Native / iOS ---
+ios/Pods/
+ios/build/
+ios/DerivedData/
+*.xcuserdatad/
+*.xcworkspace/xcuserdata/
+*.pbxuser
+*.mode1v3
+*.mode2v3
+
+# --- React Native / Android ---
+android/.gradle/
+android/.idea/
+android/local.properties
+android/build/
+android/app/build/
+*.iml
+
+# --- Expo (if you use it) ---
+.expo/
+.expo-shared/
+
+# --- Signing keys / sensitive mobile artifacts ---
+*.keystore
+*.jks
+*.p8
+*.p12
+
+# --- misc ---
+tmp/
