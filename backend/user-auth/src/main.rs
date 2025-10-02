@@ -6,8 +6,6 @@ use sqlx::{postgres::PgPoolOptions, Pool, Postgres};
 const USERS_TABLE: &str = "users";
 
 // A struct that we will use to store global state.
-// It uses a hash map to allow searching by username.
-// With a proper database, this would be unnecessary.
 #[derive(Debug)]
 struct State {
     pool: Pool<Postgres>
