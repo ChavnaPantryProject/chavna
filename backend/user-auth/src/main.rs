@@ -3,6 +3,7 @@ use rand::Rng;
 use serde::Deserialize;
 use sqlx::{postgres::PgPoolOptions, Pool, Postgres};
 
+const USERS_TABLE: &str = "users";
 
 // A struct that we will use to store global state.
 // It uses a hash map to allow searching by username.
@@ -25,7 +26,9 @@ fn hash_password(password: &str, salt: &[u8; 16]) -> Result<[u8; 60], Box<dyn st
 #[derive(Deserialize)]
 struct CreateAccountRequest {
     email: String,
-    password: String
+    password: String,
+    first_name: String,
+    last_name: String
 }
 
 #[post("/create-account")]
@@ -39,13 +42,15 @@ async fn create_account(req_body: web::Json<CreateAccountRequest>, state: web::D
     }
 
     let hash = hash_password(&req_body.password, &salt)?;
-    sqlx::query(r#"
-        INSERT INTO public."Users" (email, salt, password_hash)
-            VALUES ($1, $2, $3)
-        "#)
+    sqlx::query(&format!(r#"
+        INSERT INTO {} (email, password_salt, password_hash, first_name, last_name)
+            VALUES ($1, $2, $3, $4, $5)
+        "#, USERS_TABLE))
         .bind(&req_body.email)
         .bind(salt)
         .bind(hash)
+        .bind(&req_body.first_name)
+        .bind(&req_body.last_name)
         .execute(&state.pool).await?;
 
     Ok(HttpResponse::Ok().body(format!("Account created with email: {}", req_body.email)))
@@ -63,7 +68,7 @@ struct LoginRequest {
 // 
 #[post("/login")]
 async fn login(req_body: web::Json<LoginRequest>, state: web::Data<State>) -> Result<impl Responder, Box<dyn std::error::Error>> {
-    let query: Result<([u8; 60], [u8; 16]), _> = sqlx::query_as(r#"SELECT password_hash, salt FROM public."Users" where email = $1"#)
+    let query: Result<([u8; 60], [u8; 16]), _> = sqlx::query_as(&format!(r#"SELECT password_hash, password_salt FROM {} where email = $1"#, USERS_TABLE))
         .bind(&req_body.email)
         .fetch_one(&state.pool).await;
 
@@ -91,7 +96,7 @@ async fn hello() -> impl Responder {
 async fn main() -> std::io::Result<()> {
     let pool = PgPoolOptions::new()
         .max_connections(20)
-        .connect("postgres://postgres:chavnatest@localhost/chavna").await
+        .connect(&std::env::var("DATABASE_URL").unwrap()).await
         .unwrap();
 
     // Create state struct 
