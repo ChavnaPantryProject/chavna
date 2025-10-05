@@ -6,12 +6,16 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Date;
+
+import javax.crypto.SecretKey;
 
 import org.apache.coyote.BadRequestException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder.BCryptVersion;
@@ -19,18 +23,67 @@ import org.springframework.validation.Errors;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.client.HttpStatusCodeException;
-import org.springframework.web.client.RestTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwe;
+import io.jsonwebtoken.Jws;
+import io.jsonwebtoken.Jwt;
+import io.jsonwebtoken.JwtException;
+import io.jsonwebtoken.JwtVisitor;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.io.Decoders;
+import io.jsonwebtoken.security.Keys;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
+import lombok.Getter;
 
 @RestController
 public class UserController {
     private static Logger logger = LoggerFactory.getLogger(UserController.class);
     private static final String USERS_TABLE = "users";
+    private static final Duration TOKEN_DURATION = Duration.ofDays(14);
+
+    public static class OkResponse {
+        @Getter
+        private String success;
+        @Getter
+        private Object payload;
+        @Getter
+        private String message;
+
+        private OkResponse(String success, Object payload, String message) {
+            this.success = success;
+            this.payload = payload;
+            this.message = message;
+        }
+
+        public static OkResponse Success() {
+            return new OkResponse("success", null, null);
+        }
+
+        public static OkResponse Success(String message) {
+            return new OkResponse("success", null, message);
+        }
+
+        public static OkResponse Success(Object payload) {
+            return new OkResponse("success", payload, null);
+        }
+
+        public static OkResponse Success(String message, Object payload) {
+            return new OkResponse("success", payload, message);
+        }
+
+        public static OkResponse Error() {
+            return new OkResponse("error", null, null);
+        }
+
+        public static OkResponse Error(String message) {
+            return new OkResponse("error", null, message);
+        }
+    }
 
     private static Connection getRemoteConnection() {
         try {
@@ -68,8 +121,31 @@ public class UserController {
         public String password;
     }
 
+    public static class LoginPayload {
+        public String jwtToken;
+
+        public LoginPayload(String jwtToken) {
+            this.jwtToken = jwtToken;
+        }
+    }
+
+    public static SecretKey getJWTKey() {
+        String secret = System.getenv("JWT_SECRET");
+        return Keys.hmacShaKeyFor(Decoders.BASE64.decode(secret));
+    }
+
+    private static String createToken() {
+        String jws = Jwts.builder()
+            .issuedAt(Date.from(Instant.now()))
+            .expiration(Date.from(Instant.now().plus(TOKEN_DURATION)))
+            .signWith(getJWTKey())
+            .compact();
+        
+        return jws;
+    }
+
     @PostMapping("/login")
-    public void login(@Valid @RequestBody LoginRequest request, Errors errors) throws BadRequestException, SQLException {
+    public ResponseEntity<OkResponse> login(@Valid @RequestBody LoginRequest request, Errors errors) throws BadRequestException, SQLException {
         if (errors.hasErrors())
            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, errors.getAllErrors().get(0).toString());
         
@@ -84,12 +160,13 @@ public class UserController {
 
             BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(BCryptVersion.$2B, 8);
             if (encoder.matches(request.password, new String(hash, StandardCharsets.UTF_8))) {
-
-                throw new ResponseStatusException(HttpStatus.OK, "Sucessful Login.");
+                String jws = createToken();
+                        
+                return ResponseEntity.ok(OkResponse.Success("Succesful login.", new LoginPayload(jws)));
             }
         }
 
-        throw new ResponseStatusException(HttpStatus.OK, "Invalid Login Credentials.");
+        return ResponseEntity.ok(OkResponse.Error("Invalid login credentials"));
     }
 
     public static class UserExistsRequest {
@@ -97,8 +174,12 @@ public class UserController {
         public String email;
     }
 
+    public static class UserExistsResponse {
+        public boolean exists;
+    }
+
     @GetMapping("/user-exists")
-    public void userExists(@Valid @RequestBody UserExistsRequest request, Errors errors) throws SQLException {
+    public ResponseEntity<OkResponse> userExists(@Valid @RequestBody UserExistsRequest request, Errors errors) throws SQLException {
         if (errors.hasErrors())
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, errors.getAllErrors().get(0).toString());
 
@@ -109,9 +190,9 @@ public class UserController {
         ResultSet results = statement.executeQuery();
 
         if (results.next())
-            throw new ResponseStatusException(HttpStatus.OK, Boolean.toString(results.getInt(1) == 1));
+            return ResponseEntity.ok(OkResponse.Success(results.getInt(1) == 1));
 
-        throw new ResponseStatusException(HttpStatus.OK, "false");
+        return ResponseEntity.ok(OkResponse.Success(false));
     }
 
     public static class CreateAccountRequest {
@@ -121,8 +202,38 @@ public class UserController {
         public String password;
     }
 
+    public static class ParsedJWT {
+        private Object value;
+
+        private ParsedJWT(Object value) {
+            this.value = value;
+        }
+        
+        public Claims asClaims() {
+            if (value instanceof Claims)
+                return (Claims) value;
+            
+            throw new RuntimeException("Not a Claims value.");
+        }
+
+        public byte[] asBytes() {
+            if (value instanceof byte[])
+                return (byte[]) value;
+            
+            throw new RuntimeException("Not a byte[] value.");
+        }
+
+        public boolean isClaims() {
+            return value instanceof Claims;
+        }
+
+        public boolean isBytes() {
+            return value instanceof byte[];
+        }
+    }
+
     @PostMapping("/create-account")
-    public void createAccount(@Valid @RequestBody CreateAccountRequest request, Errors errors) throws SQLException {
+    public ResponseEntity<OkResponse> createAccount(@Valid @RequestBody CreateAccountRequest request, Errors errors) throws SQLException {
         if (errors.hasErrors())
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, errors.getAllErrors().get(0).toString());
         
@@ -151,6 +262,69 @@ public class UserController {
 
         // This feels wrong, but I can't find another way to get an
         // auto generated JSON response
-        throw new ResponseStatusException(HttpStatus.OK, "Account created succesfully");
+        return ResponseEntity.ok(OkResponse.Success("Account created succesfully"));
+    }
+
+    private ParsedJWT authorize(String authorizationHeader) {
+        String[] split = authorizationHeader.split(" ");
+        System.err.println(authorizationHeader);
+
+        if (split.length != 2 || !split[0].equals("Bearer"))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid authorization header.");
+
+        String token = split[1];
+
+        var parser = Jwts.parser()
+            .verifyWith(getJWTKey())
+            .build();
+
+        var parsed = parser.parse(token);
+
+        var visitor = new JwtVisitor<ParsedJWT>() {
+
+            @Override
+            public ParsedJWT visit(Jwt<?, ?> jwt) {
+                throw new UnsupportedOperationException("Unimplemented method 'visit'");
+            }
+
+            @Override
+            public ParsedJWT visit(Jws<?> jws) {
+                Object payload = jws.getPayload();
+
+                return new ParsedJWT(payload);
+            }
+
+            @Override
+            public ParsedJWT visit(Jwe<?> jwe) {
+                throw new UnsupportedOperationException("Unimplemented method 'visit'");
+            }
+            
+        };
+
+        return parsed.accept(visitor);
+    }
+
+    @GetMapping("/test-auth")
+    public ResponseEntity<OkResponse> testAuth(@RequestHeader("Authorization") String authorizationHeader) throws SQLException {
+        try {
+            authorize(authorizationHeader);
+        } catch (JwtException ex) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, ex.toString());
+        }
+
+        return ResponseEntity.ok(OkResponse.Success("Authorized."));
+    }
+
+    @GetMapping("/refresh-token")
+    public ResponseEntity<OkResponse> refreshToken(@RequestHeader("Authorization") String authorizationHeader) {
+        try {
+            authorize(authorizationHeader);
+        } catch (JwtException ex) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, ex.toString());
+        }
+
+        String newToken = createToken();
+
+        return ResponseEntity.ok(OkResponse.Success("Authorized.", new LoginPayload(newToken)));
     }
 }
