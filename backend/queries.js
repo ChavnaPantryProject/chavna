@@ -1,88 +1,66 @@
 import 'dotenv/config'
-import { neon } from '@neondatabase/serverless'
+import pkg from 'pg'
+const { Pool } = pkg
 
-if (!process.env.DATABASE_URL) {
-  console.error('Missing DATABASE_URL in backend/.env')
-  process.exit(1)
-}
+const pool = new Pool({
+  host: process.env.DATABASE_URL,
+  port: Number(process.env.DATABASE_PORT || 5432),
+  user: process.env.DATABASE_USER,
+  password: process.env.DATABASE_PASSWORD,
+  database: process.env.DATABASE_NAME || 'postgres',
+  ssl: { rejectUnauthorized: false }
+})
 
-const sql = neon(process.env.DATABASE_URL)
-
-// 1) Single-statement runner 
-export async function runQuery(query, params = []) {
-  console.log('\nRunning SQL:\n', query)
+export async function runQuery(sqlText, params = []) {
+  console.log('\nSQL:\n', sqlText)
+  const client = await pool.connect()
   try {
-    const res = await sql.query(query, params) // one statement per call
-    // If it's a SELECT, print rows (res.rows may be undefined in some versions)
-    const rows = Array.isArray(res) ? res : (res?.rows ?? undefined)
-    if (rows) console.dir(rows, { depth: null })
+    const res = await client.query(sqlText, params)
+    if (res?.rows?.length) console.dir(res.rows, { depth: null })
     else console.log('OK')
-    return rows ?? null
+    return res?.rows ?? null
   } catch (e) {
     console.error('Error:', e.message)
     throw e
+  } finally {
+    client.release()
   }
 }
 
-// 2) Multi-statement helper 
-export async function runScript(script) {
-  const statements = script
-    .split(';')                 // simple split 
-    .map(s => s.trim())
-    .filter(Boolean)
 
-  for (const stmt of statements) {
-    await runQuery(stmt)
-  }
-}
+// Extensions
+export const enablePgcrypto = `create extension if not exists pgcrypto;`
+export const enableCitext   = `create extension if not exists citext;`
 
+// creating tables
 export const createUsersTable = `
-  -- helpers
-  create extension if not exists pgcrypto;
-  create extension if not exists citext;
-
   create table if not exists users (
-    id                  uuid primary key default gen_random_uuid(),
-
-    first_name          text not null,
-    last_name           text not null,
-    email               citext not null unique,
-
-    password_hash       bytea not null check (octet_length(password_hash) = 60),
-    password_salt       bytea not null check (octet_length(password_salt) = 16),
-
-    created_at          timestamptz not null default now(),
-
+    id                   uuid primary key default gen_random_uuid(),
+    first_name           text,
+    last_name            text,
+    email                citext not null unique,
+    password_hash        bytea not null check (octet_length(password_hash) = 60),
+    password_salt        bytea not null check (octet_length(password_salt) = 16),
+    password_updated_at  timestamptz not null default now(),
+    created_at           timestamptz not null default now(),
     constraint users_first_name_len check (char_length(btrim(first_name)) between 1 and 100),
     constraint users_last_name_len  check (char_length(btrim(last_name))  between 1 and 100),
     constraint users_email_len      check (char_length(btrim(email)) <= 254)
   );
 `;
 
-// Example reads/writes
-export const selectAllUsers = "select * from users";
-
+// Diagnostics / helpers
 export const listCurrentSchemaTables = `
-  select table_name
+  select table_schema, table_name
   from information_schema.tables
   where table_schema = current_schema()
   order by table_name;
-`;
-
-export const customQuery = `
-SELECT table_name
-FROM information_schema.tables
-WHERE table_schema = 'public' AND table_type = 'BASE TABLE';
 `
 
-const all = {
-  customQuery,
-  createUsersTable,
-  selectAllUsers,
-  listCurrentSchemaTables
-}
+// users queries
+export const selectAllUsers = `select * from users order by created_at desc;`
+export const countUsers = `select count(*) from users;`
 
-const query = all.customQuery
-
-await runQuery(query)
-//await runScript(query)
+//custom query for testing
+export const customQuery = `drop table Users;`
+runQuery(countUsers).catch(() => {}) 
