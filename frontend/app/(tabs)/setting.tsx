@@ -1,34 +1,26 @@
-// import React from 'react'
-// import { Text, View } from 'react-native'
-
-// const settingScreen = () => {
-//   return (
-//     <View>
-//       <Text>settingScreen</Text>
-//     </View>
-//   )
-// }
-
-// export default settingScreen
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Feather from '@expo/vector-icons/Feather';
+import { useRouter } from "expo-router";
+
 const SettingScreen = () => {
+  const router = useRouter();  // 👈 initialize router here
+
   return (
     <ScrollView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Settings</Text>
-          <TouchableOpacity onPress={() => console.log("Notifications pressed")}>
+        <TouchableOpacity onPress={() => console.log("Notifications pressed")}>
           <Ionicons name="notifications-outline" size={24} color="black" />
-          </TouchableOpacity>
+        </TouchableOpacity>
       </View>
 
       {/* Avatar Section */}
       <View style={styles.avatarContainer}>
         <Image
-          source={{ uri: "https://api.dicebear.com/7.x/adventurer/png?seed=User" }} // placeholder avatar
+          source={{ uri: "https://api.dicebear.com/7.x/adventurer/png?seed=User" }}
           style={styles.avatar}
         />
         <Text style={styles.welcome}>Hello User!</Text>
@@ -36,15 +28,24 @@ const SettingScreen = () => {
 
       {/* Options */}
       <View style={styles.options}>
-        <TouchableOpacity style={styles.optionButton}>
+        <TouchableOpacity 
+          style={styles.optionButton} 
+          onPress={() => router.push("/setting/general")}  
+        >
           <Text style={styles.optionText}>General</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.optionButton}>
-          <Text style={styles.optionText}>Privacy & Security</Text>
+          <Text style={styles.optionText}
+           onPress={() => router.push("/setting/privacy")} 
+          
+          >Privacy & Security</Text>
+
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.optionButton}>
+        <TouchableOpacity style={styles.optionButton}
+        onPress={() => router.push("/setting/household")}
+        >
           <Text style={styles.optionText}>Household Management</Text>
         </TouchableOpacity>
 
@@ -58,18 +59,17 @@ const SettingScreen = () => {
       </View>
 
       {/* Sign Out */}
-<TouchableOpacity style={styles.signOutButton}>
-  <View style={styles.signOutContent}>
-    <Text style={styles.signOutText}>Sign Out</Text>
-    <Feather name="log-out" size={20} color="white" style={{ marginLeft: 8 }} />
-  </View>
-</TouchableOpacity>
+      <TouchableOpacity style={styles.signOutButton}>
+        <View style={styles.signOutContent}>
+          <Text style={styles.signOutText}>Sign Out</Text>
+          <Feather name="log-out" size={20} color="white" style={{ marginLeft: 8 }} />
+        </View>
+      </TouchableOpacity>
     </ScrollView>
   );
 };
 
 export default SettingScreen;
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -131,4 +131,4 @@ const styles = StyleSheet.create({
   justifyContent: "center", 
 },
 
-});
+}); 
