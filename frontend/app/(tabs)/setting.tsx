@@ -35,11 +35,10 @@ const SettingScreen = () => {
           <Text style={styles.optionText}>General</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.optionButton}>
-          <Text style={styles.optionText}
-           onPress={() => router.push("/setting/privacy")} 
-          
-          >Privacy & Security</Text>
+        <TouchableOpacity style={styles.optionButton}
+        onPress={() => router.push("/setting/privacy")} 
+        >
+          <Text style={styles.optionText}>Privacy & Security</Text>
 
         </TouchableOpacity>
 
