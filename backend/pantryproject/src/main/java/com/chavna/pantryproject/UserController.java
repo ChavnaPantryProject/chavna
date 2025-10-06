@@ -9,6 +9,7 @@ import java.sql.SQLException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
+import java.util.UUID;
 
 import javax.crypto.SecretKey;
 
@@ -123,9 +124,10 @@ public class UserController {
         return Keys.hmacShaKeyFor(Decoders.BASE64.decode(secret));
     }
 
-    private static String createToken() {
+    private static String createToken(UUID userId) {
         String jws = Jwts.builder()
             .issuedAt(Date.from(Instant.now()))
+            .claim("UserId", userId)
             .expiration(Date.from(Instant.now().plus(TOKEN_DURATION)))
             .signWith(getJWTKey())
             .compact();
@@ -155,16 +157,17 @@ public class UserController {
         
         var con = getRemoteConnection();
 
-        PreparedStatement statement = con.prepareStatement("SELECT password_hash FROM " + USERS_TABLE + " where email = ?");
+        PreparedStatement statement = con.prepareStatement("SELECT password_hash, id FROM " + USERS_TABLE + " where email = ?");
         statement.setString(1, request.email);
         ResultSet results = statement.executeQuery();
 
         if (results.next()) {
             byte[] hash = results.getBytes(1);
+            UUID id = (UUID) results.getObject(2);
 
             BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(BCryptVersion.$2B, 8);
             if (encoder.matches(request.password, new String(hash, StandardCharsets.UTF_8))) {
-                String jws = createToken();
+                String jws = createToken(id);
                         
                 return ResponseEntity.ok(OkResponse.Success("Succesful login.", new LoginResponse(jws)));
             }
@@ -206,36 +209,6 @@ public class UserController {
         public String password;
     }
 
-    public static class ParsedJWT {
-        private Object value;
-
-        private ParsedJWT(Object value) {
-            this.value = value;
-        }
-        
-        public Claims asClaims() {
-            if (value instanceof Claims)
-                return (Claims) value;
-            
-            throw new RuntimeException("Not a Claims value.");
-        }
-
-        public byte[] asBytes() {
-            if (value instanceof byte[])
-                return (byte[]) value;
-            
-            throw new RuntimeException("Not a byte[] value.");
-        }
-
-        public boolean isClaims() {
-            return value instanceof Claims;
-        }
-
-        public boolean isBytes() {
-            return value instanceof byte[];
-        }
-    }
-
     @PostMapping("/create-account")
     public ResponseEntity<OkResponse> createAccount(@Valid @RequestBody CreateAccountRequest request, Errors errors) throws SQLException {
         if (errors.hasErrors())
@@ -269,7 +242,12 @@ public class UserController {
         return ResponseEntity.ok(OkResponse.Success("Account created succesfully"));
     }
 
-    private ParsedJWT authorize(String authorizationHeader) {
+    /**
+    * Verifies JWS token and returns the user id associated with it.
+    * @param  authorizationHeader  the full HTTP header containing the JWS token
+    * @return      the user id assocciated with the token.
+    */
+    private UUID authorize(String authorizationHeader) {
         String[] split = authorizationHeader.split(" ");
         System.err.println(authorizationHeader);
 
@@ -284,22 +262,22 @@ public class UserController {
 
         var parsed = parser.parse(token);
 
-        var visitor = new JwtVisitor<ParsedJWT>() {
+        var visitor = new JwtVisitor<UUID>() {
 
             @Override
-            public ParsedJWT visit(Jwt<?, ?> jwt) {
+            public UUID visit(Jwt<?, ?> jwt) {
                 throw new UnsupportedOperationException("Unimplemented method 'visit'");
             }
 
             @Override
-            public ParsedJWT visit(Jws<?> jws) {
-                Object payload = jws.getPayload();
+            public UUID visit(Jws<?> jws) {
+                Claims payload = (Claims) jws.getPayload();
 
-                return new ParsedJWT(payload);
+                return UUID.fromString((String) payload.get("UserId"));
             }
 
             @Override
-            public ParsedJWT visit(Jwe<?> jwe) {
+            public UUID visit(Jwe<?> jwe) {
                 throw new UnsupportedOperationException("Unimplemented method 'visit'");
             }
             
@@ -311,24 +289,23 @@ public class UserController {
     @GetMapping("/test-auth")
     public ResponseEntity<OkResponse> testAuth(@RequestHeader("Authorization") String authorizationHeader) throws SQLException {
         try {
-            authorize(authorizationHeader);
+            UUID user = authorize(authorizationHeader);
+
+            return ResponseEntity.ok(OkResponse.Success("Authorized as user id: " + user));
         } catch (JwtException ex) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, ex.toString());
         }
-
-        return ResponseEntity.ok(OkResponse.Success("Authorized."));
     }
 
     @GetMapping("/refresh-token")
     public ResponseEntity<OkResponse> refreshToken(@RequestHeader("Authorization") String authorizationHeader) {
         try {
-            authorize(authorizationHeader);
+            UUID user = authorize(authorizationHeader);
+
+            String newToken = createToken(user);
+            return ResponseEntity.ok(OkResponse.Success("Authorized.", new LoginPayload(newToken)));
         } catch (JwtException ex) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, ex.toString());
         }
-
-        String newToken = createToken();
-
-        return ResponseEntity.ok(OkResponse.Success("Authorized.", new LoginResponse(newToken)));
     }
 }
