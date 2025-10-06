@@ -85,52 +85,41 @@ public class UserController {
         }
     }
 
+    private static String getenvNotNull(String name) {
+        String env = System.getenv(name);
+
+        if (env == null)
+            throw new RuntimeException("Environment variable '" + name + "' not set.");
+
+        return env;
+    }
+
     private static Connection getRemoteConnection() {
         try {
             Class.forName("org.postgresql.Driver");
             String use = System.getenv("USE_NEON_DATABASE");
-            System.err.println("USE_NEON_DATABASE=\"" + use + "\"");
             if (use != null && use.equals("1")) {
-                String jdbcUrl = "jdbc:" + System.getenv("DATABASE_URL");
+                String jdbcUrl = "jdbc:" + getenvNotNull("DATABASE_URL");
                 return DriverManager.getConnection(jdbcUrl);
             }
                 
-            String hostname = System.getenv("RDS_HOSTNAME");
-            if (hostname != null) {
-                String dbName = System.getenv("RDS_DB_NAME");
-                String userName = System.getenv("RDS_USERNAME");
-                String password = System.getenv("RDS_PASSWORD");
-                String port = System.getenv("RDS_PORT");
-                String jdbcUrl = "jdbc:postgresql://" + hostname + ":" + port + "/" + dbName + "?user=" + userName + "&password=" + password;
-                return DriverManager.getConnection(jdbcUrl);
-            }
+            String hostname = getenvNotNull("RDS_HOSTNAME");
+            String dbName = getenvNotNull("RDS_DB_NAME");
+            String userName = getenvNotNull("RDS_USERNAME");
+            String password = getenvNotNull("RDS_PASSWORD");
+            String port = getenvNotNull("RDS_PORT");
+            String jdbcUrl = "jdbc:postgresql://" + hostname + ":" + port + "/" + dbName + "?user=" + userName + "&password=" + password;
+            return DriverManager.getConnection(jdbcUrl);
         }
         // Rethrow exceptions as RuntimeExceptions since spring boot is going to automatically catch them anyway.
         // I'd rather not be forced to explicitly deal with them if they arent going to crash the whole server.
         // Probably bad practice, but idc.
         catch (RuntimeException ex) { throw ex; }
         catch (Exception ex) { throw new RuntimeException(ex); }
-
-        throw new RuntimeException("nothing happened.");
-    }
-
-    public static class LoginRequest {
-        @NotNull
-        public String email;
-        @NotNull
-        public String password;
-    }
-
-    public static class LoginPayload {
-        public String jwtToken;
-
-        public LoginPayload(String jwtToken) {
-            this.jwtToken = jwtToken;
-        }
     }
 
     public static SecretKey getJWTKey() {
-        String secret = System.getenv("JWT_SECRET");
+        String secret = getenvNotNull("JWT_SECRET");
         return Keys.hmacShaKeyFor(Decoders.BASE64.decode(secret));
     }
 
@@ -142,6 +131,21 @@ public class UserController {
             .compact();
         
         return jws;
+    }
+
+    public static class LoginRequest {
+        @NotNull
+        public String email;
+        @NotNull
+        public String password;
+    }
+
+    public static class LoginResponse {
+        public String jwtToken;
+
+        public LoginResponse(String jwtToken) {
+            this.jwtToken = jwtToken;
+        }
     }
 
     @PostMapping("/login")
@@ -162,7 +166,7 @@ public class UserController {
             if (encoder.matches(request.password, new String(hash, StandardCharsets.UTF_8))) {
                 String jws = createToken();
                         
-                return ResponseEntity.ok(OkResponse.Success("Succesful login.", new LoginPayload(jws)));
+                return ResponseEntity.ok(OkResponse.Success("Succesful login.", new LoginResponse(jws)));
             }
         }
 
@@ -325,6 +329,6 @@ public class UserController {
 
         String newToken = createToken();
 
-        return ResponseEntity.ok(OkResponse.Success("Authorized.", new LoginPayload(newToken)));
+        return ResponseEntity.ok(OkResponse.Success("Authorized.", new LoginResponse(newToken)));
     }
 }
