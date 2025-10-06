@@ -40,7 +40,7 @@ const SettingScreen = () => {
         >
           <Text style={styles.optionText}>Privacy & Security</Text>
 
-        </TouchableOpacity>
+        </TouchableOpacity> 
 
         <TouchableOpacity style={styles.optionButton}
         onPress={() => router.push("/setting/household")}
@@ -48,15 +48,18 @@ const SettingScreen = () => {
           <Text style={styles.optionText}>Household Management</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.optionButton}>
-          <Text style={styles.optionText}>Notifications</Text>
-        </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.optionButton}
+        onPress={() => router.push("/setting/notification")}
+      >
+        <Text style={styles.optionText}>Notification</Text>
+      </TouchableOpacity>
 
         <TouchableOpacity style={styles.optionButton}>
           <Text style={styles.optionText}>Help Center</Text>
         </TouchableOpacity>
       </View>
-
+ 
       {/* Sign Out */}
       <TouchableOpacity style={styles.signOutButton}>
         <View style={styles.signOutContent}>
