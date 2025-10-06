@@ -122,6 +122,7 @@ const styles = StyleSheet.create({
     padding: 15,
     borderRadius: 20,
     alignItems: "center",
+    marginTop:40,
   },
   signOutText: {
     color: "#fff",
