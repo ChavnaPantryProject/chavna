@@ -55,7 +55,9 @@ const SettingScreen = () => {
         <Text style={styles.optionText}>Notification</Text>
       </TouchableOpacity>
 
-        <TouchableOpacity style={styles.optionButton}>
+        <TouchableOpacity style={styles.optionButton}
+        onPress={() => router.push("/setting/helpcenter")}
+        >
           <Text style={styles.optionText}>Help Center</Text>
         </TouchableOpacity>
       </View>
