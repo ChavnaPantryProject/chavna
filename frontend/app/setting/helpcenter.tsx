@@ -30,8 +30,6 @@ const HelpCenterScreen = () => {
           <Text style={styles.title}>Settings › Help Center</Text>
           <View style={styles.titleUnderline} />
         </View>
-
-        <Ionicons name="notifications-outline" size={22} color="black" />
       </View>
 
       {/* Question Input */}
@@ -87,7 +85,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     marginBottom: 30,
   },
-  backBtn: { width: 24 },
+  backBtn: { width: 24, marginBottom:40},
   titleContainer: {
     alignItems: "center",
     flex: 1,
