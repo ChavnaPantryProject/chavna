@@ -13,7 +13,7 @@ import {
   type ImageSourcePropType
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Stack } from 'expo-router';
+import { Stack, Link } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 // Adjust the initial list length by changing the { length: 5 }
