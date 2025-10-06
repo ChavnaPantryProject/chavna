@@ -39,6 +39,7 @@ import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 @RestController
@@ -143,10 +144,10 @@ public class UserController {
     }
 
     public static class LoginResponse {
-        public String jwtToken;
+        public String jwt;
 
-        public LoginResponse(String jwtToken) {
-            this.jwtToken = jwtToken;
+        public LoginResponse(String jwt) {
+            this.jwt = jwt;
         }
     }
 
@@ -181,6 +182,7 @@ public class UserController {
         public String email;
     }
 
+    @AllArgsConstructor
     public static class UserExistsResponse {
         public boolean exists;
     }
@@ -197,7 +199,7 @@ public class UserController {
         ResultSet results = statement.executeQuery();
 
         if (results.next())
-            return ResponseEntity.ok(OkResponse.Success(results.getInt(1) == 1));
+            return ResponseEntity.ok(OkResponse.Success(new UserExistsResponse(results.getInt(1) == 1)));
 
         return ResponseEntity.ok(OkResponse.Success(false));
     }
@@ -232,13 +234,10 @@ public class UserController {
         catch (SQLException ex) {
             if (ex.getSQLState().equals("23505"))
                 throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "User with email already exists.");
-                // return ResponseEntity.internalServerError().body("User with email already exists.");
 
             throw ex;
         }
 
-        // This feels wrong, but I can't find another way to get an
-        // auto generated JSON response
         return ResponseEntity.ok(OkResponse.Success("Account created succesfully"));
     }
 
@@ -247,7 +246,7 @@ public class UserController {
     * @param  authorizationHeader  the full HTTP header containing the JWS token
     * @return      the user id assocciated with the token.
     */
-    private UUID authorize(String authorizationHeader) {
+    public static UUID authorize(String authorizationHeader) {
         String[] split = authorizationHeader.split(" ");
         System.err.println(authorizationHeader);
 
@@ -303,7 +302,7 @@ public class UserController {
             UUID user = authorize(authorizationHeader);
 
             String newToken = createToken(user);
-            return ResponseEntity.ok(OkResponse.Success("Authorized.", new LoginPayload(newToken)));
+            return ResponseEntity.ok(OkResponse.Success("Authorized.", new LoginResponse(newToken)));
         } catch (JwtException ex) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, ex.toString());
         }
