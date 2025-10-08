@@ -17,6 +17,7 @@ const TabsLayout = () => {
       tabBarIconStyle: {
       marginTop: 6,   // push icons down
     },
+    headerShown:false,
     }}
     >
     <Tabs.Screen
