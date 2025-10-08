@@ -7,10 +7,12 @@ import {
   Image,
   ScrollView,
   Modal,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Feather from "@expo/vector-icons/Feather";
 import { useRouter } from "expo-router";
+import * as ImagePicker from 'expo-image-picker';
 
 const SettingScreen = () => {
   const router = useRouter();
@@ -18,13 +20,103 @@ const SettingScreen = () => {
   const [notifications, setNotifications] = useState([
     { id: 1, text: "Your milk will expire in 2 days." },
     { id: 2, text: "New app update available!" },
-    {id:3 , text:"Your chicken will expire tommorow. " }
+    { id: 3, text: "Your chicken will expire tomorrow." }
   ]);
   const [hasUnread, setHasUnread] = useState(true);
+  const [avatar, setAvatar] = useState("https://api.dicebear.com/7.x/adventurer/png?seed=User");
 
   const handleNotificationPress = () => {
     setShowNotifications(!showNotifications);
-    setHasUnread(false); // mark all as read when opened
+    setHasUnread(false);
+  };
+
+  const handleChangeAvatar = async () => {
+    // Request permission first
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    
+    if (status !== 'granted') {
+      Alert.alert('Permission Required', 'Sorry, we need camera roll permissions to change your avatar.');
+      return;
+    }
+
+    // Show action sheet for user to choose option
+    Alert.alert(
+      "Change Avatar",
+      "Choose an option",
+      [
+        {
+          text: "Take Photo",
+          onPress: takePhoto,
+        },
+        {
+          text: "Choose from Gallery",
+          onPress: pickImage,
+        },
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+      ]
+    );
+  };
+
+  const pickImage = async () => {
+    try {
+      let result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets[0].uri) {
+        setAvatar(result.assets[0].uri);
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to pick image');
+      console.error('Image picker error:', error);
+    }
+  };
+
+  const takePhoto = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    
+    if (status !== 'granted') {
+      Alert.alert('Permission Required', 'Sorry, we need camera permissions to take a photo.');
+      return;
+    }
+
+    try {
+      let result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets[0].uri) {
+        setAvatar(result.assets[0].uri);
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to take photo');
+      console.error('Camera error:', error);
+    }
+  };
+
+  const handleSignOut = () => {
+    Alert.alert(
+      "Sign Out",
+      "Are you sure you want to sign out?",
+      [
+        {
+          text: "Cancel",
+          style: "cancel"
+        },
+        { 
+          text: "Sign Out", 
+          onPress: () => console.log("Sign out pressed") 
+        }
+      ]
+    );
   };
 
   return (
@@ -46,13 +138,19 @@ const SettingScreen = () => {
 
       {/* Avatar Section */}
       <View style={styles.avatarContainer}>
-        <TouchableOpacity onPress={() => console.log("Change avatar pressed")}>
+        <TouchableOpacity onPress={handleChangeAvatar}>
           <Image
-            source={{ uri: "https://api.dicebear.com/7.x/adventurer/png?seed=User" }}
+            source={{ uri: avatar }}
             style={styles.avatar}
           />
+          <View style={styles.cameraIconContainer}>
+            <Ionicons name="camera-outline" size={20} color="white" />
+          </View>
         </TouchableOpacity>
         <Text style={styles.welcome}>Hello User!</Text>
+        <TouchableOpacity onPress={handleChangeAvatar}>
+          <Text style={styles.changeAvatarText}>Change Avatar</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Options */}
@@ -94,7 +192,7 @@ const SettingScreen = () => {
       </View>
 
       {/* Sign Out */}
-      <TouchableOpacity style={styles.signOutButton}>
+      <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
         <View style={styles.signOutContent}>
           <Text style={styles.signOutText}>Sign Out</Text>
           <Feather name="log-out" size={20} color="white" style={{ marginLeft: 8 }} />
@@ -169,8 +267,27 @@ const styles = StyleSheet.create({
     borderRadius: 40,
     marginBottom: 10,
   },
+  cameraIconContainer: {
+    position: 'absolute',
+    right: 0,
+    bottom: 15,
+    backgroundColor: '#499F44',
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'white',
+  },
   welcome: {
     fontSize: 16,
+    fontWeight: "500",
+    marginBottom: 5,
+  },
+  changeAvatarText: {
+    fontSize: 14,
+    color: "#499F44",
     fontWeight: "500",
   },
   options: {
