@@ -9,14 +9,14 @@ const meals = [
     name: "Fettuccine Alfredo Pasta",
     calories: 1200,
     cost: 3.0,
-    image: "https://share.google/images/O2IXNMSTMl4YN5ldL"
+    image: require('../../assets/images/FETTUCCINE_ALFREDO_HOMEPAGE.jpg')
   },
   {
     id:"2",
     name: "Chicken & Rice",
     calories: 700,
     cost: 3.45,
-    image: "https://share.google/images/RGB6ktIcgvAYy9Y1t"
+    image: require('../../assets/images/CHICKEN_AND_RICE_HOMEPAGE.jpg')
   }
 ];
 
@@ -25,42 +25,48 @@ const MealScreen = () => {
   // rendering each meal card
   const renderMeal = ({item}: {item: any}) => (
   <View style={styles.card}>
+
+    {/* Title */}
+    <Text style={styles.title}>{item.name}</Text>
+
+    {/* Divider */}
+    <View style={styles.divider} />
+
+    {/* Row with image and info */}
+    <View style={styles.contentRow}>
+      {/* Meal Image */}
+      <Image source={item.image} style={styles.image} />
+
+      {/* Meal Information */}
+      <View style={styles.info}>
+        <Text style={styles.subtitle}>{item.calories} Cals</Text>
+        <Text style={styles.subtitle}>Cost Per Serving: ${item.cost.toFixed(2)}</Text>
     
-    {/* Meal Image */}
-    <Image source={{ uri: item.image }} style={styles.image} />
+        {/* Action Buttons (Eat + Delete) */}
+        <View style={styles.buttons}>
 
-    {/* Meal Information */}
-    <View style={styles.info}>
-      <Text style={styles.title}>{item.name}</Text>
-      <Text style={styles.subtitle}>{item.calories} Cals</Text>
-      <Text style={styles.subtitle}>Cost Per Serving: ${item.cost.toFixed(2)}</Text>
-    
-      {/* Action Buttons (Eat + Delete) */}
-      <View style={styles.buttons}>
+          {/* Eat Button */}
+          <TouchableOpacity style={styles.actionBtn}>
+            <Ionicons name="restaurant" size={20} color="white" />
+          </TouchableOpacity>
 
-        {/* Eat Button */}
-        <TouchableOpacity style={styles.actionBtn}>
-          <Ionicons name="restaurant" size={20} color="white" />
-        </TouchableOpacity>
-
-        {/* Delete Button */}
-        <TouchableOpacity style={styles.actionBtn}>
-          <MaterialIcons name="delete" size={20} color="white" />
-        </TouchableOpacity>
+          {/* Delete Button */}
+          <TouchableOpacity style={styles.actionBtn}>
+            <MaterialIcons name="delete" size={20} color="white" />
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   </View>
+
 );
 
   return (
     <View style={styles.container}>
-      {/* Screen Title */}
-      <Text style={styles.header}>Meals</Text>
-
       {/* Search Bar */}
       <View style={styles.searchContainer}>
-        <Ionicons name="search" size={20} color="green" style={{ marginRight: 5}} />
-        <TextInput placeholder="Search" style={styles.searchInput} />
+        <Ionicons name="search" size={22} color="#499F44" style={{ marginRight: 6}} />
+        <TextInput placeholder="Search" placeholderTextColor="#555" style={styles.searchInput} />
       </View>
 
       {/* List of Meals */}
@@ -89,47 +95,42 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 15,
-    backgroundColor: "white",
-  },
-
-  header: {
-    textAlign: "center",
-    fontSize: 18,
-    fontWeight: "600",
-    marginBottom: 10,
+    backgroundColor: "#fff",
   },
 
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: "green",
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    marginBottom: 15,
-    height: 40,
+    borderWidth: 1.5,
+    borderColor: "#499F44",
+    borderRadius: 25,
+    paddingHorizontal: 12,
+    marginBottom: 20,
+    height: 45, // slightly bigger search bar
+    backgroundColor: "rgba(73, 159,68,0.1",
   },
 
   searchInput: {
     flex: 1,
-    fontSize: 14,
-    color: "gray",
+    fontSize: 15,
+    color: "#333",  // darker color for text
   },
 
   card: {
-    flexDirection: "row",   // image and info are side by side
     backgroundColor: "rgba(73,159,68,0.1)",   // light green background
-    borderRadius: 12,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#499F44",
     marginBottom: 15,
     padding: 10,
-    alignItems: "center",
+    overflow: "hidden",  // ensures rounded corners for image
   },
 
   image: {
-    width: 70,
-    height: 70,
-    borderRadius: 12,
-    marginRight: 10,
+    width: 100,
+    height: 100,
+    borderRadius: 16,
+    marginRight: 12,
   },
 
   info: {
@@ -139,36 +140,57 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 15,
     fontWeight: "600",
-    marginBottom: 3,
+    textAlign: "center",
+    marginVertical: 8,
+    color: "#000",
   },
 
   subtitle: {
-    fontSize: 13,
-    color: "black",
-    marginBottom: 2,
+    fontSize: 15,
+    fontWeight: "500",
+    color: "#000",
+    marginBottom: 6,
   },
 
   buttons: {
     flexDirection: "row",
-    marginTop: 5,
+    marginTop: 6,
+    width: "100%",
   },
 
   actionBtn: {
-    backgroundColor: "orange",
-    padding: 8,
-    borderRadius: 8,
+    flex: 1,
+    backgroundColor: "#F89D5D",
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 12,
     marginRight: 10,
+    justifyContent: "center",
+    alignItems: "center",
   },
 
   addBtn: {
     position: "absolute",
-    bottom: 20,
+    bottom: 25,
     alignSelf: "center",
     backgroundColor: "transparent",   // no circle background, just transparent
   },
 
   addText: {
-    fontSize: 36,
-    color: "gray",
+    fontSize: 38,
+    color: "#999",
+  },
+
+  divider: {
+    height: 1,
+    backgroundColor: "#499F44",
+    opacity: 0.7,
+    marginHorizontal: 10,
+    marginBottom: 8,
+  },
+
+  contentRow: {
+    flexDirection: "row",
+    alignItems: "center",
   },
 });
