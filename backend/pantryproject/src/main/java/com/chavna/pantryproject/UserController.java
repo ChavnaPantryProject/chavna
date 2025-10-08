@@ -1,21 +1,13 @@
 package com.chavna.pantryproject;
 
 import java.nio.charset.StandardCharsets;
-import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
-import java.time.Instant;
-import java.util.Date;
 import java.util.UUID;
 
-import javax.crypto.SecretKey;
-
 import org.apache.coyote.BadRequestException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -28,113 +20,17 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.Jwe;
-import io.jsonwebtoken.Jws;
-import io.jsonwebtoken.Jwt;
 import io.jsonwebtoken.JwtException;
-import io.jsonwebtoken.JwtVisitor;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.io.Decoders;
-import io.jsonwebtoken.security.Keys;
+
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
+
 import lombok.AllArgsConstructor;
-import lombok.Getter;
 
 @RestController
 public class UserController {
-    private static Logger logger = LoggerFactory.getLogger(UserController.class);
-    private static final String USERS_TABLE = "users";
-    private static final Duration TOKEN_DURATION = Duration.ofDays(14);
-
-    public static class OkResponse {
-        @Getter
-        private String success;
-        @Getter
-        private Object payload;
-        @Getter
-        private String message;
-
-        private OkResponse(String success, Object payload, String message) {
-            this.success = success;
-            this.payload = payload;
-            this.message = message;
-        }
-
-        public static OkResponse Success() {
-            return new OkResponse("success", null, null);
-        }
-
-        public static OkResponse Success(String message) {
-            return new OkResponse("success", null, message);
-        }
-
-        public static OkResponse Success(Object payload) {
-            return new OkResponse("success", payload, null);
-        }
-
-        public static OkResponse Success(String message, Object payload) {
-            return new OkResponse("success", payload, message);
-        }
-
-        public static OkResponse Error() {
-            return new OkResponse("error", null, null);
-        }
-
-        public static OkResponse Error(String message) {
-            return new OkResponse("error", null, message);
-        }
-    }
-
-    private static String getenvNotNull(String name) {
-        String env = System.getenv(name);
-
-        if (env == null)
-            throw new RuntimeException("Environment variable '" + name + "' not set.");
-
-        return env;
-    }
-
-    private static Connection getRemoteConnection() {
-        try {
-            Class.forName("org.postgresql.Driver");
-            String use = System.getenv("USE_NEON_DATABASE");
-            if (use != null && use.equals("1")) {
-                String jdbcUrl = "jdbc:" + getenvNotNull("DATABASE_URL");
-                return DriverManager.getConnection(jdbcUrl);
-            }
-                
-            String hostname = getenvNotNull("RDS_HOSTNAME");
-            String dbName = getenvNotNull("RDS_DB_NAME");
-            String userName = getenvNotNull("RDS_USERNAME");
-            String password = getenvNotNull("RDS_PASSWORD");
-            String port = getenvNotNull("RDS_PORT");
-            String jdbcUrl = "jdbc:postgresql://" + hostname + ":" + port + "/" + dbName + "?user=" + userName + "&password=" + password;
-            return DriverManager.getConnection(jdbcUrl);
-        }
-        // Rethrow exceptions as RuntimeExceptions since spring boot is going to automatically catch them anyway.
-        // I'd rather not be forced to explicitly deal with them if they arent going to crash the whole server.
-        // Probably bad practice, but idc.
-        catch (RuntimeException ex) { throw ex; }
-        catch (Exception ex) { throw new RuntimeException(ex); }
-    }
-
-    public static SecretKey getJWTKey() {
-        String secret = getenvNotNull("JWT_SECRET");
-        return Keys.hmacShaKeyFor(Decoders.BASE64.decode(secret));
-    }
-
-    private static String createToken(UUID userId) {
-        String jws = Jwts.builder()
-            .issuedAt(Date.from(Instant.now()))
-            .claim("UserId", userId)
-            .expiration(Date.from(Instant.now().plus(TOKEN_DURATION)))
-            .signWith(getJWTKey())
-            .compact();
-        
-        return jws;
-    }
+    public static final String USERS_TABLE = "users";
+    public static final Duration TOKEN_DURATION = Duration.ofDays(14);
 
     public static class LoginRequest {
         @NotNull
@@ -156,7 +52,7 @@ public class UserController {
         if (errors.hasErrors())
            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, errors.getAllErrors().get(0).toString());
         
-        var con = getRemoteConnection();
+        var con = HelperFunctions.getRemoteConnection();
 
         PreparedStatement statement = con.prepareStatement("SELECT password_hash, id FROM " + USERS_TABLE + " where email = ?");
         statement.setString(1, request.email);
@@ -168,7 +64,7 @@ public class UserController {
 
             BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(BCryptVersion.$2B, 8);
             if (encoder.matches(request.password, new String(hash, StandardCharsets.UTF_8))) {
-                String jws = createToken(id);
+                String jws = HelperFunctions.createToken(id);
                         
                 return ResponseEntity.ok(OkResponse.Success("Succesful login.", new LoginResponse(jws)));
             }
@@ -192,7 +88,7 @@ public class UserController {
         if (errors.hasErrors())
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, errors.getAllErrors().get(0).toString());
 
-        var con = getRemoteConnection();
+        var con = HelperFunctions.getRemoteConnection();
 
         PreparedStatement statement = con.prepareStatement("SELECT 1 FROM " + USERS_TABLE + " where email = ?");
         statement.setString(1, request.email);
@@ -216,7 +112,7 @@ public class UserController {
         if (errors.hasErrors())
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, errors.getAllErrors().get(0).toString());
         
-        var con = getRemoteConnection();
+        var con = HelperFunctions.getRemoteConnection();
 
         BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(BCryptVersion.$2B, 8);
         String hash = encoder.encode(request.password);
@@ -240,55 +136,11 @@ public class UserController {
 
         return ResponseEntity.ok(OkResponse.Success("Account created succesfully"));
     }
-
-    /**
-    * Verifies JWS token and returns the user id associated with it.
-    * @param  authorizationHeader  the full HTTP header containing the JWS token
-    * @return      the user id assocciated with the token.
-    */
-    public static UUID authorize(String authorizationHeader) {
-        String[] split = authorizationHeader.split(" ");
-        System.err.println(authorizationHeader);
-
-        if (split.length != 2 || !split[0].equals("Bearer"))
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid authorization header.");
-
-        String token = split[1];
-
-        var parser = Jwts.parser()
-            .verifyWith(getJWTKey())
-            .build();
-
-        var parsed = parser.parse(token);
-
-        var visitor = new JwtVisitor<UUID>() {
-
-            @Override
-            public UUID visit(Jwt<?, ?> jwt) {
-                throw new UnsupportedOperationException("Unimplemented method 'visit'");
-            }
-
-            @Override
-            public UUID visit(Jws<?> jws) {
-                Claims payload = (Claims) jws.getPayload();
-
-                return UUID.fromString((String) payload.get("UserId"));
-            }
-
-            @Override
-            public UUID visit(Jwe<?> jwe) {
-                throw new UnsupportedOperationException("Unimplemented method 'visit'");
-            }
-            
-        };
-
-        return parsed.accept(visitor);
-    }
-
+    
     @GetMapping("/test-auth")
     public ResponseEntity<OkResponse> testAuth(@RequestHeader("Authorization") String authorizationHeader) throws SQLException {
         try {
-            UUID user = authorize(authorizationHeader);
+            UUID user = HelperFunctions.authorize(authorizationHeader);
 
             return ResponseEntity.ok(OkResponse.Success("Authorized as user id: " + user));
         } catch (JwtException ex) {
@@ -299,9 +151,9 @@ public class UserController {
     @GetMapping("/refresh-token")
     public ResponseEntity<OkResponse> refreshToken(@RequestHeader("Authorization") String authorizationHeader) {
         try {
-            UUID user = authorize(authorizationHeader);
+            UUID user = HelperFunctions.authorize(authorizationHeader);
 
-            String newToken = createToken(user);
+            String newToken = HelperFunctions.createToken(user);
             return ResponseEntity.ok(OkResponse.Success("Authorized.", new LoginResponse(newToken)));
         } catch (JwtException ex) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, ex.toString());
