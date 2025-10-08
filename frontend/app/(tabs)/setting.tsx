@@ -1,11 +1,38 @@
-import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView } from "react-native";
+
+import React, { useState } from "react";
+import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, Alert } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import Feather from '@expo/vector-icons/Feather';
+import Feather from "@expo/vector-icons/Feather";
+import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 
 const SettingScreen = () => {
-  const router = useRouter();  // 👈 initialize router here
+  const router = useRouter();
+  const [avatar, setAvatar] = useState<string>("https://api.dicebear.com/7.x/adventurer/png?seed=User");
+
+  // Function to pick image
+  const pickImage = async () => {
+    // Ask for permission
+    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permissionResult.granted) {
+      Alert.alert("Permission required", "You need to allow access to your photos to change the avatar.");
+      return;
+    }
+
+    // Open image picker
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 1,
+    });
+
+    // If user selects an image, update avatar
+    if (!result.canceled) {
+      setAvatar(result.assets[0].uri);
+    }
+  };
 
   return (
     <ScrollView style={styles.container}>
@@ -19,49 +46,36 @@ const SettingScreen = () => {
 
       {/* Avatar Section */}
       <View style={styles.avatarContainer}>
-        <Image
-          source={{ uri: "https://api.dicebear.com/7.x/adventurer/png?seed=User" }}
-          style={styles.avatar}
-        />
+        <TouchableOpacity onPress={pickImage}>
+          <Image source={{ uri: avatar }} style={styles.avatar} />
+        </TouchableOpacity>
         <Text style={styles.welcome}>Hello User!</Text>
+        <Text style={styles.changeText}>Tap to change avatar</Text>
       </View>
 
       {/* Options */}
       <View style={styles.options}>
-        <TouchableOpacity 
-          style={styles.optionButton} 
-          onPress={() => router.push("/setting/general")}  
-        >
+        <TouchableOpacity style={styles.optionButton} onPress={() => router.push("/setting/general")}>
           <Text style={styles.optionText}>General</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.optionButton}
-        onPress={() => router.push("/setting/privacy")} 
-        >
+        <TouchableOpacity style={styles.optionButton} onPress={() => router.push("/setting/privacy")}>
           <Text style={styles.optionText}>Privacy & Security</Text>
+        </TouchableOpacity>
 
-        </TouchableOpacity> 
-
-        <TouchableOpacity style={styles.optionButton}
-        onPress={() => router.push("/setting/household")}
-        >
+        <TouchableOpacity style={styles.optionButton} onPress={() => router.push("/setting/household")}>
           <Text style={styles.optionText}>Household Management</Text>
         </TouchableOpacity>
 
-      <TouchableOpacity
-        style={styles.optionButton}
-        onPress={() => router.push("/setting/notification")}
-      >
-        <Text style={styles.optionText}>Notification</Text>
-      </TouchableOpacity>
+        <TouchableOpacity style={styles.optionButton} onPress={() => router.push("/setting/notification")}>
+          <Text style={styles.optionText}>Notification</Text>
+        </TouchableOpacity>
 
-        <TouchableOpacity style={styles.optionButton}
-        onPress={() => router.push("/setting/helpcenter")}
-        >
+        <TouchableOpacity style={styles.optionButton} onPress={() => router.push("/setting/helpcenter")}>
           <Text style={styles.optionText}>Help Center</Text>
         </TouchableOpacity>
       </View>
- 
+
       {/* Sign Out */}
       <TouchableOpacity style={styles.signOutButton}>
         <View style={styles.signOutContent}>
@@ -74,6 +88,7 @@ const SettingScreen = () => {
 };
 
 export default SettingScreen;
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -85,7 +100,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 20,
-    marginTop:50,
+    marginTop: 50,
   },
   headerTitle: {
     fontSize: 18,
@@ -104,6 +119,11 @@ const styles = StyleSheet.create({
   welcome: {
     fontSize: 16,
     fontWeight: "500",
+  },
+  changeText: {
+    fontSize: 13,
+    color: "#666",
+    marginTop: 4,
   },
   options: {
     marginBottom: 80,
@@ -124,7 +144,7 @@ const styles = StyleSheet.create({
     padding: 15,
     borderRadius: 20,
     alignItems: "center",
-    marginTop:40,
+    marginTop: 40,
   },
   signOutText: {
     color: "#fff",
@@ -132,9 +152,8 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   signOutContent: {
-  flexDirection: "row", 
-  alignItems: "center", 
-  justifyContent: "center", 
-},
-
-}); 
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+});

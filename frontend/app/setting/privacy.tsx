@@ -101,7 +101,11 @@ const PrivacySecurityScreen = () => {
           <View style={styles.modalBox}>
             <Text style={styles.modalTitle}>Change Password</Text>
             <View style={styles.underline} />
-
+            <TextInput
+              placeholder="Current Password"
+              style={styles.input}
+              secureTextEntry
+            />
             <TextInput
               placeholder="New Password"
               style={styles.input}
