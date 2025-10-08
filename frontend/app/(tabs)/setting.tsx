@@ -1,37 +1,30 @@
-
 import React, { useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, Alert } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Image,
+  ScrollView,
+  Modal,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Feather from "@expo/vector-icons/Feather";
-import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 
 const SettingScreen = () => {
   const router = useRouter();
-  const [avatar, setAvatar] = useState<string>("https://api.dicebear.com/7.x/adventurer/png?seed=User");
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState([
+    { id: 1, text: "Your milk will expire in 2 days." },
+    { id: 2, text: "New app update available!" },
+    {id:3 , text:"Your chicken will expire tommorow. " }
+  ]);
+  const [hasUnread, setHasUnread] = useState(true);
 
-  // Function to pick image
-  const pickImage = async () => {
-    // Ask for permission
-    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-    if (!permissionResult.granted) {
-      Alert.alert("Permission required", "You need to allow access to your photos to change the avatar.");
-      return;
-    }
-
-    // Open image picker
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 1,
-    });
-
-    // If user selects an image, update avatar
-    if (!result.canceled) {
-      setAvatar(result.assets[0].uri);
-    }
+  const handleNotificationPress = () => {
+    setShowNotifications(!showNotifications);
+    setHasUnread(false); // mark all as read when opened
   };
 
   return (
@@ -39,39 +32,63 @@ const SettingScreen = () => {
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Settings</Text>
-        <TouchableOpacity onPress={() => console.log("Notifications pressed")}>
-          <Ionicons name="notifications-outline" size={24} color="black" />
-        </TouchableOpacity>
+
+        <View style={{ position: "relative" }}>
+          <TouchableOpacity onPress={handleNotificationPress}>
+            <Ionicons name="notifications-outline" size={28} color="black" />
+          </TouchableOpacity>
+
+          {hasUnread && (
+            <View style={styles.redDot} />
+          )}
+        </View>
       </View>
 
       {/* Avatar Section */}
       <View style={styles.avatarContainer}>
-        <TouchableOpacity onPress={pickImage}>
-          <Image source={{ uri: avatar }} style={styles.avatar} />
+        <TouchableOpacity onPress={() => console.log("Change avatar pressed")}>
+          <Image
+            source={{ uri: "https://api.dicebear.com/7.x/adventurer/png?seed=User" }}
+            style={styles.avatar}
+          />
         </TouchableOpacity>
         <Text style={styles.welcome}>Hello User!</Text>
-        <Text style={styles.changeText}>Tap to change avatar</Text>
       </View>
 
       {/* Options */}
       <View style={styles.options}>
-        <TouchableOpacity style={styles.optionButton} onPress={() => router.push("/setting/general")}>
+        <TouchableOpacity
+          style={styles.optionButton}
+          onPress={() => router.push("/setting/general")}
+        >
           <Text style={styles.optionText}>General</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.optionButton} onPress={() => router.push("/setting/privacy")}>
+        <TouchableOpacity
+          style={styles.optionButton}
+          onPress={() => router.push("/setting/privacy")}
+        >
           <Text style={styles.optionText}>Privacy & Security</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.optionButton} onPress={() => router.push("/setting/household")}>
+        <TouchableOpacity
+          style={styles.optionButton}
+          onPress={() => router.push("/setting/household")}
+        >
           <Text style={styles.optionText}>Household Management</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.optionButton} onPress={() => router.push("/setting/notification")}>
+        <TouchableOpacity
+          style={styles.optionButton}
+          onPress={() => router.push("/setting/notification")}
+        >
           <Text style={styles.optionText}>Notification</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.optionButton} onPress={() => router.push("/setting/helpcenter")}>
+        <TouchableOpacity
+          style={styles.optionButton}
+          onPress={() => router.push("/setting/helpcenter")}
+        >
           <Text style={styles.optionText}>Help Center</Text>
         </TouchableOpacity>
       </View>
@@ -83,6 +100,33 @@ const SettingScreen = () => {
           <Feather name="log-out" size={20} color="white" style={{ marginLeft: 8 }} />
         </View>
       </TouchableOpacity>
+
+      {/* Notification Popup */}
+      <Modal
+        transparent
+        visible={showNotifications}
+        animationType="fade"
+        onRequestClose={() => setShowNotifications(false)}
+      >
+        <TouchableOpacity
+          style={styles.overlay}
+          activeOpacity={1}
+          onPressOut={() => setShowNotifications(false)}
+        >
+          <View style={styles.notificationPopup}>
+            <Text style={styles.notificationTitle}>Notifications</Text>
+            {notifications.length > 0 ? (
+              notifications.map((item) => (
+                <Text key={item.id} style={styles.notificationItem}>
+                  • {item.text}
+                </Text>
+              ))
+            ) : (
+              <Text style={styles.notificationEmpty}>No new notifications</Text>
+            )}
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </ScrollView>
   );
 };
@@ -106,6 +150,15 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "600",
   },
+  redDot: {
+    position: "absolute",
+    right: 2,
+    top: 2,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: "red",
+  },
   avatarContainer: {
     alignItems: "center",
     marginBottom: 30,
@@ -119,11 +172,6 @@ const styles = StyleSheet.create({
   welcome: {
     fontSize: 16,
     fontWeight: "500",
-  },
-  changeText: {
-    fontSize: 13,
-    color: "#666",
-    marginTop: 4,
   },
   options: {
     marginBottom: 80,
@@ -155,5 +203,36 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+  },
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.3)",
+    justifyContent: "flex-start",
+    alignItems: "flex-end",
+    paddingTop: 100,
+    paddingRight: 15,
+  },
+  notificationPopup: {
+    width: 250,
+    backgroundColor: "white",
+    borderRadius: 12,
+    padding: 15,
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+    elevation: 5,
+  },
+  notificationTitle: {
+    fontWeight: "700",
+    fontSize: 16,
+    marginBottom: 10,
+  },
+  notificationItem: {
+    fontSize: 14,
+    marginBottom: 6,
+  },
+  notificationEmpty: {
+    fontSize: 14,
+    color: "#999",
   },
 });
