@@ -2,8 +2,13 @@ package com.chavna.pantryproject;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
+import java.sql.SQLException;
 import java.time.Instant;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.UUID;
 
 import javax.crypto.SecretKey;
@@ -70,6 +75,10 @@ public class HelperFunctions {
         
         return jws;
     }
+
+    public static String shortenString(String string, int amount) {
+        return string.substring(0, Math.max(string.length() - amount, 0));
+    }
     
     /**
     * Verifies JWS token and returns the user id associated with it.
@@ -78,7 +87,6 @@ public class HelperFunctions {
     */
     public static UUID authorize(String authorizationHeader) {
         String[] split = authorizationHeader.split(" ");
-        System.err.println(authorizationHeader);
 
         if (split.length != 2 || !split[0].equals("Bearer"))
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid authorization header.");
@@ -113,5 +121,50 @@ public class HelperFunctions {
         };
 
         return parsed.accept(visitor);
+    }
+
+    public static HashMap<String, Object> objectFromResultSet(ResultSet resultSet) throws SQLException {
+        ResultSetMetaData metadata = resultSet.getMetaData();
+
+        HashMap<String, Object> map = new HashMap<>();
+        for (int i = 0; i < metadata.getColumnCount(); i++) {
+            String columnName = metadata.getColumnName(i);
+            Object obj = resultSet.getObject(i);
+            map.put(columnName, obj);
+        }
+
+        return map;
+    }
+
+    public static HashMap<String, Object> getDefaultTableEntry(Connection dbConnection, String tableName) throws SQLException {
+        HashMap<String, Object> object = new HashMap<>();
+
+        PreparedStatement statement = dbConnection.prepareStatement("""
+            SELECT column_name, column_default, data_type
+            FROM information_schema.columns
+            WHERE (table_schema, table_name) = ('public', ?)
+            ORDER BY ordinal_position;
+        """);
+        statement.setString(1, tableName);
+        ResultSet result = statement.executeQuery();
+
+        while (result.next()) {
+            String name = result.getString("column_name");
+            String default_value = result.getString("column_default");
+            String data_type = result.getString("data_type");
+
+            // Schema stores default values as strings, so it must be cast to the correct type.
+            // Unfortunately, I can't find a good way to do this in java rather than an sql query for each field.
+            PreparedStatement castStatement = dbConnection.prepareStatement(String.format("""
+                SELECT CAST(casted_value AS %s) FROM (VALUES (?)) AS temp_values (casted_value)
+            """, data_type));
+            castStatement.setString(1, default_value);
+            ResultSet casted = castStatement.executeQuery();
+
+            if (casted.next())
+                object.put(name, casted.getObject(1));
+        }
+
+        return object;
     }
 }

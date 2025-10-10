@@ -1,10 +1,13 @@
 package com.chavna.pantryproject;
 
 import java.nio.charset.StandardCharsets;
+import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.UUID;
 
 import org.apache.coyote.BadRequestException;
@@ -30,6 +33,7 @@ import lombok.AllArgsConstructor;
 @RestController
 public class UserController {
     public static final String USERS_TABLE = "users";
+    public static final String PERSONAL_INFO_TABLE = "personal_info";
     public static final Duration TOKEN_DURATION = Duration.ofDays(14);
 
     public static class LoginRequest {
@@ -158,5 +162,145 @@ public class UserController {
         } catch (JwtException ex) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, ex.toString());
         }
+    }
+
+    private static class GetPersonalInfoRequest {
+        public String email;
+        public UUID userId;
+    }
+
+    @AllArgsConstructor
+    private static class GetPersonalInfoResponse {
+        @SuppressWarnings("unused")
+        public HashMap<String, Object> personal_info;
+    }
+
+    @GetMapping("/get-personal-info")
+    public ResponseEntity<OkResponse> getPersonalInfo(@RequestHeader(value = "Authorization", required = false) String authorizationHeader, @RequestBody GetPersonalInfoRequest requestBody) {
+        if (requestBody == null || (requestBody.email == null && requestBody.userId == null))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Request body must contain a user email or a user id.");
+        else if (requestBody.email != null && requestBody.userId != null)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Request body may only contain email or user id, not both.");
+
+        if (requestBody.email != null) {
+            var con = HelperFunctions.getRemoteConnection();
+
+            try {
+                // Check if user exists
+                PreparedStatement statement = con.prepareStatement(String.format("""
+                    SELECT id FROM %s WHERE email = ?
+                """, USERS_TABLE));
+                statement.setString(1, requestBody.email);
+                ResultSet query = statement.executeQuery();
+
+                if (query.next()) {
+                    UUID id = (UUID) query.getObject(1);
+                    PreparedStatement statement2 = con.prepareStatement(String.format("""
+                        SELECT * FROM %s WHERE user_id = ?
+                    """, PERSONAL_INFO_TABLE));
+                    statement2.setObject(1, id);
+                    ResultSet query2 = statement2.executeQuery();
+                    
+                    HashMap<String, Object> jsonObject;
+                    if (query2.next()) {
+                        jsonObject = HelperFunctions.objectFromResultSet(query2);
+                    } else {
+                        jsonObject = HelperFunctions.getDefaultTableEntry(con, PERSONAL_INFO_TABLE);
+                        jsonObject.put("user_id", id);
+                    }
+
+                    // Check authorization if user's profie isn't public
+                    if (!(boolean) jsonObject.get("public")) {
+                        UUID user;
+                        if (authorizationHeader != null)
+                            user = HelperFunctions.authorize(authorizationHeader);
+                        else
+                            user = null;
+
+                        if (!id.equals(user))
+                            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User has private personal info. Authorization required.");
+                    }
+
+                    return ResponseEntity.ok().body(OkResponse.Success(new GetPersonalInfoResponse(jsonObject)));
+                }
+            } catch (SQLException ex) {
+                throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, null, ex);
+            }
+        } else {
+
+        }
+
+        return ResponseEntity.ok().body(null);
+    }
+
+    public static class Test {
+        public String field;
+    }
+
+    @GetMapping("/test")
+    public ResponseEntity<OkResponse> test(@RequestBody Test body) throws SQLException {
+        Connection con = HelperFunctions.getRemoteConnection();
+        PreparedStatement statement = con.prepareStatement("""
+            SELEeCT ?? from users
+        """);
+        ResultSet query = statement.executeQuery();
+
+        if (query.next()) {
+            Object value = query.getObject(1);
+            return ResponseEntity.ok().body(OkResponse.Success(value));
+        }
+
+        return ResponseEntity.ok().body(OkResponse.Error());
+    }
+
+    @PostMapping("/set-personal-info")
+    public ResponseEntity<OkResponse> setPersonalInfo(@RequestHeader("Authorization") String authorizationHeader, @RequestBody HashMap<String, Object> requestBody) {
+        var con = HelperFunctions.getRemoteConnection();
+        UUID user = HelperFunctions.authorize(authorizationHeader);
+        requestBody.put("user_id", user);
+
+        try {
+            HashMap<String, Object> defaultInfo = HelperFunctions.getDefaultTableEntry(con, PERSONAL_INFO_TABLE);
+            String valuesString = "(";
+            String columnsString = "(";
+            String updateString = "";
+            ArrayList<String> columns = new ArrayList<>();
+            for (String columnName : defaultInfo.keySet()) {
+                // Column name comes directly from our database schema, so no chance of SQL injection
+                if (requestBody.containsKey(columnName)) {
+                    valuesString += "?, ";
+                    columnsString += columnName + ", ";
+                    updateString += columnName + " = ?,\n";
+                    
+                    columns.add(columnName);
+                }
+            }
+            valuesString = HelperFunctions.shortenString(valuesString, 2) + ")";
+            columnsString = HelperFunctions.shortenString(columnsString, 2) + ")";
+            updateString = HelperFunctions.shortenString(updateString, 2) + ";";
+
+            String statementString = String.format(
+                """
+                INSERT INTO %s %s
+                VALUES %s
+                ON CONFLICT (user_id) DO UPDATE SET
+                """ + updateString, PERSONAL_INFO_TABLE, columnsString, valuesString);
+
+            System.out.println(statementString);
+            PreparedStatement statement = con.prepareStatement(statementString);
+
+            for (int i = 1; i <= columns.size(); i++) {
+                String columnName = columns.get(i - 1);
+                Object obj = requestBody.get(columnName);
+                statement.setObject(i, obj);
+                statement.setObject(i + columns.size(), obj);
+            }
+
+            statement.executeUpdate();
+        } catch (SQLException ex) {
+
+        }
+
+        return ResponseEntity.ok().body(OkResponse.Success());
     }
 }
