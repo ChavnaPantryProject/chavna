@@ -20,7 +20,7 @@ import { useFocusEffect } from '@react-navigation/native';
 // Adjust the initial list length by changing the { length: 5 }
 const initialItems = Array.from({ length: 5 }).map((_, i) => ({
   id: String(i + 1),
-  name: 'Item Name',
+  name: '',
   done: false,
 }));
 
@@ -31,7 +31,7 @@ export default function HomeScreen() {
     setItems(prev => prev.map(it => (it.id === id ? { ...it, done: !it.done } : it)));
 
   const addItem = () =>
-    setItems(prev => [...prev, { id: String(Date.now()), name: 'Item Name', done: false }]);
+    setItems(prev => [...prev, { id: String(Date.now()), name: '', done: false }]);
 
   // Auto scroll when adding to list
   const scrollRef = useRef<ScrollView | null>(null);
@@ -122,7 +122,7 @@ export default function HomeScreen() {
                         )
                       }
                       placeholder="Item Name"
-                      placeholderTextColor="#4F8B59"
+                      placeholderTextColor="#969494ff"
                     />
                   </View>
                 ))}
