@@ -179,6 +179,15 @@ export default function AuthScreen() {
                     <Pressable style={styles.testBtn} onPress={goToSplash}>
                         <Text style={styles.testBtnText}>Go to Splash</Text>
                     </Pressable>
+                    
+                    {/* Temporary button to go to Home */}
+                    <Pressable
+                        style={[styles.testBtn, { backgroundColor: '#1976D2', marginTop: 12 }]}
+                        onPress={() => router.replace('/(tabs)/home')}
+                    >
+                        <Text style={styles.testBtnText}>Go to Home</Text>
+                    </Pressable>
+
                 </ScrollView>
             </KeyboardAvoidingView>
         </SafeAreaView>
@@ -319,4 +328,5 @@ const styles = StyleSheet.create({
         color: 'white',
         fontWeight: '700',
     },
+    
 });
