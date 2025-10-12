@@ -5,7 +5,6 @@ import {
     TextInput,
     Pressable,
     StyleSheet,
-    ScrollView,
     KeyboardAvoidingView,
     Platform,
 } from 'react-native';
@@ -15,30 +14,74 @@ import { router, type Href } from 'expo-router';
 
 type Mode = 'login' | 'signup';
 
+const GREEN = '#2E7D32';
+const GREEN_MID = '#5FA868';
+const GRAY_LIGHT = '#E6E6E6';
+const TEXT = '#111';
+
 export default function AuthScreen() {
     const [mode, setMode] = useState<Mode>('login');
 
-    const [name, setName] = useState('');
-    const [email, setEmail] = useState('');
-    const [pw, setPw] = useState('');
-    const [pw2, setPw2] = useState('');
+    // Separate state per tab
+    const [loginEmail, setLoginEmail] = useState('');
+    const [loginPw, setLoginPw] = useState('');
 
-    // Focus tracking
+    const [signupName, setSignupName] = useState('');
+    const [signupEmail, setSignupEmail] = useState('');
+    const [signupPw, setSignupPw] = useState('');
+    const [signupPw2, setSignupPw2] = useState('');
+
     const [focusedField, setFocusedField] = useState<string | null>(null);
 
+    // Validation helpers
+    const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const isLoginEmailValid = useMemo(() => EMAIL_RE.test(loginEmail.trim()), [loginEmail]);
+    const isSignupEmailValid = useMemo(() => EMAIL_RE.test(signupEmail.trim()), [signupEmail]);
+    const passwordsMatch = useMemo(() => signupPw === signupPw2, [signupPw, signupPw2]);
+
     const canSubmit = useMemo(() => {
-        if (mode === 'login') return email.trim() && pw.trim();
-        return name.trim() && email.trim() && pw.trim() && pw2.trim() && pw === pw2;
-    }, [mode, name, email, pw, pw2]);
+        if (mode === 'login') {
+            return !!(loginEmail.trim() && isLoginEmailValid && loginPw.trim());
+        }
+        return !!(
+            signupName.trim() &&
+            signupEmail.trim() && isSignupEmailValid &&
+            signupPw.trim() &&
+            signupPw2.trim() &&
+            passwordsMatch
+        );
+    }, [
+        mode,
+        loginEmail, loginPw, isLoginEmailValid,
+        signupName, signupEmail, isSignupEmailValid, signupPw, signupPw2, passwordsMatch
+    ]);
 
     const onSubmit = () => {
         if (!canSubmit) return;
-        // handle submit
+        if (mode === 'login') {
+            // use loginEmail, loginPw
+        } else {
+            // use signupName, signupEmail, signupPw
+        }
     };
 
     const goToSplash = () => {
         const target: Href = '/';
         router.replace(target);
+    };
+
+    const switchToLogin = () => {
+        setMode('login');
+        // Clear signup fields
+        setSignupName(''); setSignupEmail(''); setSignupPw(''); setSignupPw2('');
+        setFocusedField(null);
+    };
+
+    const switchToSignup = () => {
+        setMode('signup');
+        // Clear login fields
+        setLoginEmail(''); setLoginPw('');
+        setFocusedField(null);
     };
 
     const Accent = ({ active }: { active: boolean }) => (
@@ -55,20 +98,17 @@ export default function AuthScreen() {
                 behavior={Platform.select({ ios: 'padding', android: undefined })}
                 style={{ flex: 1 }}
             >
-                <ScrollView
-                    contentContainerStyle={styles.container}
-                    keyboardShouldPersistTaps="handled"
-                >
+                <View style={styles.container}>
                     {/* Tabs */}
                     <View style={styles.tabs}>
-                        <Pressable style={styles.tab} onPress={() => setMode('login')}>
+                        <Pressable style={styles.tab} onPress={switchToLogin}>
                             <Text style={[styles.tabText, mode === 'login' && styles.tabTextActive]}>
                                 Login
                             </Text>
                             <Accent active={mode === 'login'} />
                         </Pressable>
 
-                        <Pressable style={styles.tab} onPress={() => setMode('signup')}>
+                        <Pressable style={styles.tab} onPress={switchToSignup}>
                             <Text style={[styles.tabText, mode === 'signup' && styles.tabTextActive]}>
                                 Create Account
                             </Text>
@@ -78,63 +118,102 @@ export default function AuthScreen() {
 
                     {/* Form */}
                     <View style={styles.form}>
-                        {mode === 'signup' && (
+                        {mode === 'login' ? (
                             <>
+                                {/* Email (login) */}
+                                <Text style={styles.label}>Email Address</Text>
+                                <TextInput
+                                    value={loginEmail}
+                                    onChangeText={setLoginEmail}
+                                    placeholder="you@example.com"
+                                    style={[styles.input, inputBorder('email')]}
+                                    onFocus={() => setFocusedField('email')}
+                                    onBlur={() => setFocusedField(null)}
+                                    autoCapitalize="none"
+                                    keyboardType="email-address"
+                                    placeholderTextColor="#BDBDBD"
+                                />
+                                {loginEmail.length > 0 && !isLoginEmailValid && (
+                                    <Text style={styles.errorText}>Enter a valid email address</Text>
+                                )}
+
+                                {/* Password (login) */}
+                                <Text style={styles.label}>Password</Text>
+                                <TextInput
+                                    value={loginPw}
+                                    onChangeText={setLoginPw}
+                                    placeholder="••••••••"
+                                    style={[styles.input, inputBorder('password')]}
+                                    onFocus={() => setFocusedField('password')}
+                                    onBlur={() => setFocusedField(null)}
+                                    secureTextEntry
+                                    placeholderTextColor="#BDBDBD"
+                                />
+
+                                <Pressable onPress={() => { }} style={styles.forgotWrap}>
+                                    <Text style={styles.forgot}>Forgot Password</Text>
+                                </Pressable>
+                            </>
+                        ) : (
+                            <>
+                                {/* Name (signup) */}
                                 <Text style={styles.label}>Name</Text>
                                 <TextInput
-                                    value={name}
-                                    onChangeText={setName}
+                                    value={signupName}
+                                    onChangeText={setSignupName}
                                     placeholder="Your full name"
                                     style={[styles.input, inputBorder('name')]}
                                     onFocus={() => setFocusedField('name')}
                                     onBlur={() => setFocusedField(null)}
                                     autoCapitalize="words"
+                                    placeholderTextColor="#BDBDBD"
                                 />
-                            </>
-                        )}
 
-                        <Text style={styles.label}>Email Address</Text>
-                        <TextInput
-                            value={email}
-                            onChangeText={setEmail}
-                            placeholder="you@example.com"
-                            style={[styles.input, inputBorder('email')]}
-                            onFocus={() => setFocusedField('email')}
-                            onBlur={() => setFocusedField(null)}
-                            autoCapitalize="none"
-                            keyboardType="email-address"
-                        />
+                                {/* Email (signup) */}
+                                <Text style={styles.label}>Email Address</Text>
+                                <TextInput
+                                    value={signupEmail}
+                                    onChangeText={setSignupEmail}
+                                    placeholder="you@example.com"
+                                    style={[styles.input, inputBorder('email')]}
+                                    onFocus={() => setFocusedField('email')}
+                                    onBlur={() => setFocusedField(null)}
+                                    autoCapitalize="none"
+                                    keyboardType="email-address"
+                                    placeholderTextColor="#BDBDBD"
+                                />
+                                {signupEmail.length > 0 && !isSignupEmailValid && (
+                                    <Text style={styles.errorText}>Enter a valid email address</Text>
+                                )}
 
-                        <Text style={styles.label}>Password</Text>
-                        <TextInput
-                            value={pw}
-                            onChangeText={setPw}
-                            placeholder="••••••••"
-                            style={[styles.input, inputBorder('password')]}
-                            onFocus={() => setFocusedField('password')}
-                            onBlur={() => setFocusedField(null)}
-                            secureTextEntry
-                        />
+                                {/* Passwords (signup) */}
+                                <Text style={styles.label}>Password</Text>
+                                <TextInput
+                                    value={signupPw}
+                                    onChangeText={setSignupPw}
+                                    placeholder="••••••••"
+                                    style={[styles.input, inputBorder('password')]}
+                                    onFocus={() => setFocusedField('password')}
+                                    onBlur={() => setFocusedField(null)}
+                                    secureTextEntry
+                                    placeholderTextColor="#BDBDBD"
+                                />
 
-                        {mode === 'signup' && (
-                            <>
                                 <Text style={styles.label}>Confirm Password</Text>
                                 <TextInput
-                                    value={pw2}
-                                    onChangeText={setPw2}
+                                    value={signupPw2}
+                                    onChangeText={setSignupPw2}
                                     placeholder="••••••••"
                                     style={[styles.input, inputBorder('confirm')]}
                                     onFocus={() => setFocusedField('confirm')}
                                     onBlur={() => setFocusedField(null)}
                                     secureTextEntry
+                                    placeholderTextColor="#BDBDBD"
                                 />
+                                {signupPw2.length > 0 && !passwordsMatch && (
+                                    <Text style={styles.errorText}>Passwords do not match</Text>
+                                )}
                             </>
-                        )}
-
-                        {mode === 'login' && (
-                            <Pressable onPress={() => { }} style={styles.forgotWrap}>
-                                <Text style={styles.forgot}>Forgot Password</Text>
-                            </Pressable>
                         )}
 
                         <Pressable
@@ -175,25 +254,28 @@ export default function AuthScreen() {
                         />
                     </View>
 
-                    {/* Testing Button */}
-                    <Pressable style={styles.testBtn} onPress={goToSplash}>
-                        <Text style={styles.testBtnText}>Go to Splash</Text>
-                    </Pressable>
-                    
-                    {/* Temporary button to go to Home */}
-                    <Pressable
-                        style={[styles.testBtn, { backgroundColor: '#1976D2', marginTop: 12 }]}
-                        onPress={() => router.replace('/(tabs)/home')}
-                    >
-                        <Text style={styles.testBtnText}>Go to Home</Text>
-                    </Pressable>
+                    {/* Bottom dev buttons (only on login) */}
+                    {mode === 'login' && (
+                        <View style={styles.devBtns}>
+                            <Pressable style={styles.devBtn} onPress={goToSplash}>
+                                <Text style={styles.devBtnText}>Go to Splash</Text>
+                            </Pressable>
 
-                </ScrollView>
+                            <Pressable
+                                style={[styles.devBtn, { marginTop: 12 }]}
+                                onPress={() => router.replace('/(tabs)/home')}
+                            >
+                                <Text style={styles.devBtnText}>Go to Home</Text>
+                            </Pressable>
+                        </View>
+                    )}
+                </View>
             </KeyboardAvoidingView>
         </SafeAreaView>
     );
 }
 
+/* ---------- Social Button ---------- */
 function SocialButton({ icon, label }: { icon: React.ReactNode; label: string }) {
     return (
         <Pressable style={styles.socialBtn}>
@@ -203,36 +285,37 @@ function SocialButton({ icon, label }: { icon: React.ReactNode; label: string })
     );
 }
 
-const GREEN = '#2E7D32';
-const GRAY_LIGHT = '#E6E6E6';
-const BORDER = '#A0A0A0';
-const TEXT = '#111';
-
+/* ---------- Styles ---------- */
 const styles = StyleSheet.create({
     container: {
-        padding: 20,
-        paddingBottom: 60,
-        paddingTop: 16,
+        flex: 1,
+        paddingHorizontal: 20,
+        paddingTop: 12,
         backgroundColor: '#FFFFFF',
+        justifyContent: 'flex-start',
     },
 
     // Tabs
     tabs: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        marginTop: 8,
-        marginBottom: 16,
-        paddingHorizontal: 16,
+        marginTop: 4,
+        marginBottom: 10,
+        paddingHorizontal: 8,
     },
-    tab: { flex: 1, alignItems: 'center', paddingBottom: 6 },
+    tab: { flex: 1, alignItems: 'center', paddingBottom: 4 },
     tabText: { fontSize: 16, fontWeight: '700', color: '#9E9E9E' },
     tabTextActive: { color: GREEN },
-    tabUnderline: { marginTop: 6, height: 2, width: '70%', backgroundColor: 'transparent' },
+    tabUnderline: {
+        marginTop: 8,
+        height: 1,
+        width: 72,
+        backgroundColor: 'transparent',
+    },
     tabUnderlineActive: { backgroundColor: GREEN },
 
-    // Form
-    form: { marginTop: 12, gap: 14 },
-    label: { fontSize: 15, color: TEXT, fontWeight: '600', marginBottom: 6 },
+    form: { marginTop: 6, gap: 14 },
+    label: { fontSize: 14, color: TEXT, fontWeight: '600', marginBottom: 6 },
 
     input: {
         borderWidth: 1,
@@ -242,91 +325,87 @@ const styles = StyleSheet.create({
         backgroundColor: '#FFFFFF',
         fontSize: 16,
         borderColor: GRAY_LIGHT,
-        // Subtle lift
-        shadowColor: '#000',
-        shadowOpacity: 0.04,
-        shadowRadius: 3,
-        shadowOffset: { width: 0, height: 2 },
-        elevation: 1,
     },
 
     forgotWrap: { alignSelf: 'flex-end', marginTop: 6 },
-    forgot: { color: GREEN, fontWeight: '600' },
+    forgot: { color: GREEN_MID, fontWeight: '600' },
 
-    // Primary button
     primaryBtn: {
         backgroundColor: '#9ACB9F',
-        borderColor: '#2E7D32',
-        borderWidth: 1.5,
+        borderColor: GREEN,
+        borderWidth: 1,
         borderRadius: 22,
-        paddingVertical: 10,
-        paddingHorizontal: 36,
+        paddingVertical: 12,
+        width: '85%',
         alignSelf: 'center',
         alignItems: 'center',
         justifyContent: 'center',
         marginTop: 12,
-        shadowColor: '#000',
-        shadowOpacity: 0.08,
-        shadowRadius: 4,
-        shadowOffset: { width: 0, height: 2 },
-        elevation: 2,
     },
     primaryBtnDisabled: {
-        backgroundColor: '#C9E1CB',
-        borderColor: '#7FBF8E',
+        backgroundColor: '#c9cecaff',
+        borderColor: 'rgba(0, 0, 0, 0.5)',
     },
     primaryBtnText: {
         color: '#FFFFFF',
         fontWeight: '700',
         fontSize: 16,
-        // Faint gray outline around letters (~15% opacity)
-        textShadowColor: 'rgba(0,0,0,0.15)',
-        textShadowOffset: { width: 0, height: 0 },
-        textShadowRadius: 1.5,
     },
 
-    // Divider row
     dividerRow: {
-        marginTop: 20,
+        marginTop: 18,
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 14,
+        gap: 12,
     },
-    divider: { flex: 1, height: 2, backgroundColor: GREEN },
+    divider: { flex: 1, height: 1, backgroundColor: GREEN },
     or: { color: '#444', fontWeight: '600' },
 
-    // Social buttons
-    socialList: { marginTop: 8, gap: 12 },
+    socialList: {
+        marginTop: 20,
+        gap: 10,
+    },
+
     socialBtn: {
         flexDirection: 'row',
         alignItems: 'center',
         borderWidth: 1,
         borderColor: GRAY_LIGHT,
         borderRadius: 16,
-        paddingVertical: 14,
+        paddingVertical: 12,
         paddingHorizontal: 14,
         backgroundColor: '#FFFFFF',
-        shadowColor: '#000',
-        shadowOpacity: 0.05,
-        shadowRadius: 3,
-        shadowOffset: { width: 0, height: 2 },
-        elevation: 1,
     },
     socialIcon: { width: 26, alignItems: 'center' },
     socialText: { marginLeft: 10, fontSize: 16, color: TEXT, fontWeight: '600' },
 
-    // Test button
-    testBtn: {
-        marginTop: 32,
-        alignSelf: 'center',
-        backgroundColor: '#ff6e40',
-        paddingHorizontal: 30,
+    errorText: {
+        color: '#D32F2F',
+        fontSize: 13,
+        fontWeight: '600',
+        marginTop: -4,
+        marginLeft: 4,
+    },
+
+    /* Dev Buttons */
+    devBtns: {
+        marginTop: 'auto',
+        alignItems: 'center',
+        marginBottom: 20,
+    },
+    devBtn: {
+        backgroundColor: '#9ACB9F',
+        borderColor: GREEN,
+        borderWidth: 1,
+        borderRadius: 22,
         paddingVertical: 10,
-        borderRadius: 12,
+        paddingHorizontal: 36,
+        width: '85%',
+        alignItems: 'center',
     },
-    testBtnText: {
-        color: 'white',
+    devBtnText: {
+        color: '#FFFFFF',
         fontWeight: '700',
+        fontSize: 16,
     },
-    
 });
