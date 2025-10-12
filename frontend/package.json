@@ -8,7 +8,9 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "typegen": "node node_modules/expo-router/build/bin/index.js typegen",
+    "postinstall": "node node_modules/expo-router/build/bin/index.js typegen || true"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",

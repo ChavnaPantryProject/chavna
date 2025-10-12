@@ -1,9 +1,12 @@
-import { HeaderShownContext } from "@react-navigation/elements";
+// app/_layout.tsx
 import { Stack } from "expo-router";
-//import SafeScreen from "@/components/SafeScreen";
 
 export default function RootLayout() {
   return (
-    <Stack screenOptions={{headerShown: false}}></Stack>
+    <Stack
+      screenOptions={{
+        headerShown: false, // Used this to hide the headers, set to true if we need them again
+      }}
+    />
   );
 }

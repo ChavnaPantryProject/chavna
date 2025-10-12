@@ -3,17 +3,10 @@
 
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  Pressable,
-  TextInput,
-  Image,
-  ScrollView,
+  View, Text, StyleSheet, Pressable, TextInput, Image, ScrollView,
   type ImageSourcePropType
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Stack, Link } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 // Adjust the initial list length by changing the { length: 5 }
@@ -34,8 +27,6 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={[]}>
-      <Stack.Screen options={{ headerShown: false }} />
-
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* Spent section */}
         <View style={{ position: 'relative' }}>
@@ -111,11 +102,11 @@ export default function HomeScreen() {
         <View style={styles.favWrap}>
           <Text style={styles.favTitle}>Favorite Meals</Text>
           <View style={styles.favRow}>
+            {/* NOTE: path likely changes from ../../ to ../ because file moved deeper */}
             <FavMeal source={require('../../assets/images/FETTUCCINE_ALFREDO_HOMEPAGE.jpg')} />
             <FavMeal source={require('../../assets/images/CHICKEN_AND_RICE_HOMEPAGE.jpg')} />
             <FavMeal source={require('../../assets/images/BURGER_HOMEPAGE.jpg')} />
           </View>
-
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -130,10 +121,8 @@ function FavMeal({ source }: { source: ImageSourcePropType }) {
   );
 }
 
-
 const LINE_GREEN = '#499F44';
 
-// Edit Styles Section
 const styles = StyleSheet.create({
 
   // Screen Background
@@ -238,7 +227,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     alignSelf: 'center',
   },
-  
+
   // Favorite Meals Section
 
   // Green background
