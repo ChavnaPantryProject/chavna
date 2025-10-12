@@ -1,89 +1,73 @@
-import React from "react";
-import { Tabs } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import FontAwesome6 from "@expo/vector-icons/FontAwesome6";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
-import { View } from "react-native";
+import { Tabs } from "expo-router";
+import React from "react";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-export default function TabsLayout() {
+const TabsLayout = () => {
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }}>
-      <View style={{ flex: 1, paddingTop: 8 }}>
-        <Tabs
-          screenOptions={{
-            headerShown: false,
-            tabBarActiveTintColor: "#111",
-            tabBarInactiveTintColor: "#111",
-            tabBarActiveBackgroundColor: "rgba(73,159,68,0.43)",
-            tabBarItemStyle: {
-              marginHorizontal: 6,
-              marginVertical: 8,
-              borderRadius: 12,
-              overflow: "hidden",
-            },
-            tabBarStyle: {
-              height: 84,
-              paddingTop: 6,
-              paddingBottom: 12,
-              backgroundColor: "#fff",
-              borderTopWidth: 0.5,
-              borderTopColor: "#e5e5e5",
-            },
-            tabBarLabelStyle: {
-              fontSize: 12,
-              fontWeight: "600",
-            },
-            tabBarIconStyle: { marginTop: 2 },
+    <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
+      <Tabs
+        screenOptions={{
+          headerShown: false,
+          tabBarActiveTintColor: "black",
+          tabBarActiveBackgroundColor: "rgba(73, 159, 68, 0.43)",
+          tabBarStyle: {
+            height: 80,
+            paddingBottom: 10,
+          },
+          tabBarIconStyle: { marginTop: 6 },
+        }}
+      >
+        <Tabs.Screen
+          name="meal"
+          options={{
+            title: "Meal",
+            tabBarIcon: ({ color, size }) => (
+              <FontAwesome6 name="burger" size={size} color={color} />
+            ),
           }}
-        >
-          <Tabs.Screen
-            name="meal"
-            options={{
-              title: "Meals",
-              tabBarIcon: ({ color, size }) => (
-                <FontAwesome6 name="burger" size={size} color={color} />
-              ),
-            }}
-          />
-          <Tabs.Screen
-            name="scanner"
-            options={{
-              title: "Scanner",
-              tabBarIcon: ({ color, size }) => (
-                <Ionicons name="document-text-outline" size={size} color={color} />
-              ),
-            }}
-          />
-          <Tabs.Screen
-            name="home"
-            options={{
-              title: "Home",
-              tabBarIcon: ({ color, size }) => (
-                <Ionicons name="home-outline" size={size} color={color} />
-              ),
-            }}
-          />
-          <Tabs.Screen
-            name="inventory"
-            options={{
-              title: "Inventory",
-              tabBarIcon: ({ color, size }) => (
-                <MaterialIcons name="inventory" size={size} color={color} />
-              ),
-            }}
-          />
-          <Tabs.Screen
-            name="setting"
-            options={{
-              title: "Settings",
-              tabBarIcon: ({ color, size }) => (
-                <Ionicons name="settings-outline" size={size} color={color} />
-              ),
-            }}
-          />
-        </Tabs>
-      </View>
+        />
+        <Tabs.Screen
+          name="scanner"
+          options={{
+            title: "Scanner",
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="document-text" size={size} color={color} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="home"
+          options={{
+            title: "Home",
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="home" size={size} color={color} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="inventory"
+          options={{
+            title: "Inventory",
+            tabBarIcon: ({ color, size }) => (
+              <MaterialIcons name="inventory" size={size} color={color} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="setting"
+          options={{
+            title: "Setting",
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="settings" size={size} color={color} />
+            ),
+          }}
+        />
+      </Tabs>
     </SafeAreaView>
   );
-}
+};
+
+export default TabsLayout;

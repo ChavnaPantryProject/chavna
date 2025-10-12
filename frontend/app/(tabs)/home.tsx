@@ -1,12 +1,19 @@
-// index.tsx
+// home.tsx
 // Home Screen
 
 import React, { useState } from 'react';
 import {
-  View, Text, StyleSheet, Pressable, TextInput, Image, ScrollView,
-  type ImageSourcePropType
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  TextInput,
+  Image,
+  type ImageSourcePropType,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 // Adjust the initial list length by changing the { length: 5 }
@@ -27,7 +34,9 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={[]}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <Stack.Screen options={{ headerShown: false }} />
+
+      <View style={styles.content}>
         {/* Spent section */}
         <View style={{ position: 'relative' }}>
           <View style={[styles.topBar, { position: 'relative' }]}>
@@ -51,64 +60,70 @@ export default function HomeScreen() {
 
           <View style={styles.divider} />
 
-          <View style={{ alignItems: 'flex-end', paddingRight: 10, marginTop: 4 }}>
-            <Ionicons name="ellipsis-horizontal" size={22} color="gray" />
+          {/* Commented out ellipsis for now */}
+          {/* <View style={{ alignItems: 'flex-end', paddingRight: 22, marginTop: 0 }}>
+            <Ionicons name="ellipsis-horizontal" size={28} color="gray" />
+          </View> */}
+        </View>
+
+        {/* Shopping List */}
+        <View style={styles.listArea}>
+          <View style={styles.sectionHeaderContainer}>
+            <Text style={styles.sectionHeader}>Shopping List</Text>
+            <View style={styles.sectionUnderline} />
           </View>
-        </View>
 
-        {/* Shopping List Header */}
-        <View style={styles.sectionHeaderContainer}>
-          <Text style={styles.sectionHeader}>Shopping List</Text>
-          <View style={styles.sectionUnderline} />
-        </View>
+          {/* Scroll only the rows */}
+          <View style={{ flex: 1 }}>
+            <ScrollOnlyRows>
+              <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
+                {items.map(item => (
+                  <View key={item.id} style={styles.listRow}>
+                    <Pressable
+                      onPress={() => toggle(item.id)}
+                      style={[
+                        styles.checkbox,
+                        item.done && { backgroundColor: '#E6F4EA', borderColor: '#59A463' },
+                      ]}
+                    >
+                      {item.done ? <Ionicons name="checkmark" size={16} color="#59A463" /> : null}
+                    </Pressable>
 
-        {/* List Rows */}
-        <View style={{ paddingHorizontal: 16, paddingTop: 6 }}>
-          {items.map(item => (
-            <View key={item.id} style={styles.listRow}>
-              <Pressable
-                onPress={() => toggle(item.id)}
-                style={[
-                  styles.checkbox,
-                  item.done && { backgroundColor: '#E6F4EA', borderColor: '#59A463' },
-                ]}
-              >
-                {item.done ? <Ionicons name="checkmark" size={16} color="#59A463" /> : null}
-              </Pressable>
+                    <TextInput
+                      style={[
+                        styles.itemInput,
+                        item.done && { textDecorationLine: 'line-through', opacity: 0.6 },
+                      ]}
+                      value={item.name}
+                      onChangeText={t =>
+                        setItems(prev =>
+                          prev.map(it => (it.id === item.id ? { ...it, name: t } : it)),
+                        )
+                      }
+                      placeholder="Item Name"
+                      placeholderTextColor="#4F8B59"
+                    />
+                  </View>
+                ))}
 
-              <TextInput
-                style={[
-                  styles.itemInput,
-                  item.done && { textDecorationLine: 'line-through', opacity: 0.6 },
-                ]}
-                value={item.name}
-                onChangeText={t =>
-                  setItems(prev =>
-                    prev.map(it => (it.id === item.id ? { ...it, name: t } : it)),
-                  )
-                }
-                placeholder="Item Name"
-                placeholderTextColor="#4F8B59"
-              />
-            </View>
-          ))}
-
-          <Pressable onPress={addItem} style={styles.addBtn}>
-            <Ionicons name="add" size={26} color="#7A8B7E" />
-          </Pressable>
+                <Pressable onPress={addItem} style={styles.addBtn}>
+                  <Ionicons name="add" size={35} color="#7A8B7E" />
+                </Pressable>
+              </View>
+            </ScrollOnlyRows>
+          </View>
         </View>
 
         {/* Favorite Meals Section */}
         <View style={styles.favWrap}>
           <Text style={styles.favTitle}>Favorite Meals</Text>
           <View style={styles.favRow}>
-            {/* NOTE: path likely changes from ../../ to ../ because file moved deeper */}
             <FavMeal source={require('../../assets/images/FETTUCCINE_ALFREDO_HOMEPAGE.jpg')} />
             <FavMeal source={require('../../assets/images/CHICKEN_AND_RICE_HOMEPAGE.jpg')} />
             <FavMeal source={require('../../assets/images/BURGER_HOMEPAGE.jpg')} />
           </View>
         </View>
-      </ScrollView>
+      </View>
     </SafeAreaView>
   );
 }
@@ -121,62 +136,92 @@ function FavMeal({ source }: { source: ImageSourcePropType }) {
   );
 }
 
+function ScrollOnlyRows({ children }: { children: React.ReactNode }) {
+  return (
+    <ScrollView
+      style={{ flex: 1 }}
+      contentContainerStyle={styles.listAreaContent}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
+      bounces={false} 
+      alwaysBounceVertical={false} 
+      overScrollMode="never"
+      contentInsetAdjustmentBehavior="never"
+    >
+      {children}
+    </ScrollView>
+  );
+}
+
 const LINE_GREEN = '#499F44';
 
+// Edit Styles Section
 const styles = StyleSheet.create({
-
   // Screen Background
   safe: { flex: 1, backgroundColor: '#FFFFFF' },
-  content: { paddingBottom: 16 },
+  content: { flex: 1 },
 
   // Contains spent this week and alert dot
   topBar: {
     paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 6,
+    marginTop: 2,
   },
 
   // Top Section
-
-  // For Centering the top portion, not including the red dot
-  spentPillWrap: { flex: 1, alignItems: 'center', gap: 6, marginTop: 40, marginLeft: -21 }, /* Used marginLeft to fix centering */
-  // "Spent This Week"  
-  spentLabel: { fontSize: 15, color: 'black', fontWeight: '400' },
+  // For centering the top portion, not including the red dot
+  spentPillWrap: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 30,
+    marginLeft: -21, // Used marginLeft to fix centering
+  },
+  // "Spent This Week"
+  spentLabel: { fontSize: 18, color: 'black', fontWeight: '400' },
   // Pill
   spentPill: {
-    paddingHorizontal: 16,
-    paddingVertical: 3,
+    paddingHorizontal: 15,
+    paddingVertical: 8,
     backgroundColor: '#ADD0B3',
     borderRadius: 999,
     minWidth: 150,
   },
 
   // Text Inside Pill
-  spentValue: { textAlign: 'center', fontWeight: '800', color: '#FFFFFF' },
+  spentValue: { textAlign: 'center', fontWeight: '800', color: '#FFFFFF', fontSize: 20 },
   // Red Alert Dot
   alertDot: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+    width: 40,
+    height: 40,
+    borderRadius: 19,
     backgroundColor: '#F65E5D',
     alignItems: 'center',
     justifyContent: 'center',
   },
   // Exclamation inside alert
-  alertExcl: { color: 'white', fontWeight: '800' },
+  alertExcl: { color: 'white', fontWeight: '800', fontSize: 24 },
 
   // Divider between spent and shopping list
-  divider: { height: 2, backgroundColor: LINE_GREEN, marginTop: 8 },
+  divider: { height: 2, backgroundColor: LINE_GREEN, marginTop: 20, marginBottom: 15 },
 
   // Shopping List Section
+  listArea: {
+    flex: 1,
+    paddingTop: 12,
+  },
+  listAreaContent: {
+    paddingBottom: 16, 
+  },
 
   // "Shopping List"
   sectionHeader: {
-    fontSize: 15,
+    fontSize: 18,
     fontWeight: '400',
     color: 'black',
     textAlign: 'center',
+    marginTop: -12,
   },
   // Underline
   sectionUnderline: {
@@ -184,6 +229,7 @@ const styles = StyleSheet.create({
     backgroundColor: LINE_GREEN,
     width: 160,
     marginTop: 6,
+    marginBottom: 20,
     borderRadius: 2,
   },
   // Centering for "Shopping List" and the underline
@@ -191,7 +237,6 @@ const styles = StyleSheet.create({
     width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: 14,
   },
   // Shopping List Rows
   listRow: {
@@ -201,9 +246,9 @@ const styles = StyleSheet.create({
   },
   // Circle outline for check boxes
   checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: 30,
+    height: 30,
+    borderRadius: 14,
     borderWidth: 2,
     borderColor: '#499F44',
     alignItems: 'center',
@@ -216,28 +261,26 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#499F44',
     borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    paddingVertical: 9,
+    paddingHorizontal: 7,
     color: '#1D3B25',
     fontWeight: '600',
+    fontSize: 20,
   },
   // Add button (Plus Sign)
   addBtn: {
-    marginTop: 6,
-    marginBottom: 20,
+    marginBottom: 12,
     alignSelf: 'center',
   },
 
   // Favorite Meals Section
-
-  // Green background
   favWrap: {
     backgroundColor: '#B7D7BF',
     paddingTop: 12,
     paddingBottom: 24,
     paddingHorizontal: 16,
-    borderTopLeftRadius: 8,
-    borderTopRightRadius: 8,
+    borderColor: '#499F44',
+    borderWidth: 2,
   },
   // "Favorite Meals"
   favTitle: {
@@ -245,7 +288,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     color: 'black',
     fontWeight: '400',
-    fontSize: 15,
+    fontSize: 18,
   },
   // Horizontal row layout
   favRow: {
@@ -259,8 +302,8 @@ const styles = StyleSheet.create({
     height: 86,
     borderRadius: 43,
     overflow: 'hidden',
-    backgroundColor: 'FFFFFF',
+    backgroundColor: '#FFFFFF',
   },
-  // Image adjustments in container (Can't really adjust because the images will end up too small to fit in the circle)
-  favImage: { width: '100%', height: '100%' }
+  // Image adjustments in container
+  favImage: { width: '100%', height: '100%' },
 });
