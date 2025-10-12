@@ -1,7 +1,7 @@
 // home.tsx
 // Home Screen
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 
 // Adjust the initial list length by changing the { length: 5 }
 const initialItems = Array.from({ length: 5 }).map((_, i) => ({
@@ -31,6 +32,23 @@ export default function HomeScreen() {
 
   const addItem = () =>
     setItems(prev => [...prev, { id: String(Date.now()), name: 'Item Name', done: false }]);
+
+  // Auto scroll when adding to list
+  const scrollRef = useRef<ScrollView | null>(null);
+
+  // List resets back to top when returning to page
+  useFocusEffect(
+    React.useCallback(() => {
+      requestAnimationFrame(() => {
+        scrollRef.current?.scrollTo({ y: 0, animated: false });
+      });
+      return undefined;
+    }, [])
+  );
+
+  useEffect(() => {
+    scrollRef.current?.scrollToEnd({ animated: true });
+  }, [items.length]);
 
   return (
     <SafeAreaView style={styles.safe} edges={[]}>
@@ -75,8 +93,8 @@ export default function HomeScreen() {
 
           {/* Scroll only the rows */}
           <View style={{ flex: 1 }}>
-            <ScrollOnlyRows>
-              <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
+            <ScrollOnlyRows scrollRef={scrollRef}>
+              <View style={{ paddingHorizontal: 16, paddingTop: 0 }}>
                 {items.map(item => (
                   <View key={item.id} style={styles.listRow}>
                     <Pressable
@@ -136,15 +154,23 @@ function FavMeal({ source }: { source: ImageSourcePropType }) {
   );
 }
 
-function ScrollOnlyRows({ children }: { children: React.ReactNode }) {
+// (2) Updated prop type to accept nullable ref
+function ScrollOnlyRows({
+  children,
+  scrollRef,
+}: {
+  children: React.ReactNode;
+  scrollRef: React.RefObject<ScrollView | null>;
+}) {
   return (
     <ScrollView
+      ref={scrollRef}
       style={{ flex: 1 }}
       contentContainerStyle={styles.listAreaContent}
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
-      bounces={false} 
-      alwaysBounceVertical={false} 
+      bounces={false}
+      alwaysBounceVertical={false}
       overScrollMode="never"
       contentInsetAdjustmentBehavior="never"
     >
@@ -212,7 +238,7 @@ const styles = StyleSheet.create({
     paddingTop: 12,
   },
   listAreaContent: {
-    paddingBottom: 16, 
+    paddingBottom: 16,
   },
 
   // "Shopping List"
