@@ -95,8 +95,11 @@ export default function HomeScreen() {
           <View style={{ flex: 1 }}>
             <ScrollOnlyRows scrollRef={scrollRef}>
               <View style={{ paddingHorizontal: 16, paddingTop: 0 }}>
-                {items.map(item => (
-                  <View key={item.id} style={styles.listRow}>
+                {items.map((item, idx) => (
+                  <View
+                    key={item.id}
+                    style={[styles.listRow, idx === 0 && styles.listRowFirst]}
+                  >
                     <Pressable
                       onPress={() => toggle(item.id)}
                       style={[
@@ -123,6 +126,7 @@ export default function HomeScreen() {
                     />
                   </View>
                 ))}
+
 
                 <Pressable onPress={addItem} style={styles.addBtn}>
                   <Ionicons name="add" size={35} color="#7A8B7E" />
@@ -293,6 +297,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 20,
   },
+
+  // First Row
+  listRowFirst: { marginTop: 0 },
+
   // Add button (Plus Sign)
   addBtn: {
     marginBottom: 12,
@@ -302,31 +310,33 @@ const styles = StyleSheet.create({
   // Favorite Meals Section
   favWrap: {
     backgroundColor: '#B7D7BF',
-    paddingTop: 12,
-    paddingBottom: 24,
-    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 25,
+    paddingHorizontal: 12,
     borderColor: '#499F44',
     borderWidth: 2,
+    marginTop: 'auto',    
   },
   // "Favorite Meals"
   favTitle: {
     textAlign: 'center',
-    marginBottom: 10,
+    marginBottom: 6,
     color: 'black',
     fontWeight: '400',
-    fontSize: 18,
+    fontSize: 16,
   },
   // Horizontal row layout
   favRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginBottom: 8,
+    marginTop: 10,
+    marginBottom: 0,
   },
   // Circular containers
   favItem: {
-    width: 86,
-    height: 86,
-    borderRadius: 43,
+    width: 80,
+    height: 80,
+    borderRadius: 32,
     overflow: 'hidden',
     backgroundColor: '#FFFFFF',
   },
