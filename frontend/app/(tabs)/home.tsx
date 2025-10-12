@@ -223,15 +223,17 @@ const styles = StyleSheet.create({
   spentValue: { textAlign: 'center', fontWeight: '800', color: '#FFFFFF', fontSize: 20 },
   // Red Alert Dot
   alertDot: {
-    width: 40,
-    height: 40,
+    width: 32,
+    height: 32,
     borderRadius: 19,
     backgroundColor: '#F65E5D',
     alignItems: 'center',
     justifyContent: 'center',
   },
   // Exclamation inside alert
-  alertExcl: { color: 'white', fontWeight: '800', fontSize: 24 },
+  alertExcl: { color: 'white', fontWeight: '600', fontSize: 22
+
+   },
 
   // Divider between spent and shopping list
   divider: { height: 2, backgroundColor: LINE_GREEN, marginTop: 20, marginBottom: 15 },
@@ -336,9 +338,11 @@ const styles = StyleSheet.create({
   favItem: {
     width: 80,
     height: 80,
-    borderRadius: 32,
+    borderRadius: 40,
     overflow: 'hidden',
     backgroundColor: '#FFFFFF',
+    borderColor: '#499F44',
+    borderWidth: 2,
   },
   // Image adjustments in container
   favImage: { width: '100%', height: '100%' },
