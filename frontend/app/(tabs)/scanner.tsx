@@ -11,6 +11,8 @@ export default function ScannerScreen(){
   return (
     <View style={styles.container}>
       {/* Scanner area */}
+      <View style={styles.topBar}>
+      </View>
       <View style={styles.scannerArea}>
         <View style={styles.cornerTopLeft} />
         <View style={styles.cornerTopRight} />
@@ -45,8 +47,16 @@ export default function ScannerScreen(){
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#000",
+    backgroundColor: "#DCEFD7",
     justifyContent: "space-between",
+  },
+  topBar: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    alignItems: "center",
+    height: 70,
+    paddingVertical: 20,
+    backgroundColor: "#499F4458",
   },
   scannerArea: {
     flex: 1,
@@ -61,7 +71,7 @@ const styles = StyleSheet.create({
     height: 30,
     borderTopWidth: 3,
     borderLeftWidth: 3,
-    borderColor: "white",
+    borderColor: "black",
   },
   cornerTopRight: {
     position: "absolute",
@@ -71,7 +81,7 @@ const styles = StyleSheet.create({
     height: 30,
     borderTopWidth: 3,
     borderRightWidth: 3,
-    borderColor: "white",
+    borderColor: "black",
   },
   cornerBottomLeft: {
     position: "absolute",
@@ -81,7 +91,7 @@ const styles = StyleSheet.create({
     height: 30,
     borderBottomWidth: 3,
     borderLeftWidth: 3,
-    borderColor: "white",
+    borderColor: "black",
   },
   cornerBottomRight: {
     position: "absolute",
@@ -91,14 +101,14 @@ const styles = StyleSheet.create({
     height: 30,
     borderBottomWidth: 3,
     borderRightWidth: 3,
-    borderColor: "white",
+    borderColor: "black",
   },
   bottomBar: {
     flexDirection: "row",
     justifyContent: "space-around",
     alignItems: "center",
     paddingVertical: 20,
-    backgroundColor: "#4CAF5058",
+    backgroundColor: "#499F4458",
   },
   iconButton: {
     padding: 10,
