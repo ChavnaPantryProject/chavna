@@ -62,7 +62,7 @@ const MealScreen = () => {
         <Ionicons 
           name={favorites.includes(item.id) ? "star" : "star-outline"}
           size={22} 
-          color={favorites.includes(item.id) ? "#F89D5D" : "#585757ff"} 
+          color={favorites.includes(item.id) ? "#F89D5D" : "#5b5959ff"} 
         />
       </TouchableOpacity>
     </View>
