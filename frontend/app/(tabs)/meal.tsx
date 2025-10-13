@@ -1,5 +1,16 @@
 import React from 'react'
-import { Text, View, StyleSheet, TextInput, Image, TouchableOpacity, FlatList } from 'react-native'
+import { 
+  Text, 
+  View, 
+  StyleSheet, 
+  TextInput, 
+  Image, 
+  TouchableOpacity, 
+  FlatList,
+  Modal,
+} from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
+import { useRouter } from "expo-router";
 import { Ionicons, MaterialIcons } from '@expo/vector-icons'
 
 // example meal card data used in our figma
@@ -21,10 +32,40 @@ const meals = [
 ];
 
 const MealScreen = () => {
-  
+  const router = useRouter(); // nav controller
+  const [showDeleteModal, setShowDeleteModal] = React.useState(false);
+  const [selectedMeal, setSelectedMeal] = React.useState<any>(null);
+  const [favorites, setFavorites] = React.useState<string[]>([]); // fav meal IDs
+
+  // for the delete button to prompt when clicked
+  const handleDelete = (meal: any) => {
+    setSelectedMeal(meal);
+    setShowDeleteModal(true);
+  };
+
+  // to allow users to favorite a meal
+  const handleFavorite = (meal: any) => {
+    setFavorites((prev) => 
+      prev.includes(meal.id)
+        ? prev.filter((id) => id !== meal.id)
+        : [...prev, meal.id]
+    );
+  };
+
   // rendering each meal card
   const renderMeal = ({item}: {item: any}) => (
   <View style={styles.card}>
+
+    {/* Favorite Icon - top right corner */}
+    <View style={styles.favoriteIcon}>
+      <TouchableOpacity onPress={() => handleFavorite(item)}>
+        <Ionicons 
+          name={favorites.includes(item.id) ? "star" : "star-outline"}
+          size={22} 
+          color={favorites.includes(item.id) ? "#F89D5D" : "#5b5959ff"} 
+        />
+      </TouchableOpacity>
+    </View>
 
     {/* Title */}
     <Text style={styles.title}>{item.name}</Text>
@@ -46,12 +87,18 @@ const MealScreen = () => {
         <View style={styles.buttons}>
 
           {/* Eat Button */}
-          <TouchableOpacity style={styles.actionBtn}>
+          <TouchableOpacity 
+            style={styles.actionBtn} 
+            onPress={() => router.push("/meals/editmeal")}
+          >
             <Ionicons name="restaurant" size={20} color="white" />
           </TouchableOpacity>
 
           {/* Delete Button */}
-          <TouchableOpacity style={styles.actionBtn}>
+          <TouchableOpacity 
+            style={styles.actionBtn}
+            onPress={() => handleDelete(item)}
+          >
             <MaterialIcons name="delete" size={20} color="white" />
           </TouchableOpacity>
         </View>
@@ -62,11 +109,20 @@ const MealScreen = () => {
 );
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       {/* Search Bar */}
       <View style={styles.searchContainer}>
-        <Ionicons name="search" size={22} color="#499F44" style={{ marginRight: 6}} />
-        <TextInput placeholder="Search" placeholderTextColor="#555" style={styles.searchInput} />
+        <Ionicons 
+          name="search" 
+          size={22} 
+          color="#499F44" 
+          style={{ marginRight: 6}} 
+        />
+        <TextInput 
+          placeholder="Search" 
+          placeholderTextColor="#555" 
+          style={styles.searchInput} 
+        />
       </View>
 
       {/* List of Meals */}
@@ -85,7 +141,41 @@ const MealScreen = () => {
       <TouchableOpacity style={styles.addBtn}>
         <Text style={styles.addText}>+</Text>
       </TouchableOpacity>
-    </View>
+
+      {/* Delete Meal Confirmation */}
+      <Modal
+        visible={showDeleteModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowDeleteModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>Delete Meal</Text>
+            <View style={styles.modalDivider} />
+            <Text style={styles.modalText}>
+              Are you sure you want to delete {selectedMeal?.name}?
+            </Text>
+
+            <TouchableOpacity
+              style={styles.modalBtn}
+              onPress={() => {
+                setShowDeleteModal(false);
+              }}
+            >
+              <Text style={styles.modalBtnText}>Delete Meal</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.modalBtn}
+              onPress={() => setShowDeleteModal(false)}
+            >
+              <Text style={styles.modalBtnText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    </SafeAreaView>
   );
 };
 
@@ -192,5 +282,67 @@ const styles = StyleSheet.create({
   contentRow: {
     flexDirection: "row",
     alignItems: "center",
+  },
+
+  // for favorite meals
+  favoriteIcon: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    zIndex: 1,
+  },
+
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  modalBox: {
+    width: "90%",
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#499F44",
+    paddingVertical: 20,
+    alignItems: "center",
+  },
+
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    marginBottom: 7,
+    color: "#000",
+  },
+
+  modalDivider: {
+    height: 1,
+    width: "70%",
+    backgroundColor: "#499F44",
+    marginVertical: 6,
+  },
+
+  modalText: {
+    fontSize: 15,
+    textAlign: "center",
+    marginVertical: 15,
+    marginHorizontal: 30,
+    color: "#000",
+  },
+
+  modalBtn: {
+    backgroundColor: "#F89D5D",
+    paddingVertical: 10,
+    borderRadius: 12,
+    marginVertical: 6,
+    width: "60%",
+    alignItems: "center",
+  },
+
+  modalBtnText: {
+    color: "white",
+    fontWeight: "600",
   },
 });
