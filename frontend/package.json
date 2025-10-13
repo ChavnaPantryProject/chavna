@@ -8,10 +8,13 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "typegen": "node node_modules/expo-router/build/bin/index.js typegen",
+    "postinstall": "node node_modules/expo-router/build/bin/index.js typegen || true"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",
+    "@react-native-picker/picker": "2.11.1",
     "@react-navigation/bottom-tabs": "^7.4.0",
     "@react-navigation/elements": "^2.6.3",
     "@react-navigation/native": "^7.1.8",
@@ -20,8 +23,9 @@
     "expo-font": "~14.0.8",
     "expo-haptics": "~15.0.7",
     "expo-image": "~3.0.8",
+    "expo-image-picker": "~17.0.8",
     "expo-linking": "~8.0.8",
-    "expo-router": "~6.0.7",
+    "expo-router": "~6.0.12",
     "expo-splash-screen": "~31.0.10",
     "expo-status-bar": "~3.0.8",
     "expo-symbols": "~1.0.7",
