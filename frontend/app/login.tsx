@@ -1,0 +1,411 @@
+import React, { useMemo, useState } from 'react';
+import {
+    View,
+    Text,
+    TextInput,
+    Pressable,
+    StyleSheet,
+    KeyboardAvoidingView,
+    Platform,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import { router, type Href } from 'expo-router';
+
+type Mode = 'login' | 'signup';
+
+const GREEN = '#2E7D32';
+const GREEN_MID = '#5FA868';
+const GRAY_LIGHT = '#E6E6E6';
+const TEXT = '#111';
+
+export default function AuthScreen() {
+    const [mode, setMode] = useState<Mode>('login');
+
+    // Separate state per tab
+    const [loginEmail, setLoginEmail] = useState('');
+    const [loginPw, setLoginPw] = useState('');
+
+    const [signupName, setSignupName] = useState('');
+    const [signupEmail, setSignupEmail] = useState('');
+    const [signupPw, setSignupPw] = useState('');
+    const [signupPw2, setSignupPw2] = useState('');
+
+    const [focusedField, setFocusedField] = useState<string | null>(null);
+
+    // Validation helpers
+    const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const isLoginEmailValid = useMemo(() => EMAIL_RE.test(loginEmail.trim()), [loginEmail]);
+    const isSignupEmailValid = useMemo(() => EMAIL_RE.test(signupEmail.trim()), [signupEmail]);
+    const passwordsMatch = useMemo(() => signupPw === signupPw2, [signupPw, signupPw2]);
+
+    const canSubmit = useMemo(() => {
+        if (mode === 'login') {
+            return !!(loginEmail.trim() && isLoginEmailValid && loginPw.trim());
+        }
+        return !!(
+            signupName.trim() &&
+            signupEmail.trim() && isSignupEmailValid &&
+            signupPw.trim() &&
+            signupPw2.trim() &&
+            passwordsMatch
+        );
+    }, [
+        mode,
+        loginEmail, loginPw, isLoginEmailValid,
+        signupName, signupEmail, isSignupEmailValid, signupPw, signupPw2, passwordsMatch
+    ]);
+
+    const onSubmit = () => {
+        if (!canSubmit) return;
+        if (mode === 'login') {
+            // use loginEmail, loginPw
+        } else {
+            // use signupName, signupEmail, signupPw
+        }
+    };
+
+    const goToSplash = () => {
+        const target: Href = '/';
+        router.replace(target);
+    };
+
+    const switchToLogin = () => {
+        setMode('login');
+        // Clear signup fields
+        setSignupName(''); setSignupEmail(''); setSignupPw(''); setSignupPw2('');
+        setFocusedField(null);
+    };
+
+    const switchToSignup = () => {
+        setMode('signup');
+        // Clear login fields
+        setLoginEmail(''); setLoginPw('');
+        setFocusedField(null);
+    };
+
+    const Accent = ({ active }: { active: boolean }) => (
+        <View style={[styles.tabUnderline, active && styles.tabUnderlineActive]} />
+    );
+
+    const inputBorder = (field: string) => ({
+        borderColor: focusedField === field ? GREEN : GRAY_LIGHT,
+    });
+
+    return (
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
+            <KeyboardAvoidingView
+                behavior={Platform.select({ ios: 'padding', android: undefined })}
+                style={{ flex: 1 }}
+            >
+                <View style={styles.container}>
+                    {/* Tabs */}
+                    <View style={styles.tabs}>
+                        <Pressable style={styles.tab} onPress={switchToLogin}>
+                            <Text style={[styles.tabText, mode === 'login' && styles.tabTextActive]}>
+                                Login
+                            </Text>
+                            <Accent active={mode === 'login'} />
+                        </Pressable>
+
+                        <Pressable style={styles.tab} onPress={switchToSignup}>
+                            <Text style={[styles.tabText, mode === 'signup' && styles.tabTextActive]}>
+                                Create Account
+                            </Text>
+                            <Accent active={mode === 'signup'} />
+                        </Pressable>
+                    </View>
+
+                    {/* Form */}
+                    <View style={styles.form}>
+                        {mode === 'login' ? (
+                            <>
+                                {/* Email (login) */}
+                                <Text style={styles.label}>Email Address</Text>
+                                <TextInput
+                                    value={loginEmail}
+                                    onChangeText={setLoginEmail}
+                                    placeholder="you@example.com"
+                                    style={[styles.input, inputBorder('email')]}
+                                    onFocus={() => setFocusedField('email')}
+                                    onBlur={() => setFocusedField(null)}
+                                    autoCapitalize="none"
+                                    keyboardType="email-address"
+                                    placeholderTextColor="#BDBDBD"
+                                />
+                                {loginEmail.length > 0 && !isLoginEmailValid && (
+                                    <Text style={styles.errorText}>Enter a valid email address</Text>
+                                )}
+
+                                {/* Password (login) */}
+                                <Text style={styles.label}>Password</Text>
+                                <TextInput
+                                    value={loginPw}
+                                    onChangeText={setLoginPw}
+                                    placeholder="••••••••"
+                                    style={[styles.input, inputBorder('password')]}
+                                    onFocus={() => setFocusedField('password')}
+                                    onBlur={() => setFocusedField(null)}
+                                    secureTextEntry
+                                    placeholderTextColor="#BDBDBD"
+                                />
+
+                                <Pressable onPress={() => { }} style={styles.forgotWrap}>
+                                    <Text style={styles.forgot}>Forgot Password</Text>
+                                </Pressable>
+                            </>
+                        ) : (
+                            <>
+                                {/* Name (signup) */}
+                                <Text style={styles.label}>Name</Text>
+                                <TextInput
+                                    value={signupName}
+                                    onChangeText={setSignupName}
+                                    placeholder="Your full name"
+                                    style={[styles.input, inputBorder('name')]}
+                                    onFocus={() => setFocusedField('name')}
+                                    onBlur={() => setFocusedField(null)}
+                                    autoCapitalize="words"
+                                    placeholderTextColor="#BDBDBD"
+                                />
+
+                                {/* Email (signup) */}
+                                <Text style={styles.label}>Email Address</Text>
+                                <TextInput
+                                    value={signupEmail}
+                                    onChangeText={setSignupEmail}
+                                    placeholder="you@example.com"
+                                    style={[styles.input, inputBorder('email')]}
+                                    onFocus={() => setFocusedField('email')}
+                                    onBlur={() => setFocusedField(null)}
+                                    autoCapitalize="none"
+                                    keyboardType="email-address"
+                                    placeholderTextColor="#BDBDBD"
+                                />
+                                {signupEmail.length > 0 && !isSignupEmailValid && (
+                                    <Text style={styles.errorText}>Enter a valid email address</Text>
+                                )}
+
+                                {/* Passwords (signup) */}
+                                <Text style={styles.label}>Password</Text>
+                                <TextInput
+                                    value={signupPw}
+                                    onChangeText={setSignupPw}
+                                    placeholder="••••••••"
+                                    style={[styles.input, inputBorder('password')]}
+                                    onFocus={() => setFocusedField('password')}
+                                    onBlur={() => setFocusedField(null)}
+                                    secureTextEntry
+                                    placeholderTextColor="#BDBDBD"
+                                />
+
+                                <Text style={styles.label}>Confirm Password</Text>
+                                <TextInput
+                                    value={signupPw2}
+                                    onChangeText={setSignupPw2}
+                                    placeholder="••••••••"
+                                    style={[styles.input, inputBorder('confirm')]}
+                                    onFocus={() => setFocusedField('confirm')}
+                                    onBlur={() => setFocusedField(null)}
+                                    secureTextEntry
+                                    placeholderTextColor="#BDBDBD"
+                                />
+                                {signupPw2.length > 0 && !passwordsMatch && (
+                                    <Text style={styles.errorText}>Passwords do not match</Text>
+                                )}
+                            </>
+                        )}
+
+                        <Pressable
+                            onPress={onSubmit}
+                            disabled={!canSubmit}
+                            style={[styles.primaryBtn, !canSubmit && styles.primaryBtnDisabled]}
+                        >
+                            <Text style={styles.primaryBtnText}>
+                                {mode === 'login' ? 'Login' : 'Create Account'}
+                            </Text>
+                        </Pressable>
+                    </View>
+
+                    {/* Divider */}
+                    <View style={styles.dividerRow}>
+                        <View style={styles.divider} />
+                        <Text style={styles.or}>Or</Text>
+                        <View style={styles.divider} />
+                    </View>
+
+                    {/* Social Buttons */}
+                    <View style={styles.socialList}>
+                        <SocialButton
+                            icon={<Ionicons name="logo-apple" size={18} />}
+                            label={mode === 'login' ? 'Login With Apple' : 'Continue With Apple'}
+                        />
+                        <SocialButton
+                            icon={<Ionicons name="logo-google" size={18} color="#DB4437" />}
+                            label={mode === 'login' ? 'Login With Google' : 'Continue With Google'}
+                        />
+                        <SocialButton
+                            icon={<Ionicons name="logo-facebook" size={18} color="#1877F2" />}
+                            label={mode === 'login' ? 'Login With Facebook' : 'Continue With Facebook'}
+                        />
+                        <SocialButton
+                            icon={<Ionicons name="person" size={18} />}
+                            label={mode === 'login' ? 'Login As Guest' : 'Continue As Guest'}
+                        />
+                    </View>
+
+                    {/* Bottom dev buttons (only on login) */}
+                    {mode === 'login' && (
+                        <View style={styles.devBtns}>
+                            <Pressable style={styles.devBtn} onPress={goToSplash}>
+                                <Text style={styles.devBtnText}>Go to Splash</Text>
+                            </Pressable>
+
+                            <Pressable
+                                style={[styles.devBtn, { marginTop: 12 }]}
+                                onPress={() => router.replace('/(tabs)/home')}
+                            >
+                                <Text style={styles.devBtnText}>Go to Home</Text>
+                            </Pressable>
+                        </View>
+                    )}
+                </View>
+            </KeyboardAvoidingView>
+        </SafeAreaView>
+    );
+}
+
+/* ---------- Social Button ---------- */
+function SocialButton({ icon, label }: { icon: React.ReactNode; label: string }) {
+    return (
+        <Pressable style={styles.socialBtn}>
+            <View style={styles.socialIcon}>{icon}</View>
+            <Text style={styles.socialText}>{label}</Text>
+        </Pressable>
+    );
+}
+
+/* ---------- Styles ---------- */
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        paddingHorizontal: 20,
+        paddingTop: 12,
+        backgroundColor: '#FFFFFF',
+        justifyContent: 'flex-start',
+    },
+
+    // Tabs
+    tabs: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginTop: 4,
+        marginBottom: 10,
+        paddingHorizontal: 8,
+    },
+    tab: { flex: 1, alignItems: 'center', paddingBottom: 4 },
+    tabText: { fontSize: 16, fontWeight: '700', color: '#9E9E9E' },
+    tabTextActive: { color: GREEN },
+    tabUnderline: {
+        marginTop: 8,
+        height: 1,
+        width: 72,
+        backgroundColor: 'transparent',
+    },
+    tabUnderlineActive: { backgroundColor: GREEN },
+
+    form: { marginTop: 6, gap: 14 },
+    label: { fontSize: 14, color: TEXT, fontWeight: '600', marginBottom: 6 },
+
+    input: {
+        borderWidth: 1,
+        borderRadius: 14,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        backgroundColor: '#FFFFFF',
+        fontSize: 16,
+        borderColor: GRAY_LIGHT,
+    },
+
+    forgotWrap: { alignSelf: 'flex-end', marginTop: 6 },
+    forgot: { color: GREEN_MID, fontWeight: '600' },
+
+    primaryBtn: {
+        backgroundColor: '#9ACB9F',
+        borderColor: GREEN,
+        borderWidth: 1,
+        borderRadius: 22,
+        paddingVertical: 12,
+        width: '85%',
+        alignSelf: 'center',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 12,
+    },
+    primaryBtnDisabled: {
+        backgroundColor: '#c9cecaff',
+        borderColor: 'rgba(0, 0, 0, 0.5)',
+    },
+    primaryBtnText: {
+        color: '#FFFFFF',
+        fontWeight: '700',
+        fontSize: 16,
+    },
+
+    dividerRow: {
+        marginTop: 18,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    divider: { flex: 1, height: 1, backgroundColor: GREEN },
+    or: { color: '#444', fontWeight: '600' },
+
+    socialList: {
+        marginTop: 20,
+        gap: 10,
+    },
+
+    socialBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: GRAY_LIGHT,
+        borderRadius: 16,
+        paddingVertical: 12,
+        paddingHorizontal: 14,
+        backgroundColor: '#FFFFFF',
+    },
+    socialIcon: { width: 26, alignItems: 'center' },
+    socialText: { marginLeft: 10, fontSize: 16, color: TEXT, fontWeight: '600' },
+
+    errorText: {
+        color: '#D32F2F',
+        fontSize: 13,
+        fontWeight: '600',
+        marginTop: -4,
+        marginLeft: 4,
+    },
+
+    /* Dev Buttons */
+    devBtns: {
+        marginTop: 'auto',
+        alignItems: 'center',
+        marginBottom: 20,
+    },
+    devBtn: {
+        backgroundColor: '#9ACB9F',
+        borderColor: GREEN,
+        borderWidth: 1,
+        borderRadius: 22,
+        paddingVertical: 10,
+        paddingHorizontal: 36,
+        width: '85%',
+        alignItems: 'center',
+    },
+    devBtnText: {
+        color: '#FFFFFF',
+        fontWeight: '700',
+        fontSize: 16,
+    },
+});

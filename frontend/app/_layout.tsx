@@ -1,8 +1,12 @@
+// app/_layout.tsx
 import { Stack } from "expo-router";
-//import SafeScreen from "@/components/SafeScreen";
 
 export default function RootLayout() {
   return (
-    <Stack></Stack>
+    <Stack
+      screenOptions={{
+        headerShown: false, // Used this to hide the headers, set to true if we need them again
+      }}
+    />
   );
 }
