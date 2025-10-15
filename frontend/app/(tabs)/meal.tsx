@@ -87,7 +87,6 @@ const MealScreen = () => {
         <View style={styles.buttons}>
 
           {/* Eat Button */}
-          <TouchableOpacity style={styles.actionBtn}>
           <TouchableOpacity 
             style={styles.actionBtn} 
             onPress={() => router.push("/meals/editmeal")}
@@ -96,7 +95,6 @@ const MealScreen = () => {
           </TouchableOpacity>
 
           {/* Delete Button */}
-          <TouchableOpacity style={styles.actionBtn}>
           <TouchableOpacity 
             style={styles.actionBtn}
             onPress={() => handleDelete(item)}
@@ -111,11 +109,6 @@ const MealScreen = () => {
 );
 
   return (
-    <View style={styles.container}>
-      {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <Ionicons name="search" size={22} color="#499F44" style={{ marginRight: 6}} />
-        <TextInput placeholder="Search" placeholderTextColor="#555" style={styles.searchInput} />
     <SafeAreaView style={styles.container}>
       {/* Search Bar */}
       <View style={styles.searchContainer}>
