@@ -21,6 +21,7 @@ const InventoryScreen = () => {
 
     {/* list of food categories */}
       <View style={style.catergoryContainer}>
+        {/* looping through foodCategories array to create a card for each category */}
         {foodCategories.map((category) => (
           <Pressable key={category} style={style.card}>
             <View style={style.cardTextContainer}>
@@ -41,7 +42,7 @@ const style = StyleSheet.create({
   container: {
     flex: 1,
     alignItems: 'center',
-    marginTop: 100,
+    marginTop: 10,
   },
   searchBar: {
     borderWidth: 2,
@@ -63,11 +64,12 @@ const style = StyleSheet.create({
     borderWidth: 2,
     borderColor: 'rgba(73,159,68,1)',
     borderRadius: 25,
-    height: 125,
-    width: 125,
+    height: 150,
+    width: 150,
     padding: 10,
     margin: 10,
     alignItems: 'center',
+    backgroundColor: "rgba(73,159,68,0.1)",
   },
 
   cardTextContainer: {
