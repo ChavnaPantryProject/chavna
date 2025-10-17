@@ -2,7 +2,7 @@
 This page documents the expected request and response bodies.
 # Login
 ### Endpoint
-  ```http://our.server.com/login```
+  ```https://api.chavnapantry.com/login```
 ### Request
 #### Body
 ```
@@ -33,7 +33,7 @@ Invalid login
 ```
 # Create Account
 ### Endpoint
-  ```http://our.server.com/create-account```
+  ```https://api.chavnapantry.com/create-account```
 ### Request
 #### Body
 ```
