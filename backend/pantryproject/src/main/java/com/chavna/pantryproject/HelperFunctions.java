@@ -6,6 +6,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
 import java.util.HashMap;
@@ -25,8 +26,18 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.sesv2.SesV2Client;
+import software.amazon.awssdk.services.sesv2.model.Body;
+import software.amazon.awssdk.services.sesv2.model.Content;
+import software.amazon.awssdk.services.sesv2.model.Destination;
+import software.amazon.awssdk.services.sesv2.model.EmailContent;
+import software.amazon.awssdk.services.sesv2.model.Message;
+import software.amazon.awssdk.services.sesv2.model.SendEmailRequest;
+
 public class HelperFunctions {
-    
+    public static SecretKey encryptionKey = Jwts.ENC.A256CBC_HS512.key().build();
+
     public static String getenvNotNull(String name) {
         String env = System.getenv(name);
 
@@ -68,12 +79,24 @@ public class HelperFunctions {
     public static String createToken(UUID userId) {
         String jws = Jwts.builder()
             .issuedAt(Date.from(Instant.now()))
-            .claim("UserId", userId)
+            .claim("user_id", userId)
             .expiration(Date.from(Instant.now().plus(UserController.TOKEN_DURATION)))
-            .signWith(getJWTKey())
+            .signWith(encryptionKey)
             .compact();
         
         return jws;
+    }
+
+    public static String createSingupToken(String email, String password) {
+        String jwe = Jwts.builder()
+            .issuedAt(Date.from(Instant.now()))
+            .claim("email", email)
+            .claim("password", password)
+            .expiration(Date.from(Instant.now().plus(Duration.ofMinutes(30))))
+            .encryptWith(encryptionKey, Jwts.ENC.A256CBC_HS512)
+            .compact();
+
+        return jwe;
     }
 
     public static String shortenString(String string, int amount) {
@@ -110,7 +133,7 @@ public class HelperFunctions {
             public UUID visit(Jws<?> jws) {
                 Claims payload = (Claims) jws.getPayload();
 
-                return UUID.fromString((String) payload.get("UserId"));
+                return UUID.fromString((String) payload.get("userId"));
             }
 
             @Override
@@ -166,5 +189,45 @@ public class HelperFunctions {
         }
 
         return object;
+    }
+
+    public static void sendEmail(String from, String to, String htmlContent, String subject) {
+        Region region = Region.US_EAST_1;
+        SesV2Client client = SesV2Client.builder()
+            .region(region)
+            .build();
+        
+        Destination dest = Destination.builder()
+            .toAddresses(to)
+            .build();
+
+        Content content = Content.builder()
+            .data(htmlContent)
+            .build();
+
+        Content sub = Content.builder()
+            .data(subject)
+            .build();
+
+        Body body = Body.builder()
+            .html(content)
+            .build();
+        
+        Message message = Message.builder()
+            .subject(sub)
+            .body(body)
+            .build();
+
+        EmailContent email = EmailContent.builder()
+            .simple(message)
+            .build();
+
+        SendEmailRequest emailRequest = SendEmailRequest.builder()
+            .destination(dest)
+            .content(email)
+            .fromEmailAddress(from)
+            .build();
+
+        client.sendEmail(emailRequest);
     }
 }

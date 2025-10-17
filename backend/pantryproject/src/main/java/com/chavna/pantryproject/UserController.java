@@ -20,11 +20,17 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwe;
+import io.jsonwebtoken.Jws;
+import io.jsonwebtoken.Jwt;
 import io.jsonwebtoken.JwtException;
-
+import io.jsonwebtoken.JwtVisitor;
+import io.jsonwebtoken.Jwts;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 
@@ -35,6 +41,7 @@ public class UserController {
     public static final String USERS_TABLE = "users";
     public static final String PERSONAL_INFO_TABLE = "personal_info";
     public static final Duration TOKEN_DURATION = Duration.ofDays(14);
+    public static final String CHAVNA_URL = "https://api.chavnapantry.com/";
 
     public static class LoginRequest {
         @NotNull
@@ -112,10 +119,69 @@ public class UserController {
     }
 
     @PostMapping("/create-account")
-    public ResponseEntity<OkResponse> createAccount(@Valid @RequestBody CreateAccountRequest request, Errors errors) throws SQLException {
+    public ResponseEntity<OkResponse> createAccount(@Valid @RequestBody CreateAccountRequest request, Errors errors) {
         if (errors.hasErrors())
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, errors.getAllErrors().get(0).toString());
         
+        String token = HelperFunctions.createSingupToken(request.email, request.password);
+
+        String url = CHAVNA_URL + "confirm-account?token=" + token;
+        String emailContent = String.format(
+            """
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title></title>
+            </head>
+            <body>
+                Click <a href="%s">here</a> to confirm your email address.
+            </body>
+            </html>
+            """
+        , url);
+
+        HelperFunctions.sendEmail("noreply@email.chavnapantry.com", request.email, emailContent, "Account Confirmation");
+
+        return ResponseEntity.ok(OkResponse.Success("Confirmation email sent."));
+    }
+
+    @GetMapping("/confirm-account")
+    public ResponseEntity<String> confirmAccount(@RequestParam("token") String token) throws SQLException {
+        var parser = Jwts.parser()
+            .decryptWith(HelperFunctions.encryptionKey)
+            .build();
+
+        var parsed = parser.parse(token);
+
+        var visitor = new JwtVisitor<CreateAccountRequest>() {
+
+            @Override
+            public CreateAccountRequest visit(Jwt<?, ?> jwt) {
+                throw new UnsupportedOperationException("Unimplemented method 'visit'");
+            }
+
+            @Override
+            public CreateAccountRequest visit(Jws<?> jws) {
+                throw new UnsupportedOperationException("Unimplemented method 'visit'");
+            }
+
+            @Override
+            public CreateAccountRequest visit(Jwe<?> jwe) {
+                Claims payload = (Claims) jwe.getPayload();
+
+                CreateAccountRequest request = new CreateAccountRequest();
+                request.email = (String) payload.get("email");
+                request.password = (String) payload.get("password");
+
+                return request;
+            }
+            
+        };
+
+        CreateAccountRequest request = parsed.accept(visitor);
+
         var con = HelperFunctions.getRemoteConnection();
 
         BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(BCryptVersion.$2B, 8);
@@ -138,7 +204,7 @@ public class UserController {
             throw ex;
         }
 
-        return ResponseEntity.ok(OkResponse.Success("Account created succesfully"));
+        return ResponseEntity.ok("Account succesfully created.");
     }
     
     @GetMapping("/test-auth")
@@ -237,22 +303,6 @@ public class UserController {
         public String field;
     }
 
-    @GetMapping("/test")
-    public ResponseEntity<OkResponse> test(@RequestBody Test body) throws SQLException {
-        Connection con = HelperFunctions.getRemoteConnection();
-        PreparedStatement statement = con.prepareStatement("""
-            SELEeCT ?? from users
-        """);
-        ResultSet query = statement.executeQuery();
-
-        if (query.next()) {
-            Object value = query.getObject(1);
-            return ResponseEntity.ok().body(OkResponse.Success(value));
-        }
-
-        return ResponseEntity.ok().body(OkResponse.Error());
-    }
-
     @PostMapping("/set-personal-info")
     public ResponseEntity<OkResponse> setPersonalInfo(@RequestHeader("Authorization") String authorizationHeader, @RequestBody HashMap<String, Object> requestBody) {
         var con = HelperFunctions.getRemoteConnection();
@@ -302,5 +352,10 @@ public class UserController {
         }
 
         return ResponseEntity.ok().body(OkResponse.Success());
+    }
+
+    @GetMapping("/")
+    public ResponseEntity<String> index() {
+        return ResponseEntity.ok().body("We have no website.");
     }
 }
