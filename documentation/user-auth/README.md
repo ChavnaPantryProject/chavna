@@ -49,10 +49,10 @@ Success
 {
   "success": "success",
   "payload": null,
-  "message": "Account created succesfully"
+  "message": "Confirmation email sent."
 }
 ```
-User already exists
+User already exists (THIS CURRENTLY DOESNT WORK)
 ```
 {
   "timestamp": "2025-10-06T18:53:10.873+00:00",
