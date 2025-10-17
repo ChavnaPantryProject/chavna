@@ -37,6 +37,7 @@ import software.amazon.awssdk.services.sesv2.model.SendEmailRequest;
 
 public class HelperFunctions {
     public static SecretKey encryptionKey = Jwts.ENC.A256CBC_HS512.key().build();
+    public static SecretKey jwtKey = getJWTKey();
 
     public static String getenvNotNull(String name) {
         String env = System.getenv(name);
@@ -81,7 +82,7 @@ public class HelperFunctions {
             .issuedAt(Date.from(Instant.now()))
             .claim("user_id", userId)
             .expiration(Date.from(Instant.now().plus(UserController.TOKEN_DURATION)))
-            .signWith(encryptionKey)
+            .signWith(jwtKey)
             .compact();
         
         return jws;
@@ -117,7 +118,7 @@ public class HelperFunctions {
         String token = split[1];
 
         var parser = Jwts.parser()
-            .verifyWith(getJWTKey())
+            .verifyWith(jwtKey)
             .build();
 
         var parsed = parser.parse(token);
