@@ -77,10 +77,10 @@ public class HelperFunctions {
         return Keys.hmacShaKeyFor(Decoders.BASE64.decode(secret));
     }
 
-    public static String createToken(UUID userId) {
+    public static String createToken(UUID user_id) {
         String jws = Jwts.builder()
             .issuedAt(Date.from(Instant.now()))
-            .claim("user_id", userId)
+            .claim("user_id", user_id)
             .expiration(Date.from(Instant.now().plus(UserController.TOKEN_DURATION)))
             .signWith(jwtKey)
             .compact();
@@ -134,7 +134,7 @@ public class HelperFunctions {
             public UUID visit(Jws<?> jws) {
                 Claims payload = (Claims) jws.getPayload();
 
-                return UUID.fromString((String) payload.get("userId"));
+                return UUID.fromString((String) payload.get("user_id"));
             }
 
             @Override
@@ -151,7 +151,7 @@ public class HelperFunctions {
         ResultSetMetaData metadata = resultSet.getMetaData();
 
         HashMap<String, Object> map = new HashMap<>();
-        for (int i = 0; i < metadata.getColumnCount(); i++) {
+        for (int i = 1; i <= metadata.getColumnCount(); i++) {
             String columnName = metadata.getColumnName(i);
             Object obj = resultSet.getObject(i);
             map.put(columnName, obj);

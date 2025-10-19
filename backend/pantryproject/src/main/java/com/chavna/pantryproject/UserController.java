@@ -248,65 +248,78 @@ public class UserController {
         else if (requestBody.email != null && requestBody.userId != null)
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Request body may only contain email or user id, not both.");
 
-        if (requestBody.email != null) {
-            var con = HelperFunctions.getRemoteConnection();
+        var con = HelperFunctions.getRemoteConnection();
 
-            try {
+        UUID authorizedUser;
+        if (authorizationHeader != null)
+            authorizedUser = HelperFunctions.authorize(authorizationHeader);
+        else
+            authorizedUser = null;
+        
+        UUID requestedUser;
+        try {
+            if (requestBody.email != null) {
                 // Check if user exists
-                PreparedStatement statement = con.prepareStatement(String.format("""
+                PreparedStatement idFromEmailStatement = con.prepareStatement(String.format("""
                     SELECT id FROM %s WHERE email = ?
                 """, USERS_TABLE));
-                statement.setString(1, requestBody.email);
-                ResultSet query = statement.executeQuery();
+                idFromEmailStatement.setString(1, requestBody.email);
+                ResultSet query = idFromEmailStatement.executeQuery();
 
-                if (query.next()) {
-                    UUID id = (UUID) query.getObject(1);
-                    PreparedStatement statement2 = con.prepareStatement(String.format("""
-                        SELECT * FROM %s WHERE user_id = ?
-                    """, PERSONAL_INFO_TABLE));
-                    statement2.setObject(1, id);
-                    ResultSet query2 = statement2.executeQuery();
-                    
-                    HashMap<String, Object> jsonObject;
-                    if (query2.next()) {
-                        jsonObject = HelperFunctions.objectFromResultSet(query2);
-                    } else {
-                        jsonObject = HelperFunctions.getDefaultTableEntry(con, PERSONAL_INFO_TABLE);
-                        jsonObject.put("user_id", id);
-                    }
+                if (query.next())
+                    requestedUser = (UUID) query.getObject(1);
+                else
+                    throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User with provided e-mail does not exist.");
+            } else {
+                requestedUser = requestBody.userId;
 
-                    // Check authorization if user's profie isn't public
-                    if (!(boolean) jsonObject.get("public")) {
-                        UUID user;
-                        if (authorizationHeader != null)
-                            user = HelperFunctions.authorize(authorizationHeader);
-                        else
-                            user = null;
+                PreparedStatement userExistsStatement = con.prepareStatement(String.format(
+                """
+                    SELECT 1 FROM %s WHERE id = ?
+                """, USERS_TABLE));
+                userExistsStatement.setObject(1, requestedUser);
+                ResultSet result = userExistsStatement.executeQuery();
 
-                        if (!id.equals(user))
-                            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User has private personal info. Authorization required.");
-                    }
-
-                    return ResponseEntity.ok().body(OkResponse.Success(new GetPersonalInfoResponse(jsonObject)));
-                }
-            } catch (SQLException ex) {
-                throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, null, ex);
+                if (!result.next())
+                    throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User with provided id does not exist.");
             }
-        } else {
 
+            PreparedStatement personalInfoStatement = con.prepareStatement(String.format("""
+                SELECT * FROM %s WHERE user_id = ?
+            """, PERSONAL_INFO_TABLE));
+            personalInfoStatement.setObject(1, requestedUser);
+            ResultSet query2 = personalInfoStatement.executeQuery();
+            
+            HashMap<String, Object> jsonObject;
+            if (query2.next()) {
+                jsonObject = HelperFunctions.objectFromResultSet(query2);
+            } else {
+                jsonObject = HelperFunctions.getDefaultTableEntry(con, PERSONAL_INFO_TABLE);
+            }
+            
+            jsonObject.remove("user_id");
+
+            // Check authorization if user's profie isn't public
+            if (!(boolean) jsonObject.get("public")) {
+
+                if (!requestedUser.equals(authorizedUser))
+                    throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User has private personal info. Authorization required.");
+            }
+
+            return ResponseEntity.ok().body(OkResponse.Success(new GetPersonalInfoResponse(jsonObject)));
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, null, ex);
         }
-
-        return ResponseEntity.ok().body(null);
-    }
-
-    public static class Test {
-        public String field;
     }
 
     @PostMapping("/set-personal-info")
     public ResponseEntity<OkResponse> setPersonalInfo(@RequestHeader("Authorization") String authorizationHeader, @RequestBody HashMap<String, Object> requestBody) {
         var con = HelperFunctions.getRemoteConnection();
         UUID user = HelperFunctions.authorize(authorizationHeader);
+        if (requestBody.containsKey("user_id"))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid column: \"user_id\"");
+        
         requestBody.put("user_id", user);
 
         try {
@@ -315,15 +328,16 @@ public class UserController {
             String columnsString = "(";
             String updateString = "";
             ArrayList<String> columns = new ArrayList<>();
-            for (String columnName : defaultInfo.keySet()) {
+            for (String columnName : requestBody.keySet()) {
                 // Column name comes directly from our database schema, so no chance of SQL injection
-                if (requestBody.containsKey(columnName)) {
+                if (defaultInfo.containsKey(columnName)) {
                     valuesString += "?, ";
                     columnsString += columnName + ", ";
                     updateString += columnName + " = ?,\n";
                     
                     columns.add(columnName);
-                }
+                } else
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, String.format("Invalid column: \"%s\"", columnName));
             }
             valuesString = HelperFunctions.shortenString(valuesString, 2) + ")";
             columnsString = HelperFunctions.shortenString(columnsString, 2) + ")";
