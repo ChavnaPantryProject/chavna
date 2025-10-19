@@ -206,17 +206,6 @@ public class UserController {
 
         return ResponseEntity.ok("Account succesfully created.");
     }
-    
-    @GetMapping("/test-auth")
-    public ResponseEntity<OkResponse> testAuth(@RequestHeader("Authorization") String authorizationHeader) throws SQLException {
-        try {
-            UUID user = HelperFunctions.authorize(authorizationHeader);
-
-            return ResponseEntity.ok(OkResponse.Success("Authorized as user id: " + user));
-        } catch (JwtException ex) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, ex.toString());
-        }
-    }
 
     @GetMapping("/refresh-token")
     public ResponseEntity<OkResponse> refreshToken(@RequestHeader("Authorization") String authorizationHeader) {
@@ -366,10 +355,5 @@ public class UserController {
         }
 
         return ResponseEntity.ok().body(OkResponse.Success());
-    }
-
-    @GetMapping("/")
-    public ResponseEntity<String> index() {
-        return ResponseEntity.ok().body("We have no website.");
     }
 }
