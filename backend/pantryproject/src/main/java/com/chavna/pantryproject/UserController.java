@@ -122,6 +122,20 @@ public class UserController {
     public ResponseEntity<OkResponse> createAccount(@Valid @RequestBody CreateAccountRequest request, Errors errors) {
         if (errors.hasErrors())
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, errors.getAllErrors().get(0).toString());
+
+        try {
+            var con = HelperFunctions.getRemoteConnection();
+
+            PreparedStatement statement = con.prepareStatement("SELECT 1 FROM " + USERS_TABLE + " where email = ?");
+            statement.setString(1, request.email);
+            ResultSet results = statement.executeQuery();
+
+            if (results.next())
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "User with email already exists.");
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, null);
+        }
         
         String token = HelperFunctions.createSingupToken(request.email, request.password);
 
