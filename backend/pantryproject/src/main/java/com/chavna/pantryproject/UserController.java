@@ -1,7 +1,6 @@
 package com.chavna.pantryproject;
 
 import java.nio.charset.StandardCharsets;
-import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -63,7 +62,7 @@ public class UserController {
         if (errors.hasErrors())
            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, errors.getAllErrors().get(0).toString());
         
-        var con = HelperFunctions.getRemoteConnection();
+        var con = Database.getRemoteConnection();
 
         PreparedStatement statement = con.prepareStatement("SELECT password_hash, id FROM " + USERS_TABLE + " where email = ?");
         statement.setString(1, request.email);
@@ -75,7 +74,7 @@ public class UserController {
 
             BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(BCryptVersion.$2B, 8);
             if (encoder.matches(request.password, new String(hash, StandardCharsets.UTF_8))) {
-                String jws = HelperFunctions.createToken(id);
+                String jws = Authorization.createToken(id);
                         
                 return ResponseEntity.ok(OkResponse.Success("Succesful login.", new LoginResponse(jws)));
             }
@@ -99,7 +98,7 @@ public class UserController {
         if (errors.hasErrors())
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, errors.getAllErrors().get(0).toString());
 
-        var con = HelperFunctions.getRemoteConnection();
+        var con = Database.getRemoteConnection();
 
         PreparedStatement statement = con.prepareStatement("SELECT 1 FROM " + USERS_TABLE + " where email = ?");
         statement.setString(1, request.email);
@@ -124,7 +123,7 @@ public class UserController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, errors.getAllErrors().get(0).toString());
 
         try {
-            var con = HelperFunctions.getRemoteConnection();
+            var con = Database.getRemoteConnection();
 
             PreparedStatement statement = con.prepareStatement("SELECT 1 FROM " + USERS_TABLE + " where email = ?");
             statement.setString(1, request.email);
@@ -137,7 +136,7 @@ public class UserController {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, null);
         }
         
-        String token = HelperFunctions.createSingupToken(request.email, request.password);
+        String token = Authorization.createSingupToken(request.email, request.password);
 
         String url = CHAVNA_URL + "confirm-account?token=" + token;
         String emailContent = String.format(
@@ -156,7 +155,7 @@ public class UserController {
             """
         , url);
 
-        HelperFunctions.sendEmail("noreply@email.chavnapantry.com", request.email, emailContent, "Account Confirmation");
+        Email.sendEmail("noreply@email.chavnapantry.com", request.email, emailContent, "Account Confirmation");
 
         return ResponseEntity.ok(OkResponse.Success("Confirmation email sent."));
     }
@@ -164,7 +163,7 @@ public class UserController {
     @GetMapping("/confirm-account")
     public ResponseEntity<String> confirmAccount(@RequestParam("token") String token) throws SQLException {
         var parser = Jwts.parser()
-            .decryptWith(HelperFunctions.encryptionKey)
+            .decryptWith(Authorization.encryptionKey)
             .build();
 
         var parsed = parser.parse(token);
@@ -196,7 +195,7 @@ public class UserController {
 
         CreateAccountRequest request = parsed.accept(visitor);
 
-        var con = HelperFunctions.getRemoteConnection();
+        var con = Database.getRemoteConnection();
 
         BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(BCryptVersion.$2B, 8);
         String hash = encoder.encode(request.password);
@@ -224,9 +223,9 @@ public class UserController {
     @GetMapping("/refresh-token")
     public ResponseEntity<OkResponse> refreshToken(@RequestHeader("Authorization") String authorizationHeader) {
         try {
-            UUID user = HelperFunctions.authorize(authorizationHeader);
+            UUID user = Authorization.authorize(authorizationHeader);
 
-            String newToken = HelperFunctions.createToken(user);
+            String newToken = Authorization.createToken(user);
             return ResponseEntity.ok(OkResponse.Success("Authorized.", new LoginResponse(newToken)));
         } catch (JwtException ex) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, ex.toString());
@@ -251,11 +250,11 @@ public class UserController {
         else if (requestBody.email != null && requestBody.userId != null)
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Request body may only contain email or user id, not both.");
 
-        var con = HelperFunctions.getRemoteConnection();
+        var con = Database.getRemoteConnection();
 
         UUID authorizedUser;
         if (authorizationHeader != null)
-            authorizedUser = HelperFunctions.authorize(authorizationHeader);
+            authorizedUser = Authorization.authorize(authorizationHeader);
         else
             authorizedUser = null;
         
@@ -295,9 +294,9 @@ public class UserController {
             
             HashMap<String, Object> jsonObject;
             if (query2.next()) {
-                jsonObject = HelperFunctions.objectFromResultSet(query2);
+                jsonObject = Database.objectFromResultSet(query2);
             } else {
-                jsonObject = HelperFunctions.getDefaultTableEntry(con, PERSONAL_INFO_TABLE);
+                jsonObject = Database.getDefaultTableEntry(con, PERSONAL_INFO_TABLE);
             }
             
             jsonObject.remove("user_id");
@@ -316,17 +315,21 @@ public class UserController {
         }
     }
 
+    private static String shortenString(String string, int amount) {
+        return string.substring(0, Math.max(string.length() - amount, 0));
+    }
+
     @PostMapping("/set-personal-info")
     public ResponseEntity<OkResponse> setPersonalInfo(@RequestHeader("Authorization") String authorizationHeader, @RequestBody HashMap<String, Object> requestBody) {
-        var con = HelperFunctions.getRemoteConnection();
-        UUID user = HelperFunctions.authorize(authorizationHeader);
+        var con = Database.getRemoteConnection();
+        UUID user = Authorization.authorize(authorizationHeader);
         if (requestBody.containsKey("user_id"))
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid column: \"user_id\"");
         
         requestBody.put("user_id", user);
 
         try {
-            HashMap<String, Object> defaultInfo = HelperFunctions.getDefaultTableEntry(con, PERSONAL_INFO_TABLE);
+            HashMap<String, Object> defaultInfo = Database.getDefaultTableEntry(con, PERSONAL_INFO_TABLE);
             String valuesString = "(";
             String columnsString = "(";
             String updateString = "";
@@ -342,9 +345,9 @@ public class UserController {
                 } else
                     throw new ResponseStatusException(HttpStatus.BAD_REQUEST, String.format("Invalid column: \"%s\"", columnName));
             }
-            valuesString = HelperFunctions.shortenString(valuesString, 2) + ")";
-            columnsString = HelperFunctions.shortenString(columnsString, 2) + ")";
-            updateString = HelperFunctions.shortenString(updateString, 2) + ";";
+            valuesString = shortenString(valuesString, 2) + ")";
+            columnsString = shortenString(columnsString, 2) + ")";
+            updateString = shortenString(updateString, 2) + ";";
 
             String statementString = String.format(
                 """
