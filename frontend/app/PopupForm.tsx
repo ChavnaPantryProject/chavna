@@ -1,245 +1,240 @@
-import * as React from "react";
-import { useState } from "react";
+/*
+import this
+import PopupForm from "./PopupForm";
+
+Add for the button
+<TouchableOpacity onPress={() => setPopupVisible(true)}>
+  <Text style={{ fontSize: 26, color: "#2E4E3F", textAlign: "center" }}>＋</Text>
+</TouchableOpacity>
+
+possible usage:
+<PopupMenu
+  visible={popupVisible}
+  onClose={() => setPopupVisible(false)}
+  onSave={(data) => {
+    console.log("Saved data:", data);
+    setPopupVisible(false);
+    // You can also add it to your list, send to backend, etc.
+  }}
+  dropdownOptions={["Chicken Breast", "Beef", "Fish", "Vegetable"]}
+/>
+
+*/
+
+
+import React, { useState } from "react";
 import {
+  Modal,
   View,
   Text,
-  Modal,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
   TextInput,
+  TouchableOpacity,
   StyleSheet,
   Platform,
-  Keyboard,
 } from "react-native";
+import { Picker } from "@react-native-picker/picker";
 import DateTimePicker from "@react-native-community/datetimepicker";
 
-type Option = { label: string; value: string };
+interface DropdownOption {
+  label: string;
+  value: string;
+}
 
-type PopupFormProps = {
+interface PopupMenuProps {
   visible: boolean;
   onClose: () => void;
-  onSubmit: (data: {
-    dropdown: string;
-    text: string;
-    number1: number;
-    number2: number;
-    date: Date;
-  }) => void;
-  dropdownOptions: Option[];
-  title?: string;
-};
+  onSave: (data: any) => void;
+  dropdownOptions: DropdownOption[];
+}
 
-export default function PopupForm({
+const PopupMenu: React.FC<PopupMenuProps> = ({
   visible,
   onClose,
-  onSubmit,
+  onSave,
   dropdownOptions,
-  title = "Add Item",
-}: PopupFormProps) {
-  const [dropdownValue, setDropdownValue] = useState("");
+}) => {
+  const [selectedOption, setSelectedOption] = useState<string>(
+    dropdownOptions[0]?.value || ""
+  );
   const [textValue, setTextValue] = useState("");
-  const [num1, setNum1] = useState("");
-  const [num2, setNum2] = useState("");
+  const [number1, setNumber1] = useState("");
+  const [number2, setNumber2] = useState("");
   const [date, setDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
 
-  const handleConfirm = () => {
-    onSubmit({
-      dropdown: dropdownValue,
-      text: textValue,
-      number1: Number(num1),
-      number2: Number(num2),
+  const handleSave = () => {
+    onSave({
+      selectedOption,
+      textValue,
+      number1,
+      number2,
       date,
     });
     onClose();
   };
 
-  const handleDateChange = (event: any, selectedDate?: Date) => {
-    if (event.type === "dismissed") {
-      setShowDatePicker(false);
-      return;
-    }
-    const currentDate = selectedDate || date;
-    setDate(currentDate);
-    if (Platform.OS === "android") {
-      setShowDatePicker(false);
-    }
-  };
-
   return (
-    <Modal
-      transparent
-      visible={visible}
-      animationType="fade"
-      onRequestClose={onClose}
-    >
-      <TouchableOpacity
-        style={styles.overlay}
-        activeOpacity={1}
-        onPress={onClose}
-      >
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-          <View style={styles.container}>
-            <Text style={styles.title}>{title}</Text>
+    <Modal visible={visible} transparent animationType="fade">
+      <View style={styles.overlay}>
+        <View style={styles.container}>
+          <Text style={styles.title}>Add Item</Text>
 
-            {/* Dropdown */}
-            <View style={styles.dropdown}>
-              {(dropdownOptions || []).map((opt) => (
-                <TouchableOpacity
-                  key={opt.value}
-                  style={[
-                    styles.dropdownItem,
-                    dropdownValue === opt.value && styles.dropdownItemSelected,
-                  ]}
-                  onPress={() => setDropdownValue(opt.value)}
-                >
-                  <Text
-                    style={[
-                      styles.dropdownText,
-                      dropdownValue === opt.value && { fontWeight: "bold" },
-                    ]}
-                  >
-                    {opt.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            {/* Text Input */}
-            <TextInput
-              style={styles.input}
-              placeholder="Enter text..."
-              value={textValue}
-              onChangeText={setTextValue}
-            />
-
-            {/* Number Inputs */}
-            <TextInput
-              style={styles.input}
-              placeholder="Number 1"
-              keyboardType="numeric"
-              value={num1}
-              onChangeText={setNum1}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Number 2"
-              keyboardType="numeric"
-              value={num2}
-              onChangeText={setNum2}
-            />
-
-            {/* Date Picker */}
-            <TouchableOpacity
-              onPress={() => setShowDatePicker(true)}
-              style={styles.dateButton}
+          {/* Dropdown */}
+          <View style={styles.row}>
+            <Picker
+              selectedValue={selectedOption}
+              onValueChange={(itemValue) => setSelectedOption(itemValue)}
+              style={styles.dropdown}
             >
-              <Text style={styles.dateButtonText}>
-                {date.toLocaleDateString()}
-              </Text>
-            </TouchableOpacity>
-
-            
-            {showDatePicker && (
-              <DateTimePicker
-                value={date}
-                mode="date"
-                display={Platform.OS === "ios" ? "spinner" : "default"}
-                onChange={handleDateChange}
-              />
-            )}
-            
-
-            {/* Buttons */}
-            <View style={styles.buttonRow}>
-              <TouchableOpacity onPress={onClose} style={styles.cancelButton}>
-                <Text style={styles.buttonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={handleConfirm} style={styles.saveButton}>
-                <Text style={[styles.buttonText, { color: "white" }]}>Save</Text>
-              </TouchableOpacity>
-            </View>
+              {dropdownOptions.map((option, index) => (
+                <Picker.Item key={index}
+                  label={option.label}
+                  value={option.value}/>
+              ))}
+            </Picker>
           </View>
-        </TouchableWithoutFeedback>
-      </TouchableOpacity>
+
+          {/* Textbox */}
+          <TextInput
+            style={styles.input}
+            placeholder="Enter text..."
+            value={textValue}
+            onChangeText={setTextValue}
+          />
+
+          {/* Number 1 */}
+          <TextInput
+            style={styles.input}
+            placeholder="Weight"
+            keyboardType="numeric"
+            value={number1}
+            onChangeText={setNumber1}
+          />
+
+          {/* Number 2 */}
+          <TextInput
+            style={styles.input}
+            placeholder="Quantity"
+            keyboardType="numeric"
+            value={number2}
+            onChangeText={setNumber2}
+          />
+
+          {/* Date */}
+          <TouchableOpacity
+            style={styles.dateButton}
+            onPress={() => setShowDatePicker(true)}
+          >
+            <Text style={styles.dateText}>
+              {date.toLocaleDateString("en-US")}
+            </Text>
+          </TouchableOpacity>
+
+          {showDatePicker && (
+            <DateTimePicker
+              value={date}
+              mode="date"
+              display={Platform.OS === "ios" ? "spinner" : "default"}
+              onChange={(event, selectedDate) => {
+                setShowDatePicker(false);
+                if (selectedDate) setDate(selectedDate);
+              }}
+            />
+          )}
+
+          {/* Buttons */}
+          <View style={styles.buttonRow}>
+            <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
+              <Text style={styles.cancelText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
+              <Text style={styles.saveText}>Save</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
     </Modal>
   );
-}
+};
 
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.2)",
+    backgroundColor: "rgba(0,0,0,0.3)",
     justifyContent: "center",
     alignItems: "center",
   },
   container: {
-    backgroundColor: "#CBE6BE",
-    width: 300,
-    borderRadius: 16,
+    backgroundColor: "#d9f0cb",
     padding: 20,
-    elevation: 5,
+    borderRadius: 20,
+    width: "80%",
+    alignItems: "center",
   },
   title: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#2E4E1F",
-    textAlign: "center",
-    marginBottom: 12,
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#2f4f2f",
+    marginBottom: 15,
+  },
+  row: {
+    width: "100%",
   },
   dropdown: {
-    backgroundColor: "#A8D5A0",
-    borderRadius: 8,
-    marginBottom: 10,
-  },
-  dropdownItem: {
-    padding: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "#CBE6BE",
-  },
-  dropdownItemSelected: {
-    backgroundColor: "#8FBF88",
-  },
-  dropdownText: {
-    color: "#1B3614",
+    backgroundColor: "#ffffff",
+    borderRadius: 10,
+    marginBottom: 12,
+    width: "100%",
   },
   input: {
-    backgroundColor: "white",
-    borderRadius: 8,
+    backgroundColor: "#ffffff",
+    borderRadius: 10,
     padding: 10,
-    marginBottom: 10,
+    width: "100%",
+    marginBottom: 12,
   },
   dateButton: {
-    backgroundColor: "#A8D5A0",
-    borderRadius: 8,
-    padding: 10,
+    backgroundColor: "#a8d5a0",
+    padding: 12,
+    borderRadius: 10,
+    width: "100%",
     alignItems: "center",
-    marginBottom: 10,
+    marginBottom: 12,
   },
-  dateButtonText: {
-    color: "#1B3614",
+  dateText: {
+    color: "#1b3b1b",
     fontWeight: "500",
   },
   buttonRow: {
     flexDirection: "row",
     justifyContent: "space-between",
+    width: "100%",
+    marginTop: 10,
   },
   cancelButton: {
-    backgroundColor: "#D9EAD3",
-    padding: 10,
-    borderRadius: 8,
-    width: "45%",
+    backgroundColor: "#cde7c0",
+    flex: 1,
+    marginRight: 10,
+    borderRadius: 10,
+    paddingVertical: 10,
     alignItems: "center",
   },
   saveButton: {
-    backgroundColor: "#8FBF88",
-    padding: 10,
-    borderRadius: 8,
-    width: "45%",
+    backgroundColor: "#8dc78a",
+    flex: 1,
+    marginLeft: 10,
+    borderRadius: 10,
+    paddingVertical: 10,
     alignItems: "center",
   },
-  buttonText: {
-    fontWeight: "600",
-    color: "#2E4E1F",
+  cancelText: {
+    color: "#2f4f2f",
+    fontWeight: "500",
+  },
+  saveText: {
+    color: "#ffffff",
+    fontWeight: "700",
   },
 });
+
+export default PopupMenu;
