@@ -1,16 +1,41 @@
 import React, { useMemo, useState } from 'react'
 import { Text, View, StyleSheet, TextInput, Pressable, FlatList } from 'react-native'
+import { Feather, Ionicons } from "@expo/vector-icons";
+import ModalFoodCategory from "../pantry/modalFoodCategory";
 
 const InventoryScreen = () => {
   const [searchEntry, setSearchEntry] = useState('')
   // hard coded for now
   const foodCategories: string[] = ['Protein', 'Seafood', 'Vegetables', 'Herbs & Spices', 'test']
 
+  //state for modal visibility
+  const [modalVisible, setModalVisible] = useState(false)
+  const open = () => setModalVisible(true)
+  const close = () => setModalVisible(false)
+
+  //state for modal content
+  const [modalData, setModalData] = useState<string | null >(null) //setting type to be a string or null <string | null >
+
+
+
 
   return (
     <View style={style.container}>
+      {/* view for meat ball icon, the three dots */}
+     // in render
+    <View style={style.header}>
+      <Pressable onPress={() => console.log("Menu pressed")} hitSlop={8}>
+        <Feather name="more-horizontal" size={24} style={style.meatballButton} />
+      </Pressable>
+    </View>
       {/* search bar */}
       <View style={style.searchBar}>
+        <Ionicons 
+          name="search" 
+          size={22} 
+          color="#499F44" 
+          style={{ marginRight: 6}} 
+        />
         <TextInput
           value={searchEntry}
           onChangeText={setSearchEntry}
@@ -23,26 +48,48 @@ const InventoryScreen = () => {
       <View style={style.catergoryContainer}>
         {/* looping through foodCategories array to create a card for each category */}
         {foodCategories.map((category) => (
-          <Pressable key={category} style={style.card}>
+          <Pressable key={category} style={style.card} onPress={()=>{
+            open() // open modal
+            setModalData(category) //telling the modal what category to populate
+          }}>
             <View style={style.cardTextContainer}>
               <Text>{category}</Text>
             </View>
           </Pressable>
         ))}
       </View>
+
+      {/* This is a modal which will be a pop up for the food category, it is invisble until a user clicks on a category */}
+       <ModalFoodCategory visible={modalVisible} onClose={close} title={modalData ?? undefined}/>
+
       {/* plus icon to add another category */}
       <Pressable>
-        <Text>+</Text>
+       
+        <Text style={style.addButton}>+</Text>
       </Pressable>
     </View>
   )
 }
 
 const style = StyleSheet.create({
+  //container of the the entire screen
   container: {
     flex: 1,
     alignItems: 'center',
     marginTop: 10,
+  },
+  //needed this header class to position meatball to the right
+  header: {
+    alignSelf: 'stretch',        
+    paddingHorizontal: 16,
+    paddingTop: 5,
+    paddingBottom: 10,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginRight: 15,
+  },
+  meatballButton:{
+    color: "gray",
   },
   searchBar: {
     borderWidth: 2,
@@ -52,6 +99,7 @@ const style = StyleSheet.create({
     padding: 10,
     alignItems: 'center',
     marginBottom: 16,
+    flexDirection: 'row'
   },
 
   catergoryContainer: { 
@@ -59,7 +107,7 @@ const style = StyleSheet.create({
     flexWrap: 'wrap', 
     justifyContent: 'center'
   },
-
+  //the boxes on the screen that display the user food category
   card: {
     borderWidth: 2,
     borderColor: 'rgba(73,159,68,1)',
@@ -72,6 +120,7 @@ const style = StyleSheet.create({
     backgroundColor: "rgba(73,159,68,0.1)",
   },
 
+  //portion of the card the holds the text and the underline
   cardTextContainer: {
     alignSelf: 'stretch',
     marginHorizontal: -10, // so the underline would be the whole box, the padding was affecting this
@@ -79,6 +128,11 @@ const style = StyleSheet.create({
     borderBottomColor: 'green',
     paddingBottom: 6,
     alignItems: 'center',
+  },
+
+  addButton:{
+    fontSize: 40,
+    color: "rgba(138, 141, 138)"
   }
 
 })
