@@ -2,27 +2,38 @@ import React, { useMemo, useState } from 'react'
 import { Text, View, StyleSheet, TextInput, Pressable, FlatList } from 'react-native'
 import { Feather, Ionicons } from "@expo/vector-icons";
 import ModalFoodCategory from "../pantry/modalFoodCategory";
+import ModalCreateFoodCategory from "../pantry/modalAddCategory"
 
 const InventoryScreen = () => {
+
   const [searchEntry, setSearchEntry] = useState('')
+
   // hard coded for now
   const foodCategories: string[] = ['Protein', 'Seafood', 'Vegetables', 'Herbs & Spices', 'test']
 
-  //state for modal visibility
-  const [modalVisible, setModalVisible] = useState(false)
-  const open = () => setModalVisible(true)
-  const close = () => setModalVisible(false)
+  //states for modal visibility
+    //modal for users food categories
+  const [modalCategoryVisible, setCategoryModalVisible] = useState(false)
+  const openCategory = () => setCategoryModalVisible(true)
+  const closeCategory = () => setCategoryModalVisible(false)
 
-  //state for modal content
-  const [modalData, setModalData] = useState<string | null >(null) //setting type to be a string or null <string | null >
+    //modal for user creating a new category
+  const [modalCreateCategory, setCreateCategory] = useState(false)
+  const openCreateCategory = () => setCreateCategory(true)
+  const closeCreateCategory = () => setCreateCategory(false)
 
+
+
+  //states for modal content
+
+  //setting type to be a string or null <string | null >
+  const [foodCategoryTitle, setFoodCategoryTitle] = useState<string | null >(null) 
 
 
 
   return (
     <View style={style.container}>
       {/* view for meat ball icon, the three dots */}
-     // in render
     <View style={style.header}>
       <Pressable onPress={() => console.log("Menu pressed")} hitSlop={8}>
         <Feather name="more-horizontal" size={24} style={style.meatballButton} />
@@ -49,8 +60,8 @@ const InventoryScreen = () => {
         {/* looping through foodCategories array to create a card for each category */}
         {foodCategories.map((category) => (
           <Pressable key={category} style={style.card} onPress={()=>{
-            open() // open modal
-            setModalData(category) //telling the modal what category to populate
+            openCategory() // open modal
+            setFoodCategoryTitle(category) //telling the modal what category to populate
           }}>
             <View style={style.cardTextContainer}>
               <Text>{category}</Text>
@@ -60,11 +71,17 @@ const InventoryScreen = () => {
       </View>
 
       {/* This is a modal which will be a pop up for the food category, it is invisble until a user clicks on a category */}
-       <ModalFoodCategory visible={modalVisible} onClose={close} title={modalData ?? undefined}/>
+       <ModalFoodCategory visible={modalCategoryVisible} onClose={closeCategory} title={foodCategoryTitle ?? undefined}/>
 
       {/* plus icon to add another category */}
-      <Pressable>
-       
+      <Pressable onPress={() => {openCreateCategory()}}>
+
+        <ModalCreateFoodCategory
+          visible={modalCreateCategory}
+          onClose={closeCreateCategory}
+          title="New Group"
+          />
+          
         <Text style={style.addButton}>+</Text>
       </Pressable>
     </View>

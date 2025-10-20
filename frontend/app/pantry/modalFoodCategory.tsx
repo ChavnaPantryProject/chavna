@@ -18,48 +18,39 @@ export default function ModalFoodCategory({ visible, onClose, title, children }:
       onRequestClose={onClose} 
     >
       {/* backdrop that also dismisses */}
-      <Pressable style={styles.backdrop} onPress={onClose}>
+      <Pressable style={style.backdrop} onPress={onClose}>
 
         {/* stop backdrop press from closing when tapping inside */}
-        <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
+        <Pressable style={style.sheet} onPress={(e) => e.stopPropagation()}>
 
-          {title ? <Text style={styles.title}>{title}</Text> : null}
+          {title ? <Text style={style.title}>{title}</Text> : null}
           {children ?? <Text>pop up</Text>}
 
-          <View style={styles.actions}>
-            <Pressable style={[styles.btn, styles.primary]} onPress={onClose}>
-              <Text style={styles.primaryText}>Close</Text>
-            </Pressable>
-          </View>
         </Pressable>
       </Pressable>
     </Modal>
   );
 }
 
-const styles = StyleSheet.create({
+const style = StyleSheet.create({
   backdrop: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     padding: 20,
+    marginTop: 80
   },
+
   sheet: {
     width: "100%",
     maxWidth: 420,
     backgroundColor: "rgb(227,234,225)",
     padding: 18,
     borderRadius: 16,
-    // light shadow
-    shadowColor: "#000",
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 6,
+    borderWidth: 2,
+    borderColor: 'rgba(73,159,68,1)',
+    height: 600
   },
+
   title: { fontSize: 18, fontWeight: "700", marginBottom: 8 },
-  actions: { marginTop: 12, flexDirection: "row", justifyContent: "flex-end" },
-  btn: { paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10 },
-  primary: { backgroundColor: "#4F46E5" },
-  primaryText: { color: "#fff", fontWeight: "600" },
 });
