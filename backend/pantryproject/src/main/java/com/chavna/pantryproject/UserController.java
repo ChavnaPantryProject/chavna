@@ -43,7 +43,7 @@ public class UserController {
     public static final String FAMILY_TABLE = "family";
     public static final String FAMILY_MEMBER_TABLE = "family_member";
 
-    public static final String CHAVNA_URL = "http://localhost:5000/";//"https://api.chavnapantry.com/";
+    public static final String CHAVNA_URL = Env.getenvNotNull("SERVER_URL");
 
     public static enum FamilyRole {
         None,
@@ -633,22 +633,22 @@ public class UserController {
 
         Jwt<?, ?> parsed = parser.parse(token);
 
-        class Claim {
+        class Invite {
             public UUID recipientId;
             public UUID familyId;
         }
 
-        JwtVisitor<Claim> visitor = new JwtVisitor<Claim>() {
+        JwtVisitor<Invite> visitor = new JwtVisitor<Invite>() {
             @Override
-            public Claim visit(Jwt<?, ?> jwt) {
+            public Invite visit(Jwt<?, ?> jwt) {
                 throw new UnsupportedOperationException("Unimplemented method 'visit'");
             }
 
             @Override
-            public Claim visit(Jws<?> jws) {
+            public Invite visit(Jws<?> jws) {
                 Claims payload = (Claims) jws.getPayload();
 
-                Claim claim = new Claim();
+                Invite claim = new Invite();
                 claim.recipientId = UUID.fromString((String) payload.get("recipient"));
                 claim.familyId = UUID.fromString((String) payload.get("family_id"));
 
@@ -656,13 +656,13 @@ public class UserController {
             }
 
             @Override
-            public Claim visit(Jwe<?> jwe) {
+            public Invite visit(Jwe<?> jwe) {
                 throw new UnsupportedOperationException("Unimplemented method 'visit'");
             }
             
         };
 
-        Claim claim = parsed.accept(visitor);
+        Invite invite = parsed.accept(visitor);
 
         try {
             Connection con = Database.getRemoteConnection();
@@ -672,7 +672,7 @@ public class UserController {
                 """
                 SELECT family_membership FROM %s WHERE id = ?
                 """, USERS_TABLE));
-            checkFamilyQuery.setObject(1, claim.recipientId);
+            checkFamilyQuery.setObject(1, invite.recipientId);
             ResultSet result = checkFamilyQuery.executeQuery();
 
             if (!result.next())
@@ -691,7 +691,7 @@ public class UserController {
                 RETURNING member_id;
                 """, FAMILY_MEMBER_TABLE));
             createMembershipQuery.setInt(1, FamilyRole.Member.ordinal());
-            createMembershipQuery.setObject(2, claim.familyId);
+            createMembershipQuery.setObject(2, invite.familyId);
             result = createMembershipQuery.executeQuery();
             result.next();
             memberId = (UUID) result.getObject(1);
@@ -704,7 +704,7 @@ public class UserController {
                 WHERE id = ?;
                 """, USERS_TABLE));
             updateQuery.setObject(1, memberId);
-            updateQuery.setObject(2, claim.recipientId);
+            updateQuery.setObject(2, invite.recipientId);
             updateQuery.executeUpdate();
         } catch (SQLException ex) {
             ex.printStackTrace();
@@ -712,5 +712,57 @@ public class UserController {
         }
         
         return ResponseEntity.ok("Invite accepted.");
+    }
+
+    @AllArgsConstructor
+    public static class FamilyMember {
+        public UUID userId;
+        public String email;
+        public FamilyRole role;
+    }
+
+    @AllArgsConstructor
+    public static class GetFamilyMemembersResponse {
+        public ArrayList<FamilyMember> members;
+    }
+
+    @GetMapping("/get-family-members")
+    public ResponseEntity<OkResponse> getFamilyMembers(@RequestHeader("Authorization") String authorizationHeader) {
+        UUID user = Authorization.authorize(authorizationHeader);
+
+        try {
+            Connection con = Database.getRemoteConnection();
+
+            PreparedStatement query = con.prepareStatement(String.format(
+                """
+                WITH m AS (
+                    SELECT id, family_id, email, role FROM %s
+                    INNER JOIN %s
+                    ON family_membership = member_id
+                )
+
+                SELECT id, email, role FROM m
+                WHERE family_id = (
+                    SELECT family_id FROM m
+                    WHERE id = ?
+                );
+                """, FAMILY_MEMBER_TABLE, USERS_TABLE));
+            query.setObject(1, user);
+            ResultSet result = query.executeQuery();
+
+            ArrayList<FamilyMember> members = new ArrayList<>();
+            while (result.next()) {
+                UUID id = (UUID) result.getObject(1);
+                String email = result.getString(2);
+                FamilyRole role = FamilyRole.values()[result.getInt(3)];
+
+                members.add(new FamilyMember(id, email, role));
+            }
+
+            return ResponseEntity.ok().body(OkResponse.Success(new GetFamilyMemembersResponse(members)));
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "SQL Error");
+        }
     }
 }

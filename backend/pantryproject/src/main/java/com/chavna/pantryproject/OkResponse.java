@@ -1,7 +1,11 @@
 package com.chavna.pantryproject;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonInclude.Include;
+
 import lombok.Getter;
 
+@JsonInclude(Include.NON_NULL)
 public class OkResponse {
     @Getter
     private String success;
