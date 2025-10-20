@@ -10,9 +10,12 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "typegen": "node node_modules/expo-router/build/bin/index.js typegen",
-    "postinstall": "node node_modules/expo-router/build/bin/index.js typegen || true"
+    "postinstall": "echo \"postinstall: nothing to do\""
+
+
   },
   "dependencies": {
+    "-": "^0.0.1",
     "@expo/vector-icons": "^15.0.2",
     "@react-native-picker/picker": "2.11.1",
     "@react-navigation/bottom-tabs": "^7.4.0",
