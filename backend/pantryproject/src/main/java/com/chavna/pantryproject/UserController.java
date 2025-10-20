@@ -660,7 +660,7 @@ public class UserController {
                 throw new UnsupportedOperationException("Unimplemented method 'visit'");
             }
             
-            jsonObject.remove("user_id");
+        };
 
         Invite invite = parsed.accept(visitor);
 
@@ -764,7 +764,5 @@ public class UserController {
             ex.printStackTrace();
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "SQL Error");
         }
-
-        return ResponseEntity.ok().body(OkResponse.Success());
     }
 }
