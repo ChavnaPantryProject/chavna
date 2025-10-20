@@ -3,6 +3,7 @@ import { useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import PopupForm from "./PopupForm";
 
 export default function ConfirmationScreen() {
   const router = useRouter();
@@ -10,12 +11,31 @@ export default function ConfirmationScreen() {
     { name: "Chicken Breast", weight: "300g", qty: "3", exp: "9/15/2025" },
   ]);
 
+  const [isPopupVisible, setIsPopupVisible] = useState(false);
+
+  const handleAddItem = (data: {
+    dropdown: string | string;
+    text: string;
+    number1: number;
+    number2: number;
+    date?: Date | null;
+  }) => {
+    const newItem = {
+      name: data.text || (data.dropdown ? String(data.dropdown) : "New Item"),
+      weight: data.number1 ? `${data.number1}g` : "-",
+      qty: data.number2 ? String(data.number2) : "-",
+      exp: data.date ? data.date.toLocaleDateString() : "-",
+    };
+    setItems((prev) => [...prev, newItem]);
+
+/*
   const addItem = () => {
     // Add a blank new row when "+" is pressed
     setItems([
       ...items,
       { name: "New Item", weight: "-", qty: "-", exp: "-" },
     ]);
+*/
   };
 
   return (
@@ -50,13 +70,17 @@ export default function ConfirmationScreen() {
         ))}
 
         {/* + Button */}
-        <TouchableOpacity onPress={addItem}>
+        <TouchableOpacity onPress={() =>
+          //() => router.push("/PopupForm")
+          setIsPopupVisible(true)
+      
+          }>
           <Text style={styles.plusSign}>＋</Text>
         </TouchableOpacity>
 
         {/* Save Button */}
         <TouchableOpacity style={styles.saveButton}
-        onPress={() => router.push("/(tabs)/inventory")}
+        onPress={() => router.push("/(tabs)/home")}
         >
           <Text style={styles.saveText}>Save</Text>
         </TouchableOpacity>
@@ -64,7 +88,27 @@ export default function ConfirmationScreen() {
 
       {/* Bottom White Section */}
       <View style={styles.bottomWhite} />
+      <PopupForm
+        visible={isPopupVisible}
+        onClose={() => setIsPopupVisible(false)}
+        onSave={(data) => console.log("Saved:", data)}
+        /*
+        onSubmit={(data) => {
+          handleAddItem(data);      // add the returned data to the table
+          setIsPopupVisible(false); // close the popup
+        }}
+          */
+        dropdownOptions={[
+          { label: "Protein", value: "Protein" },
+          { label: "Vegetables", value: "Vegetables" },
+          { label: "Seafood", value: "Seafood" },
+          { label: "Carbs", value: "Carbs" },
+          { label: "Fruits", value: "Fruits" }
+        ]}
+        //title="Add Item"
+      />
     </View>
+    
   );
 }
 
