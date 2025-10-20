@@ -1,5 +1,5 @@
 import React from "react";
-import { Modal, StyleSheet, Pressable, Text } from "react-native";
+import { Modal, StyleSheet, Pressable, Text , TextInput, View} from "react-native";
 
 type Props = {
   visible: boolean;
@@ -23,7 +23,30 @@ export default function ModalCreateFoodCategory({ visible, onClose, title, child
                 <Pressable style={style.sheet} onPress={(e) => e.stopPropagation()}>
 
                 {title ? <Text style={style.title}>{title}</Text> : null}
-                {children ?? <Text>pop up</Text>}
+
+                {/* input field for new category name */}
+                <View style={style.addCategoryInputContainer}>
+                  <TextInput
+                  placeholder={"New Group"}
+                  style={style.addCategoryInput}
+                  autoFocus
+                  />
+                </View>
+
+                {/* buttons for confirming or canceling the new category */}
+                <Pressable 
+                style={style.buttonsForAddCategory}
+                onPress={onClose}
+                >
+                  <Text style={style.textInButton}>Add</Text>
+                </Pressable>
+
+                <Pressable 
+                style={style.buttonsForAddCategory}
+                onPress={onClose}
+                >
+                  <Text style={style.textInButton}>Cancel</Text>
+                </Pressable>
 
                 </Pressable>
             </Pressable>
@@ -37,13 +60,14 @@ const style = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     padding: 20,
-    marginBottom: 150
+    marginBottom: 150,
+    backgroundColor: "rgba(0,0,0,0.35)", // dim the page
   },
 
   sheet: {
     width: "80%",
     maxWidth: 420,
-    backgroundColor: "rgb(227,234,225)",
+    backgroundColor: "rgba(255, 255, 255, 1)",
     padding: 18,
     borderRadius: 16,
     borderWidth: 2,
@@ -52,5 +76,41 @@ const style = StyleSheet.create({
     alignItems: 'center'
   },
 
-  title: { fontSize: 18, fontWeight: "700", marginBottom: 8 },
+  title: { 
+    padding: 10,
+    textAlign: 'center',
+    width: "80%",
+    fontSize: 18, 
+    fontWeight: "700", 
+    marginBottom: 8,
+    borderBottomWidth: 2,
+    borderBottomColor: '#499F44', 
+  },
+
+  addCategoryInputContainer:{
+    marginTop: 15,
+    width: "100%",
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#499F44', 
+    marginBottom: 10,
+  },
+  addCategoryInput:{
+    padding: 15
+  },
+  buttonsForAddCategory:{
+    borderWidth: 2,
+    borderColor: '#A74500',
+    width: "60%",
+    marginTop: 15,
+    backgroundColor: '#F89D5D',
+    borderRadius: 10,
+  },
+  textInButton:{
+    textAlign: 'center',
+    color: 'white',
+    padding: 8,
+    fontWeight: 'bold',
+    fontSize: 16
+  }
 });
