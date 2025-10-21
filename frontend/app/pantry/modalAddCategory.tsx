@@ -65,7 +65,7 @@ const style = StyleSheet.create({
   },
 
   sheet: {
-    width: "80%",
+    width: "90%",
     maxWidth: 420,
     backgroundColor: "rgba(255, 255, 255, 1)",
     padding: 18,
