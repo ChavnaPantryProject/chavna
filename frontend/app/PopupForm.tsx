@@ -97,7 +97,7 @@ const PopupMenu: React.FC<PopupMenuProps> = ({
           {/* Textbox */}
           <TextInput
             style={styles.input}
-            placeholder="Enter text..."
+            placeholder="Name"
             value={textValue}
             onChangeText={setTextValue}
           />
@@ -183,6 +183,7 @@ const styles = StyleSheet.create({
   dropdown: {
     backgroundColor: "#ffffff",
     borderRadius: 10,
+    padding: 10,
     marginBottom: 12,
     width: "100%",
   },

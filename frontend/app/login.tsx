@@ -150,7 +150,7 @@ export default function AuthScreen() {
                                     placeholderTextColor="#BDBDBD"
                                 />
 
-                                <Pressable onPress={() => { }} style={styles.forgotWrap}>
+                                <Pressable onPress={() => router.push("/ForgotPassword")} style={styles.forgotWrap}>
                                     <Text style={styles.forgot}>Forgot Password</Text>
                                 </Pressable>
                             </>
