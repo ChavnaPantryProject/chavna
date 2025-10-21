@@ -23,6 +23,9 @@ public class Authorization {
     public static SecretKey encryptionKey = Jwts.ENC.A256CBC_HS512.key().build();
     public static SecretKey jwtKey = getJWTKey();
 
+    public static final Duration TOKEN_DURATION = Duration.ofDays(14);
+    public static final Duration INVITE_DURATION = Duration.ofDays(30);
+
     public static SecretKey getJWTKey() {
         String secret = Env.getenvNotNull("JWT_SECRET");
         return Keys.hmacShaKeyFor(Decoders.BASE64.decode(secret));
@@ -32,10 +35,22 @@ public class Authorization {
         String jws = Jwts.builder()
             .issuedAt(Date.from(Instant.now()))
             .claim("user_id", user_id)
-            .expiration(Date.from(Instant.now().plus(UserController.TOKEN_DURATION)))
+            .expiration(Date.from(Instant.now().plus(TOKEN_DURATION)))
             .signWith(jwtKey)
             .compact();
         
+        return jws;
+    }
+
+    public static String createInviteToken(UUID recipient, UUID familyId) {
+        String jws = Jwts.builder()
+            .issuedAt(Date.from(Instant.now()))
+            .claim("recipient", recipient)
+            .claim("family_id", familyId)
+            .expiration(Date.from(Instant.now().plus(INVITE_DURATION)))
+            .signWith(jwtKey)
+            .compact();
+
         return jws;
     }
 
