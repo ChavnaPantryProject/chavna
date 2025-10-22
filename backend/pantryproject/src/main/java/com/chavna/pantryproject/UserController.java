@@ -765,4 +765,108 @@ public class UserController {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "SQL Error");
         }
     }
+
+    private static class RemoveFamilyMemberRequest {
+        public String email;
+        public UUID userId;
+    }
+
+    @PostMapping("/remove-family-member")
+    public ResponseEntity<OkResponse> removeFamilyMember(@RequestHeader(value = "Authorization") String authorizationHeader, @RequestBody RemoveFamilyMemberRequest requestBody) {
+        if (requestBody == null || (requestBody.email == null && requestBody.userId == null))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Request body must contain a user email or a user id.");
+        else if (requestBody.email != null && requestBody.userId != null)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Request body may only contain email or user id, not both.");
+
+        UUID user = Authorization.authorize(authorizationHeader);
+        
+        try {
+            Connection con = Database.getRemoteConnection();
+
+            // Get membership
+            PreparedStatement checkFamilyQuery = con.prepareStatement(String.format(
+                """ 
+                SELECT id, role, family_id FROM %s
+                INNER JOIN %s
+                ON family_membership = member_id
+                WHERE id = ?;
+                """, FAMILY_MEMBER_TABLE, USERS_TABLE));
+            checkFamilyQuery.setObject(1, user);
+            ResultSet result = checkFamilyQuery.executeQuery();
+
+            if (!result.next())
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "User not part of a family.");
+
+            FamilyRole role = FamilyRole.values()[result.getInt(2)];
+            UUID familyId = (UUID) result.getObject(3);
+
+            if (role != FamilyRole.Owner)
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Only owner can delete family.");
+            
+            // Verify requested user
+            UUID requestedUser;
+            if (requestBody.email != null) {
+                // Check if user exists
+                PreparedStatement idFromEmailStatement = con.prepareStatement(String.format("""
+                    SELECT id FROM %s WHERE email = ?
+                """, USERS_TABLE));
+                idFromEmailStatement.setString(1, requestBody.email);
+                ResultSet query = idFromEmailStatement.executeQuery();
+
+                if (query.next())
+                    requestedUser = (UUID) query.getObject(1);
+                else
+                    throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User with provided e-mail does not exist.");
+            } else {
+                requestedUser = requestBody.userId;
+
+                PreparedStatement userExistsStatement = con.prepareStatement(String.format(
+                """
+                    SELECT 1 FROM %s WHERE id = ?
+                """, USERS_TABLE));
+                userExistsStatement.setObject(1, requestedUser);
+                result = userExistsStatement.executeQuery();
+
+                if (!result.next())
+                    throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User with provided id does not exist.");
+            }
+
+            if (user.equals(requestedUser))
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot remove yourself.");
+
+            // Verify requested user is part of family
+
+            PreparedStatement checkFamilyQuery2 = con.prepareStatement(String.format(
+                """ 
+                SELECT member_id FROM %s
+                INNER JOIN %s
+                ON family_membership = member_id
+                WHERE id = ? and family_id = ?;
+                """, FAMILY_MEMBER_TABLE, USERS_TABLE));
+            
+            checkFamilyQuery2.setObject(1, requestedUser);
+            checkFamilyQuery2.setObject(2, familyId);
+            result = checkFamilyQuery2.executeQuery();
+
+            if (!result.next())
+                throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Requested user does not belong to your family.");
+
+            UUID memberId = (UUID) result.getObject(1);
+
+            // Remove member
+            PreparedStatement removeMemberQuery = con.prepareStatement(String.format(
+                """
+                DELETE FROM %s
+                WHERE member_id = ?;
+                """, FAMILY_MEMBER_TABLE));
+            removeMemberQuery.setObject(1, memberId);
+
+            removeMemberQuery.executeUpdate();
+
+            return ResponseEntity.ok().body(OkResponse.Success("Member removed."));
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, null, ex);
+        }
+    }
 }
