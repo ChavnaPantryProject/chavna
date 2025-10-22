@@ -60,12 +60,12 @@ const style = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     padding: 20,
-    marginBottom: 150,
+    marginBottom: 0,
     backgroundColor: "rgba(0,0,0,0.35)", // dim the page
   },
 
   sheet: {
-    width: "80%",
+    width: "90%",
     maxWidth: 420,
     backgroundColor: "rgba(255, 255, 255, 1)",
     padding: 18,
@@ -73,7 +73,8 @@ const style = StyleSheet.create({
     borderWidth: 2,
     borderColor: 'rgba(73,159,68,1)',
     height: 300,
-    alignItems: 'center'
+    alignItems: 'center',
+    marginBottom: 150,
   },
 
   title: { 
