@@ -7,9 +7,11 @@ import {
     StyleSheet,
     KeyboardAvoidingView,
     Platform,
+    ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import * as SecureStore from 'expo-secure-store';
 import { router, type Href } from 'expo-router';
 
 type Mode = 'login' | 'signup';
@@ -18,6 +20,12 @@ const GREEN = '#2E7D32';
 const GREEN_MID = '#5FA868';
 const GRAY_LIGHT = '#E6E6E6';
 const TEXT = '#111';
+
+const API_URL = (process.env.EXPO_PUBLIC_API_URL || 'https://api.chavnapantry.com').replace(
+    /\/+$/,
+    ''
+);
+
 
 export default function AuthScreen() {
     const [mode, setMode] = useState<Mode>('login');
@@ -32,6 +40,45 @@ export default function AuthScreen() {
     const [signupPw2, setSignupPw2] = useState('');
 
     const [focusedField, setFocusedField] = useState<string | null>(null);
+    const [loading, setLoading] = useState(false);
+    const [submitError, setSubmitError] = useState<string | null>(null);
+
+    // Response Types
+    type BackendSuccess = {
+        success: 'success' | true;
+        payload: { jwt: string };
+        message?: string;
+    };
+
+    type BackendFail = {
+        success: 'fail' | false | string;
+        message?: string;
+    };
+
+    type LoginResponse = BackendSuccess | BackendFail;
+
+    // Type Guard
+    function isSuccess(resp: LoginResponse): resp is BackendSuccess {
+        return resp.success === 'success' || resp.success === true;
+
+    }
+
+    // Fetch with Timeout
+    function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}, ms = 10000) {
+        const controller = new AbortController();
+        const id = setTimeout(() => controller.abort(), ms);
+        return fetch(input, { ...init, signal: controller.signal }).finally(() => clearTimeout(id));
+    }
+
+    // Persist token
+    async function saveToken(token: string) {
+        try {
+            await SecureStore.setItemAsync('jwt', token);
+        } catch {
+            try { localStorage.setItem('jwt', token);
+             } catch { }
+        }
+    }
 
     // Validation helpers
     const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -56,12 +103,53 @@ export default function AuthScreen() {
         signupName, signupEmail, isSignupEmailValid, signupPw, signupPw2, passwordsMatch
     ]);
 
-    const onSubmit = () => {
-        if (!canSubmit) return;
+    const onSubmit = async () => {
+        if (!canSubmit || loading) return;
+        setSubmitError(null);
+        
         if (mode === 'login') {
-            // use loginEmail, loginPw
+           try {
+            setLoading(true);
+            const endpoint = `${API_URL}/login`;
+            const res = await fetchWithTimeout(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    email: loginEmail.trim(),
+                    password: loginPw,
+                }),
+            });
+
+            let data: LoginResponse;
+            try {
+                data = (await res.json()) as LoginResponse;
+            } catch {
+                throw new Error('Invalid server response.');
+            }
+
+            if (!res.ok) {
+                throw new Error((data as BackendFail)?.message || 'Login failed.');
+            }
+
+            if (!isSuccess(data)) {
+                throw new Error(data?.message || 'Login failed.');
+            }
+
+            const token = data.payload.jwt;
+            await saveToken(token);
+            router.replace('/(tabs)/home');
+        } catch (err: any) {
+            const msg =
+                err?.name === 'AbortError'
+                    ? 'Login timed out. Check your connection and try again.'
+                    : err?.message || 'Login failed. Please try again.';
+            setSubmitError(msg);
+        } finally {
+            setLoading(false);
+        }
+
         } else {
-            // use signupName, signupEmail, signupPw
+            // Adding signup later
         }
     };
 
@@ -75,6 +163,7 @@ export default function AuthScreen() {
         // Clear signup fields
         setSignupName(''); setSignupEmail(''); setSignupPw(''); setSignupPw2('');
         setFocusedField(null);
+        setSubmitError(null);
     };
 
     const switchToSignup = () => {
@@ -82,6 +171,7 @@ export default function AuthScreen() {
         // Clear login fields
         setLoginEmail(''); setLoginPw('');
         setFocusedField(null);
+        setSubmitError(null);
     };
 
     const Accent = ({ active }: { active: boolean }) => (
@@ -101,14 +191,14 @@ export default function AuthScreen() {
                 <View style={styles.container}>
                     {/* Tabs */}
                     <View style={styles.tabs}>
-                        <Pressable style={styles.tab} onPress={switchToLogin}>
+                        <Pressable style={styles.tab} onPress={switchToLogin} disabled={loading}>
                             <Text style={[styles.tabText, mode === 'login' && styles.tabTextActive]}>
                                 Login
                             </Text>
                             <Accent active={mode === 'login'} />
                         </Pressable>
 
-                        <Pressable style={styles.tab} onPress={switchToSignup}>
+                        <Pressable style={styles.tab} onPress={switchToSignup} disabled={loading}>
                             <Text style={[styles.tabText, mode === 'signup' && styles.tabTextActive]}>
                                 Create Account
                             </Text>
@@ -132,6 +222,8 @@ export default function AuthScreen() {
                                     autoCapitalize="none"
                                     keyboardType="email-address"
                                     placeholderTextColor="#BDBDBD"
+                                    editable={!loading}
+
                                 />
                                 {loginEmail.length > 0 && !isLoginEmailValid && (
                                     <Text style={styles.errorText}>Enter a valid email address</Text>
@@ -148,9 +240,11 @@ export default function AuthScreen() {
                                     onBlur={() => setFocusedField(null)}
                                     secureTextEntry
                                     placeholderTextColor="#BDBDBD"
+                                    editable={!loading}
+
                                 />
 
-                                <Pressable onPress={() => { }} style={styles.forgotWrap}>
+                                <Pressable onPress={() => { }} style={styles.forgotWrap} disabled={loading}>
                                     <Text style={styles.forgot}>Forgot Password</Text>
                                 </Pressable>
                             </>
@@ -167,6 +261,7 @@ export default function AuthScreen() {
                                     onBlur={() => setFocusedField(null)}
                                     autoCapitalize="words"
                                     placeholderTextColor="#BDBDBD"
+                                    editable={!loading}
                                 />
 
                                 {/* Email (signup) */}
@@ -181,6 +276,8 @@ export default function AuthScreen() {
                                     autoCapitalize="none"
                                     keyboardType="email-address"
                                     placeholderTextColor="#BDBDBD"
+                                    editable={!loading}
+
                                 />
                                 {signupEmail.length > 0 && !isSignupEmailValid && (
                                     <Text style={styles.errorText}>Enter a valid email address</Text>
@@ -197,6 +294,8 @@ export default function AuthScreen() {
                                     onBlur={() => setFocusedField(null)}
                                     secureTextEntry
                                     placeholderTextColor="#BDBDBD"
+                                    editable={!loading}
+
                                 />
 
                                 <Text style={styles.label}>Confirm Password</Text>
@@ -209,6 +308,7 @@ export default function AuthScreen() {
                                     onBlur={() => setFocusedField(null)}
                                     secureTextEntry
                                     placeholderTextColor="#BDBDBD"
+                                    editable={!loading}
                                 />
                                 {signupPw2.length > 0 && !passwordsMatch && (
                                     <Text style={styles.errorText}>Passwords do not match</Text>
@@ -216,14 +316,20 @@ export default function AuthScreen() {
                             </>
                         )}
 
+                        {submitError && <Text style={[styles.errorText, { marginTop: 4 }]}>{submitError}</Text>}
+
                         <Pressable
                             onPress={onSubmit}
-                            disabled={!canSubmit}
-                            style={[styles.primaryBtn, !canSubmit && styles.primaryBtnDisabled]}
+                            disabled={!canSubmit || loading}
+                            style={[styles.primaryBtn, (!canSubmit || loading) && styles.primaryBtnDisabled]}
                         >
+                            {loading ? (
+                                <ActivityIndicator color="#1D3B25" />
+                            ) : (
                             <Text style={styles.primaryBtnText}>
                                 {mode === 'login' ? 'Login' : 'Create Account'}
                             </Text>
+                            )}
                         </Pressable>
                     </View>
 
@@ -275,7 +381,7 @@ export default function AuthScreen() {
     );
 }
 
-/* ---------- Social Button ---------- */
+// Socials
 function SocialButton({ icon, label }: { icon: React.ReactNode; label: string }) {
     return (
         <Pressable style={styles.socialBtn}>
@@ -285,7 +391,7 @@ function SocialButton({ icon, label }: { icon: React.ReactNode; label: string })
     );
 }
 
-/* ---------- Styles ---------- */
+// Styles
 const styles = StyleSheet.create({
     container: {
         flex: 1,
@@ -387,7 +493,8 @@ const styles = StyleSheet.create({
         marginLeft: 4,
     },
 
-    /* Dev Buttons */
+    // Dev Buttons (Can Remove in Final Version)
+    // Reminder to adjust spacing bc it's going to look strange with empty space
     devBtns: {
         marginTop: 'auto',
         alignItems: 'center',
