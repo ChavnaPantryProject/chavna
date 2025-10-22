@@ -11,6 +11,7 @@ import {
   Image,
   type ImageSourcePropType,
   ScrollView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack } from 'expo-router';
@@ -128,8 +129,21 @@ export default function HomeScreen() {
                 ))}
 
 
-                <Pressable onPress={addItem} style={styles.addBtn}>
-                  <Ionicons name="add" size={35} color="#7A8B7E" />
+                <Pressable onPress={addItem} 
+                  style={({ pressed }) => [
+                  styles.addBtn,
+                  pressed && {
+                    backgroundColor: '#CBE8CC', // On press glow
+                    shadowColor: '#499F44',
+                    shadowOffset: { width: 0, height: 0 },
+                    shadowOpacity: 0.5,
+                    shadowRadius: 10,
+                    transform: [{ scale: 0.95 }],
+                    ...(Platform.OS === 'android' ? { elevation: 8 } : {}),
+                        },
+                      ]}
+                    >
+                  <Ionicons name="add" size={35} color="#2E7D32" />
                 </Pressable>
               </View>
             </ScrollOnlyRows>
@@ -158,7 +172,6 @@ function FavMeal({ source }: { source: ImageSourcePropType }) {
   );
 }
 
-// (2) Updated prop type to accept nullable ref
 function ScrollOnlyRows({
   children,
   scrollRef,
@@ -307,6 +320,14 @@ const styles = StyleSheet.create({
   addBtn: {
     marginBottom: 12,
     alignSelf: 'center',
+    width: 45,
+    height: 45,
+    borderRadius: 30,
+    borderWidth: 2  ,
+    borderColor: '#499F44',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#E6F4EA'
   },
 
   // Favorite Meals Section
