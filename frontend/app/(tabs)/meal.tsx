@@ -36,8 +36,6 @@ const MealScreen = () => {
   const [showDeleteModal, setShowDeleteModal] = React.useState(false);
   const [selectedMeal, setSelectedMeal] = React.useState<any>(null);
   const [favorites, setFavorites] = React.useState<string[]>([]); // fav meal IDs
-  const [data, setData] = React.useState(meals);
-
 
   // for the delete button to prompt when clicked
   const handleDelete = (meal: any) => {
@@ -53,16 +51,6 @@ const MealScreen = () => {
         : [...prev, meal.id]
     );
   };
-
-  const confirmDelete = () => {
-  if (!selectedMeal) return;
-  setData(prev => prev.filter(m => m.id !== selectedMeal.id));
-  // also remove from favorites if it was starred
-  setFavorites(prev => prev.filter(id => id !== selectedMeal.id));
-  setShowDeleteModal(false);
-  setSelectedMeal(null);
-};
-
 
   // rendering each meal card
   const renderMeal = ({item}: {item: any}) => (
@@ -140,7 +128,7 @@ const MealScreen = () => {
       {/* List of Meals */}
       <FlatList
         // data source
-        data={data}
+        data={meals} // Not sure why this was data = {data} but put it to meals as a fix for now since the page wasn't loading - Brandon
         // unique key for each mealunique key
         keyExtractor={(item) => item.id}
         // render each meal card
@@ -169,9 +157,11 @@ const MealScreen = () => {
               Are you sure you want to delete {selectedMeal?.name}?
             </Text>
 
-              <TouchableOpacity
+            <TouchableOpacity
               style={styles.modalBtn}
-              onPress={confirmDelete}
+              onPress={() => {
+                setShowDeleteModal(false);
+              }}
             >
               <Text style={styles.modalBtnText}>Delete Meal</Text>
             </TouchableOpacity>
