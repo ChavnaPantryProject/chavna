@@ -128,7 +128,7 @@ const MealScreen = () => {
       {/* List of Meals */}
       <FlatList
         // data source
-        data={data}
+        data={meals} // Not sure why this was data = {data} but put it to meals as a fix for now since the page wasn't loading - Brandon
         // unique key for each mealunique key
         keyExtractor={(item) => item.id}
         // render each meal card

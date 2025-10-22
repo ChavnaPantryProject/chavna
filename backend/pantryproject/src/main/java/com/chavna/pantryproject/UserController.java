@@ -2,20 +2,14 @@ package com.chavna.pantryproject;
 
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.Date;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.UUID;
 
-import javax.crypto.SecretKey;
-
 import org.apache.coyote.BadRequestException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -25,6 +19,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -33,87 +28,32 @@ import io.jsonwebtoken.Jwe;
 import io.jsonwebtoken.Jws;
 import io.jsonwebtoken.Jwt;
 import io.jsonwebtoken.JwtException;
+import io.jsonwebtoken.JwtParser;
 import io.jsonwebtoken.JwtVisitor;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.io.Decoders;
-import io.jsonwebtoken.security.Keys;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
-import lombok.Getter;
+
+import lombok.AllArgsConstructor;
 
 @RestController
 public class UserController {
-    private static Logger logger = LoggerFactory.getLogger(UserController.class);
-    private static final String USERS_TABLE = "users";
-    private static final Duration TOKEN_DURATION = Duration.ofDays(14);
+    public static final String USERS_TABLE = "users";
+    public static final String PERSONAL_INFO_TABLE = "personal_info";
+    public static final String FAMILY_TABLE = "family";
+    public static final String FAMILY_MEMBER_TABLE = "family_member";
 
-    public static class OkResponse {
-        @Getter
-        private String success;
-        @Getter
-        private Object payload;
-        @Getter
-        private String message;
+    public static final String CHAVNA_URL = Env.getenvNotNull("SERVER_URL");
 
-        private OkResponse(String success, Object payload, String message) {
-            this.success = success;
-            this.payload = payload;
-            this.message = message;
-        }
-
-        public static OkResponse Success() {
-            return new OkResponse("success", null, null);
-        }
-
-        public static OkResponse Success(String message) {
-            return new OkResponse("success", null, message);
-        }
-
-        public static OkResponse Success(Object payload) {
-            return new OkResponse("success", payload, null);
-        }
-
-        public static OkResponse Success(String message, Object payload) {
-            return new OkResponse("success", payload, message);
-        }
-
-        public static OkResponse Error() {
-            return new OkResponse("error", null, null);
-        }
-
-        public static OkResponse Error(String message) {
-            return new OkResponse("error", null, message);
-        }
+    public static enum FamilyRole {
+        None,
+        Owner,
+        Member
     }
 
-    private static Connection getRemoteConnection() {
-        try {
-            Class.forName("org.postgresql.Driver");
-            String use = System.getenv("USE_NEON_DATABASE");
-            System.err.println("USE_NEON_DATABASE=\"" + use + "\"");
-            if (use != null && use.equals("1")) {
-                String jdbcUrl = "jdbc:" + System.getenv("DATABASE_URL");
-                return DriverManager.getConnection(jdbcUrl);
-            }
-                
-            String hostname = System.getenv("RDS_HOSTNAME");
-            if (hostname != null) {
-                String dbName = System.getenv("RDS_DB_NAME");
-                String userName = System.getenv("RDS_USERNAME");
-                String password = System.getenv("RDS_PASSWORD");
-                String port = System.getenv("RDS_PORT");
-                String jdbcUrl = "jdbc:postgresql://" + hostname + ":" + port + "/" + dbName + "?user=" + userName + "&password=" + password;
-                return DriverManager.getConnection(jdbcUrl);
-            }
-        }
-        // Rethrow exceptions as RuntimeExceptions since spring boot is going to automatically catch them anyway.
-        // I'd rather not be forced to explicitly deal with them if they arent going to crash the whole server.
-        // Probably bad practice, but idc.
-        catch (RuntimeException ex) { throw ex; }
-        catch (Exception ex) { throw new RuntimeException(ex); }
-
-        throw new RuntimeException("nothing happened.");
-    }
+    //                          //
+    //  USER RELATED REQUESTS   //
+    //                          //
 
     public static class LoginRequest {
         @NotNull
@@ -122,28 +62,12 @@ public class UserController {
         public String password;
     }
 
-    public static class LoginPayload {
-        public String jwtToken;
+    public static class LoginResponse {
+        public String jwt;
 
-        public LoginPayload(String jwtToken) {
-            this.jwtToken = jwtToken;
+        public LoginResponse(String jwt) {
+            this.jwt = jwt;
         }
-    }
-
-    public static SecretKey getJWTKey() {
-        String secret = System.getenv("JWT_SECRET");
-        return Keys.hmacShaKeyFor(Decoders.BASE64.decode(secret));
-    }
-
-    private static String createToken(UUID userId) {
-        String jws = Jwts.builder()
-            .issuedAt(Date.from(Instant.now()))
-            .claim("UserId", userId)
-            .expiration(Date.from(Instant.now().plus(TOKEN_DURATION)))
-            .signWith(getJWTKey())
-            .compact();
-        
-        return jws;
     }
 
     @PostMapping("/login")
@@ -151,7 +75,7 @@ public class UserController {
         if (errors.hasErrors())
            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, errors.getAllErrors().get(0).toString());
         
-        var con = getRemoteConnection();
+        Connection con = Database.getRemoteConnection();
 
         PreparedStatement statement = con.prepareStatement("SELECT password_hash, id FROM " + USERS_TABLE + " where email = ?");
         statement.setString(1, request.email);
@@ -163,9 +87,9 @@ public class UserController {
 
             BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(BCryptVersion.$2B, 8);
             if (encoder.matches(request.password, new String(hash, StandardCharsets.UTF_8))) {
-                String jws = createToken(id);
+                String jws = Authorization.createToken(id);
                         
-                return ResponseEntity.ok(OkResponse.Success("Succesful login.", new LoginPayload(jws)));
+                return ResponseEntity.ok(OkResponse.Success("Succesful login.", new LoginResponse(jws)));
             }
         }
 
@@ -177,6 +101,7 @@ public class UserController {
         public String email;
     }
 
+    @AllArgsConstructor
     public static class UserExistsResponse {
         public boolean exists;
     }
@@ -186,14 +111,14 @@ public class UserController {
         if (errors.hasErrors())
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, errors.getAllErrors().get(0).toString());
 
-        var con = getRemoteConnection();
+        Connection con = Database.getRemoteConnection();
 
         PreparedStatement statement = con.prepareStatement("SELECT 1 FROM " + USERS_TABLE + " where email = ?");
         statement.setString(1, request.email);
         ResultSet results = statement.executeQuery();
 
         if (results.next())
-            return ResponseEntity.ok(OkResponse.Success(results.getInt(1) == 1));
+            return ResponseEntity.ok(OkResponse.Success(new UserExistsResponse(results.getInt(1) == 1)));
 
         return ResponseEntity.ok(OkResponse.Success(false));
     }
@@ -206,11 +131,84 @@ public class UserController {
     }
 
     @PostMapping("/create-account")
-    public ResponseEntity<OkResponse> createAccount(@Valid @RequestBody CreateAccountRequest request, Errors errors) throws SQLException {
+    public ResponseEntity<OkResponse> createAccount(@Valid @RequestBody CreateAccountRequest request, Errors errors) {
         if (errors.hasErrors())
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, errors.getAllErrors().get(0).toString());
+
+        try {
+            Connection con = Database.getRemoteConnection();
+
+            PreparedStatement statement = con.prepareStatement("SELECT 1 FROM " + USERS_TABLE + " where email = ?");
+            statement.setString(1, request.email);
+            ResultSet results = statement.executeQuery();
+
+            if (results.next())
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "User with email already exists.");
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, null);
+        }
         
-        var con = getRemoteConnection();
+        String token = Authorization.createSingupToken(request.email, request.password);
+
+        String url = CHAVNA_URL + "confirm-account?token=" + token;
+        String emailContent = String.format(
+            """
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title></title>
+            </head>
+            <body>
+                <a href="%s">Click here to confirm your email address.</a>
+            </body>
+            </html>
+            """
+        , url);
+
+        Email.sendEmail("noreply@email.chavnapantry.com", request.email, emailContent, "Account Confirmation");
+
+        return ResponseEntity.ok(OkResponse.Success("Confirmation email sent."));
+    }
+
+    @GetMapping("/confirm-account")
+    public ResponseEntity<String> confirmAccount(@RequestParam("token") String token) throws SQLException {
+        JwtParser parser = Jwts.parser()
+            .decryptWith(Authorization.encryptionKey)
+            .build();
+
+        Jwt<?, ?> parsed = parser.parse(token);
+
+        JwtVisitor<CreateAccountRequest> visitor = new JwtVisitor<CreateAccountRequest>() {
+
+            @Override
+            public CreateAccountRequest visit(Jwt<?, ?> jwt) {
+                throw new UnsupportedOperationException("Unimplemented method 'visit'");
+            }
+
+            @Override
+            public CreateAccountRequest visit(Jws<?> jws) {
+                throw new UnsupportedOperationException("Unimplemented method 'visit'");
+            }
+
+            @Override
+            public CreateAccountRequest visit(Jwe<?> jwe) {
+                Claims payload = (Claims) jwe.getPayload();
+
+                CreateAccountRequest request = new CreateAccountRequest();
+                request.email = (String) payload.get("email");
+                request.password = (String) payload.get("password");
+
+                return request;
+            }
+            
+        };
+
+        CreateAccountRequest request = parsed.accept(visitor);
+
+        Connection con = Database.getRemoteConnection();
 
         BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(BCryptVersion.$2B, 8);
         String hash = encoder.encode(request.password);
@@ -226,82 +224,649 @@ public class UserController {
             statement.executeUpdate();
         }
         catch (SQLException ex) {
+            ex.printStackTrace();
             if (ex.getSQLState().equals("23505"))
                 throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "User with email already exists.");
-                // return ResponseEntity.internalServerError().body("User with email already exists.");
 
             throw ex;
         }
 
-        // This feels wrong, but I can't find another way to get an
-        // auto generated JSON response
-        return ResponseEntity.ok(OkResponse.Success("Account created succesfully"));
-    }
-
-    /**
-    * Verifies JWS token and returns the user id associated with it.
-    * @param  authorizationHeader  the full HTTP header containing the JWS token
-    * @return      the user id assocciated with the token.
-    */
-    private UUID authorize(String authorizationHeader) {
-        String[] split = authorizationHeader.split(" ");
-        System.err.println(authorizationHeader);
-
-        if (split.length != 2 || !split[0].equals("Bearer"))
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid authorization header.");
-
-        String token = split[1];
-
-        var parser = Jwts.parser()
-            .verifyWith(getJWTKey())
-            .build();
-
-        var parsed = parser.parse(token);
-
-        var visitor = new JwtVisitor<UUID>() {
-
-            @Override
-            public UUID visit(Jwt<?, ?> jwt) {
-                throw new UnsupportedOperationException("Unimplemented method 'visit'");
-            }
-
-            @Override
-            public UUID visit(Jws<?> jws) {
-                Claims payload = (Claims) jws.getPayload();
-
-                return UUID.fromString((String) payload.get("UserId"));
-            }
-
-            @Override
-            public UUID visit(Jwe<?> jwe) {
-                throw new UnsupportedOperationException("Unimplemented method 'visit'");
-            }
-            
-        };
-
-        return parsed.accept(visitor);
-    }
-
-    @GetMapping("/test-auth")
-    public ResponseEntity<OkResponse> testAuth(@RequestHeader("Authorization") String authorizationHeader) throws SQLException {
-        try {
-            UUID user = authorize(authorizationHeader);
-
-            return ResponseEntity.ok(OkResponse.Success("Authorized as user id: " + user));
-        } catch (JwtException ex) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, ex.toString());
-        }
+        return ResponseEntity.ok("Account succesfully created.");
     }
 
     @GetMapping("/refresh-token")
     public ResponseEntity<OkResponse> refreshToken(@RequestHeader("Authorization") String authorizationHeader) {
         try {
-            UUID user = authorize(authorizationHeader);
+            UUID user = Authorization.authorize(authorizationHeader);
 
-            String newToken = createToken(user);
-            return ResponseEntity.ok(OkResponse.Success("Authorized.", new LoginPayload(newToken)));
+            String newToken = Authorization.createToken(user);
+            return ResponseEntity.ok(OkResponse.Success("Authorized.", new LoginResponse(newToken)));
         } catch (JwtException ex) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, ex.toString());
+        }
+    }
+
+    //                          //
+    //  PERSONAL INFO REQUESTS  //
+    //                          //
+
+    private static class GetPersonalInfoRequest {
+        public String email;
+        public UUID userId;
+    }
+
+    @AllArgsConstructor
+    private static class GetPersonalInfoResponse {
+        @SuppressWarnings("unused")
+        public HashMap<String, Object> personal_info;
+    }
+
+    @GetMapping("/get-personal-info")
+    public ResponseEntity<OkResponse> getPersonalInfo(@RequestHeader(value = "Authorization", required = false) String authorizationHeader, @RequestBody GetPersonalInfoRequest requestBody) {
+        if (requestBody == null || (requestBody.email == null && requestBody.userId == null))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Request body must contain a user email or a user id.");
+        else if (requestBody.email != null && requestBody.userId != null)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Request body may only contain email or user id, not both.");
+
+        Connection con = Database.getRemoteConnection();
+
+        UUID authorizedUser;
+        if (authorizationHeader != null)
+            authorizedUser = Authorization.authorize(authorizationHeader);
+        else
+            authorizedUser = null;
+        
+        UUID requestedUser;
+        try {
+            if (requestBody.email != null) {
+                // Check if user exists
+                PreparedStatement idFromEmailStatement = con.prepareStatement(String.format("""
+                    SELECT id FROM %s WHERE email = ?
+                """, USERS_TABLE));
+                idFromEmailStatement.setString(1, requestBody.email);
+                ResultSet query = idFromEmailStatement.executeQuery();
+
+                if (query.next())
+                    requestedUser = (UUID) query.getObject(1);
+                else
+                    throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User with provided e-mail does not exist.");
+            } else {
+                requestedUser = requestBody.userId;
+
+                PreparedStatement userExistsStatement = con.prepareStatement(String.format(
+                """
+                    SELECT 1 FROM %s WHERE id = ?
+                """, USERS_TABLE));
+                userExistsStatement.setObject(1, requestedUser);
+                ResultSet result = userExistsStatement.executeQuery();
+
+                if (!result.next())
+                    throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User with provided id does not exist.");
+            }
+
+            PreparedStatement personalInfoStatement = con.prepareStatement(String.format("""
+                SELECT * FROM %s WHERE user_id = ?
+            """, PERSONAL_INFO_TABLE));
+            personalInfoStatement.setObject(1, requestedUser);
+            ResultSet query2 = personalInfoStatement.executeQuery();
+            
+            HashMap<String, Object> jsonObject;
+            if (query2.next()) {
+                jsonObject = Database.objectFromResultSet(query2);
+            } else {
+                jsonObject = Database.getDefaultTableEntry(con, PERSONAL_INFO_TABLE);
+            }
+            
+            jsonObject.remove("user_id");
+
+            // Check authorization if user's profie isn't public
+            if (!(boolean) jsonObject.get("public")) {
+
+                if (!requestedUser.equals(authorizedUser))
+                    throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User has private personal info. Authorization required.");
+            }
+
+            return ResponseEntity.ok().body(OkResponse.Success(new GetPersonalInfoResponse(jsonObject)));
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, null, ex);
+        }
+    }
+
+    private static String shortenString(String string, int amount) {
+        return string.substring(0, Math.max(string.length() - amount, 0));
+    }
+
+    @PostMapping("/set-personal-info")
+    public ResponseEntity<OkResponse> setPersonalInfo(@RequestHeader("Authorization") String authorizationHeader, @RequestBody HashMap<String, Object> requestBody) {
+        Connection con = Database.getRemoteConnection();
+        UUID user = Authorization.authorize(authorizationHeader);
+        if (requestBody.containsKey("user_id"))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid column: \"user_id\"");
+        
+        requestBody.put("user_id", user);
+
+        try {
+            HashMap<String, Object> defaultInfo = Database.getDefaultTableEntry(con, PERSONAL_INFO_TABLE);
+            String valuesString = "(";
+            String columnsString = "(";
+            String updateString = "";
+            ArrayList<String> columns = new ArrayList<>();
+            for (String columnName : requestBody.keySet()) {
+                // Column name comes directly from our database schema, so no chance of SQL injection
+                if (defaultInfo.containsKey(columnName)) {
+                    valuesString += "?, ";
+                    columnsString += columnName + ", ";
+                    updateString += columnName + " = ?,\n";
+                    
+                    columns.add(columnName);
+                } else
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, String.format("Invalid column: \"%s\"", columnName));
+            }
+            valuesString = shortenString(valuesString, 2) + ")";
+            columnsString = shortenString(columnsString, 2) + ")";
+            updateString = shortenString(updateString, 2) + ";";
+
+            String statementString = String.format(
+                """
+                INSERT INTO %s %s
+                VALUES %s
+                ON CONFLICT (user_id) DO UPDATE SET
+                """ + updateString, PERSONAL_INFO_TABLE, columnsString, valuesString);
+
+            System.out.println(statementString);
+            PreparedStatement statement = con.prepareStatement(statementString);
+
+            for (int i = 1; i <= columns.size(); i++) {
+                String columnName = columns.get(i - 1);
+                Object obj = requestBody.get(columnName);
+                statement.setObject(i, obj);
+                statement.setObject(i + columns.size(), obj);
+            }
+
+            statement.executeUpdate();
+        } catch (SQLException ex) {
+
+        }
+
+        return ResponseEntity.ok().body(OkResponse.Success());
+    }
+
+    //                  //
+    //  FAMILY REQUESTS //
+    //                  //
+
+    @PostMapping("create-family")
+    public ResponseEntity<OkResponse> createFamily(@RequestHeader("Authorization") String authorizationHeader) {
+        UUID user = Authorization.authorize(authorizationHeader);
+        
+        try {
+            Connection con = Database.getRemoteConnection();
+
+            // Error if alreayd part of family
+            PreparedStatement checkFamilyQuery = con.prepareStatement(String.format(
+                """
+                SELECT family_membership FROM %s WHERE id = ?
+                """, USERS_TABLE));
+            checkFamilyQuery.setObject(1, user);
+            ResultSet result = checkFamilyQuery.executeQuery();
+
+            if (result.next()) {
+                UUID memberId = (UUID) result.getObject(1);
+
+                if (memberId != null)
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, "User already part of a family.");
+            }
+
+            // Create the family
+            PreparedStatement createFamilyQuery = con.prepareStatement(String.format(
+                """
+                INSERT INTO %s DEFAULT VALUES
+                RETURNING family_id;
+                """, FAMILY_TABLE));
+            result = createFamilyQuery.executeQuery();
+            result.next();
+            UUID familyId = (UUID) result.getObject(1);
+
+            // Create family membership
+            PreparedStatement createMembershipQuery = con.prepareStatement(String.format(
+                """
+                INSERT INTO %s (role, family_id)
+                VALUES (?, ?)
+                RETURNING member_id;
+                """, FAMILY_MEMBER_TABLE));
+            createMembershipQuery.setInt(1, FamilyRole.Owner.ordinal());
+            createMembershipQuery.setObject(2, familyId);
+            result = createMembershipQuery.executeQuery();
+            result.next();
+            UUID memberId = (UUID) result.getObject(1);
+
+            // Update member_id
+            PreparedStatement updateQuery = con.prepareStatement(String.format(
+                """
+                UPDATE %s
+                SET family_membership = ?
+                WHERE id = ?;
+                """, USERS_TABLE));
+            updateQuery.setObject(1, memberId);
+            updateQuery.setObject(2, user);
+            updateQuery.executeUpdate();
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "SQL Error");
+        }
+
+        return ResponseEntity.ok().body(OkResponse.Success("Family created"));
+    }
+
+    @PostMapping("leave-family")
+    public ResponseEntity<OkResponse> leaveFamily(@RequestHeader("Authorization") String authorizationHeader) {
+        UUID user = Authorization.authorize(authorizationHeader);
+        
+        try {
+            Connection con = Database.getRemoteConnection();
+
+            // Get membership
+            PreparedStatement checkFamilyQuery = con.prepareStatement(String.format(
+                """ 
+                SELECT id, role, member_id FROM %s
+                INNER JOIN %s
+                ON family_membership = member_id
+                WHERE id = ?;
+                """, FAMILY_MEMBER_TABLE, USERS_TABLE));
+            checkFamilyQuery.setObject(1, user);
+            ResultSet result = checkFamilyQuery.executeQuery();
+
+            if (!result.next())
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "User not part of a family.");
+
+            FamilyRole role = FamilyRole.values()[result.getInt(2)];
+            UUID memberId = (UUID) result.getObject(3);
+
+            if (role == FamilyRole.Owner)
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Cannot leave family as owner.");
+
+            // Remove member
+            PreparedStatement removeMemberQuery = con.prepareStatement(String.format(
+                """
+                DELETE FROM %s
+                WHERE member_id = ?;
+                """, FAMILY_MEMBER_TABLE));
+            removeMemberQuery.setObject(1, memberId);
+            removeMemberQuery.executeUpdate();
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "SQL Error");
+        }
+
+        return ResponseEntity.ok().body(OkResponse.Success("Left family"));
+    }
+
+    @PostMapping("delete-family")
+    public ResponseEntity<OkResponse> deleteFamily(@RequestHeader("Authorization") String authorizationHeader) {
+        UUID user = Authorization.authorize(authorizationHeader);
+        
+        try {
+            Connection con = Database.getRemoteConnection();
+
+            // Get membership
+            PreparedStatement checkFamilyQuery = con.prepareStatement(String.format(
+                """ 
+                SELECT id, role, family_id FROM %s
+                INNER JOIN %s
+                ON family_membership = member_id
+                WHERE id = ?;
+                """, FAMILY_MEMBER_TABLE, USERS_TABLE));
+            checkFamilyQuery.setObject(1, user);
+            ResultSet result = checkFamilyQuery.executeQuery();
+
+            if (!result.next())
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "User not part of a family.");
+
+            FamilyRole role = FamilyRole.values()[result.getInt(2)];
+            UUID familyId = (UUID) result.getObject(3);
+
+            if (role != FamilyRole.Owner)
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Only owner can delete family.");
+
+            // Remove family
+            PreparedStatement removeFamily = con.prepareStatement(String.format(
+                """
+                DELETE FROM %s
+                WHERE family_id = ?;
+                """, FAMILY_TABLE));
+            removeFamily.setObject(1, familyId);
+            removeFamily.executeUpdate();
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "SQL Error");
+        }
+
+        return ResponseEntity.ok().body(OkResponse.Success("Deleted family"));
+    }
+
+    public static class InvitationRequest {
+        @NotNull
+        public String email;
+    }
+
+    @PostMapping("/invite-to-family")
+    public ResponseEntity<OkResponse> inviteToFamily(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody InvitationRequest requestBody, Errors errors) {
+        if (errors.hasErrors())
+           throw new ResponseStatusException(HttpStatus.BAD_REQUEST, errors.getAllErrors().get(0).toString());
+        UUID user = Authorization.authorize(authorizationHeader);
+        
+        try {
+            Connection con = Database.getRemoteConnection();
+            // Verify email
+            PreparedStatement emailQuery = con.prepareStatement(String.format(
+                """
+                SELECT id FROM %s WHERE email = ?
+                """, USERS_TABLE));
+            emailQuery.setString(1, requestBody.email);
+            ResultSet result = emailQuery.executeQuery();
+
+            if (!result.next())
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User with email does not exist.");
+            
+            UUID recipientId = (UUID) result.getObject(1);
+
+            if (recipientId.equals(user))
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot invite yourself.");
+
+            // Get membership info
+            PreparedStatement checkFamilyQuery = con.prepareStatement(String.format(
+                """
+                SELECT id, role, family_id FROM %s
+                INNER JOIN %s
+                ON family_membership = member_id
+                WHERE id = ?;
+                """, FAMILY_MEMBER_TABLE, USERS_TABLE));
+            checkFamilyQuery.setObject(1, user);
+            result = checkFamilyQuery.executeQuery();
+
+            if (!result.next())
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "User not part of a family.");
+
+            FamilyRole role = FamilyRole.values()[result.getInt(2)];
+            UUID familyId = (UUID) result.getObject(3);
+
+            if (role != FamilyRole.Owner)
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Only owner can invite members.");
+
+            String token = Authorization.createInviteToken(recipientId, familyId);
+
+            // TODO: Get the user's name.
+            String userIdentity = "&lt;user_id: " + user.toString() + "&gt;";
+            String url = CHAVNA_URL + "accept-invite?token=" + token;
+            String emailContent = String.format(
+                """
+                <!DOCTYPE html>
+                <html lang="en">
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title></title>
+                </head>
+                <body>
+                    You have been invited to join the family of %s!<br><a href="%s">Click here to accept the invitation.</a>
+                </body>
+                </html>
+                """
+            , userIdentity, url);
+
+            Email.sendEmail("noreply@email.chavnapantry.com", requestBody.email, emailContent, "Family Invitation Request.");
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "SQL Error.");
+        }
+
+        return ResponseEntity.ok().body(OkResponse.Success("Invitation sent."));
+    }
+
+    @GetMapping("/accept-invite")
+    public ResponseEntity<String> acceptInvite(@RequestParam("token") String token) {
+        // TODO: Make invite tokens one time use
+        JwtParser parser = Jwts.parser()
+            .verifyWith(Authorization.jwtKey)
+            .build();
+
+        Jwt<?, ?> parsed = parser.parse(token);
+
+        class Invite {
+            public UUID recipientId;
+            public UUID familyId;
+        }
+
+        JwtVisitor<Invite> visitor = new JwtVisitor<Invite>() {
+            @Override
+            public Invite visit(Jwt<?, ?> jwt) {
+                throw new UnsupportedOperationException("Unimplemented method 'visit'");
+            }
+
+            @Override
+            public Invite visit(Jws<?> jws) {
+                Claims payload = (Claims) jws.getPayload();
+
+                Invite claim = new Invite();
+                claim.recipientId = UUID.fromString((String) payload.get("recipient"));
+                claim.familyId = UUID.fromString((String) payload.get("family_id"));
+
+                return claim;
+            }
+
+            @Override
+            public Invite visit(Jwe<?> jwe) {
+                throw new UnsupportedOperationException("Unimplemented method 'visit'");
+            }
+            
+        };
+
+        Invite invite = parsed.accept(visitor);
+
+        try {
+            Connection con = Database.getRemoteConnection();
+
+            // Error if alreayd part of family
+            PreparedStatement checkFamilyQuery = con.prepareStatement(String.format(
+                """
+                SELECT family_membership FROM %s WHERE id = ?
+                """, USERS_TABLE));
+            checkFamilyQuery.setObject(1, invite.recipientId);
+            ResultSet result = checkFamilyQuery.executeQuery();
+
+            if (!result.next())
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Recipient id not found.");
+
+            UUID memberId = (UUID) result.getObject(1);
+
+            if (memberId != null)
+                return ResponseEntity.ok("You are already part of a family.");
+
+            // Create family membership
+            PreparedStatement createMembershipQuery = con.prepareStatement(String.format(
+                """
+                INSERT INTO %s (role, family_id)
+                VALUES (?, ?)
+                RETURNING member_id;
+                """, FAMILY_MEMBER_TABLE));
+            createMembershipQuery.setInt(1, FamilyRole.Member.ordinal());
+            createMembershipQuery.setObject(2, invite.familyId);
+            result = createMembershipQuery.executeQuery();
+            result.next();
+            memberId = (UUID) result.getObject(1);
+
+            // Update member_id
+            PreparedStatement updateQuery = con.prepareStatement(String.format(
+                """
+                UPDATE %s
+                SET family_membership = ?
+                WHERE id = ?;
+                """, USERS_TABLE));
+            updateQuery.setObject(1, memberId);
+            updateQuery.setObject(2, invite.recipientId);
+            updateQuery.executeUpdate();
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "SQL Error");
+        }
+        
+        return ResponseEntity.ok("Invite accepted.");
+    }
+
+    @AllArgsConstructor
+    public static class FamilyMember {
+        public UUID userId;
+        public String email;
+        public FamilyRole role;
+    }
+
+    @AllArgsConstructor
+    public static class GetFamilyMemembersResponse {
+        public ArrayList<FamilyMember> members;
+    }
+
+    @GetMapping("/get-family-members")
+    public ResponseEntity<OkResponse> getFamilyMembers(@RequestHeader("Authorization") String authorizationHeader) {
+        UUID user = Authorization.authorize(authorizationHeader);
+
+        try {
+            Connection con = Database.getRemoteConnection();
+
+            PreparedStatement query = con.prepareStatement(String.format(
+                """
+                WITH m AS (
+                    SELECT id, family_id, email, role FROM %s
+                    INNER JOIN %s
+                    ON family_membership = member_id
+                )
+
+                SELECT id, email, role FROM m
+                WHERE family_id = (
+                    SELECT family_id FROM m
+                    WHERE id = ?
+                );
+                """, FAMILY_MEMBER_TABLE, USERS_TABLE));
+            query.setObject(1, user);
+            ResultSet result = query.executeQuery();
+
+            ArrayList<FamilyMember> members = new ArrayList<>();
+            while (result.next()) {
+                UUID id = (UUID) result.getObject(1);
+                String email = result.getString(2);
+                FamilyRole role = FamilyRole.values()[result.getInt(3)];
+
+                members.add(new FamilyMember(id, email, role));
+            }
+
+            return ResponseEntity.ok().body(OkResponse.Success(new GetFamilyMemembersResponse(members)));
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "SQL Error");
+        }
+    }
+
+    private static class RemoveFamilyMemberRequest {
+        public String email;
+        public UUID userId;
+    }
+
+    @PostMapping("/remove-family-member")
+    public ResponseEntity<OkResponse> removeFamilyMember(@RequestHeader(value = "Authorization") String authorizationHeader, @RequestBody RemoveFamilyMemberRequest requestBody) {
+        if (requestBody == null || (requestBody.email == null && requestBody.userId == null))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Request body must contain a user email or a user id.");
+        else if (requestBody.email != null && requestBody.userId != null)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Request body may only contain email or user id, not both.");
+
+        UUID user = Authorization.authorize(authorizationHeader);
+        
+        try {
+            Connection con = Database.getRemoteConnection();
+
+            // Get membership
+            PreparedStatement checkFamilyQuery = con.prepareStatement(String.format(
+                """ 
+                SELECT id, role, family_id FROM %s
+                INNER JOIN %s
+                ON family_membership = member_id
+                WHERE id = ?;
+                """, FAMILY_MEMBER_TABLE, USERS_TABLE));
+            checkFamilyQuery.setObject(1, user);
+            ResultSet result = checkFamilyQuery.executeQuery();
+
+            if (!result.next())
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "User not part of a family.");
+
+            FamilyRole role = FamilyRole.values()[result.getInt(2)];
+            UUID familyId = (UUID) result.getObject(3);
+
+            if (role != FamilyRole.Owner)
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Only owner can delete family.");
+            
+            // Verify requested user
+            UUID requestedUser;
+            if (requestBody.email != null) {
+                // Check if user exists
+                PreparedStatement idFromEmailStatement = con.prepareStatement(String.format("""
+                    SELECT id FROM %s WHERE email = ?
+                """, USERS_TABLE));
+                idFromEmailStatement.setString(1, requestBody.email);
+                ResultSet query = idFromEmailStatement.executeQuery();
+
+                if (query.next())
+                    requestedUser = (UUID) query.getObject(1);
+                else
+                    throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User with provided e-mail does not exist.");
+            } else {
+                requestedUser = requestBody.userId;
+
+                PreparedStatement userExistsStatement = con.prepareStatement(String.format(
+                """
+                    SELECT 1 FROM %s WHERE id = ?
+                """, USERS_TABLE));
+                userExistsStatement.setObject(1, requestedUser);
+                result = userExistsStatement.executeQuery();
+
+                if (!result.next())
+                    throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User with provided id does not exist.");
+            }
+
+            if (user.equals(requestedUser))
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot remove yourself.");
+
+            // Verify requested user is part of family
+
+            PreparedStatement checkFamilyQuery2 = con.prepareStatement(String.format(
+                """ 
+                SELECT member_id FROM %s
+                INNER JOIN %s
+                ON family_membership = member_id
+                WHERE id = ? and family_id = ?;
+                """, FAMILY_MEMBER_TABLE, USERS_TABLE));
+            
+            checkFamilyQuery2.setObject(1, requestedUser);
+            checkFamilyQuery2.setObject(2, familyId);
+            result = checkFamilyQuery2.executeQuery();
+
+            if (!result.next())
+                throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Requested user does not belong to your family.");
+
+            UUID memberId = (UUID) result.getObject(1);
+
+            // Remove member
+            PreparedStatement removeMemberQuery = con.prepareStatement(String.format(
+                """
+                DELETE FROM %s
+                WHERE member_id = ?;
+                """, FAMILY_MEMBER_TABLE));
+            removeMemberQuery.setObject(1, memberId);
+
+            removeMemberQuery.executeUpdate();
+
+            return ResponseEntity.ok().body(OkResponse.Success("Member removed."));
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, null, ex);
         }
     }
 }
