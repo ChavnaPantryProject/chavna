@@ -42,6 +42,8 @@ export default function AuthScreen() {
     const [focusedField, setFocusedField] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const [submitError, setSubmitError] = useState<string | null>(null);
+    const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
 
     // Response Types
     type BackendSuccess = {
@@ -105,7 +107,8 @@ export default function AuthScreen() {
 
     const onSubmit = async () => {
         if (!canSubmit || loading) return;
-        setSubmitError(null);
+            setSubmitError(null);
+            setSuccessMsg(null);
         
         if (mode === 'login') {
            try {
@@ -115,7 +118,7 @@ export default function AuthScreen() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    email: loginEmail.trim(),
+                    email: loginEmail.trim().toLowerCase(),
                     password: loginPw,
                 }),
             });
@@ -135,6 +138,7 @@ export default function AuthScreen() {
                 throw new Error(data?.message || 'Login failed.');
             }
 
+            setSubmitError('Login successful. Redirecting...');
             const token = data.payload.jwt;
             await saveToken(token);
             router.replace('/(tabs)/home');
@@ -149,8 +153,44 @@ export default function AuthScreen() {
         }
 
         } else {
-            // Adding signup later
+            // CREATE ACCOUNT
+            try {
+            setLoading(true);
+            const endpoint = `${API_URL}/create-account`;
+            const res = await fetchWithTimeout(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                email: signupEmail.trim().toLowerCase(),
+                password: signupPw,
+                }),
+            });
+
+            let data: any = null;
+            try { data = await res.json(); } catch {}
+
+            if (!res.ok) {
+                const serverMsg =
+                (data && (data.message || data.error || data.detail)) ||
+                `Signup failed with status ${res.status}`;
+                throw new Error(serverMsg);
+            }
+
+            if (!(data?.success === 'success' || data?.success === true)) {
+                throw new Error(data?.message || 'Signup failed.');
+            }
+
+            // Success — ask the user to verify and go to login
+            setSubmitError('Account created. Please check your email to verify.');
+
+            } catch (err: any) {
+                throw new Error('Signup failed.');
+                
+            } finally {
+                setLoading(false);
+            }
         }
+
     };
 
     const goToSplash = () => {
@@ -164,6 +204,7 @@ export default function AuthScreen() {
         setSignupName(''); setSignupEmail(''); setSignupPw(''); setSignupPw2('');
         setFocusedField(null);
         setSubmitError(null);
+        setSuccessMsg(null);
     };
 
     const switchToSignup = () => {
@@ -172,6 +213,7 @@ export default function AuthScreen() {
         setLoginEmail(''); setLoginPw('');
         setFocusedField(null);
         setSubmitError(null);
+        setSuccessMsg(null);
     };
 
     const Accent = ({ active }: { active: boolean }) => (
@@ -316,7 +358,23 @@ export default function AuthScreen() {
                             </>
                         )}
 
-                        {submitError && <Text style={[styles.errorText, { marginTop: 4 }]}>{submitError}</Text>}
+                            {submitError && (
+                            <Text
+                                style={[
+                                styles.errorText,
+                                {
+                                    marginTop: 4,
+                                    color:
+                                    submitError.includes('Login successful') ||
+                                    submitError.includes('Account created')
+                                        ? '#2E7D32' 
+                                        : '#D32F2F', 
+                                },
+                                ]}
+                            >
+                                {submitError}
+                            </Text>
+                            )}
 
                         <Pressable
                             onPress={onSubmit}
