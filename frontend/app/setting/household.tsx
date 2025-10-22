@@ -755,6 +755,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SecureStore from 'expo-secure-store';
 
 const API_BASE_URL = "https://api.chavnapantry.com";
 
@@ -792,6 +793,8 @@ const HouseholdManagementScreen = () => {
 
   const loadToken = async () => {
     try {
+      let t = await SecureStore.getItemAsync("jwt");
+      console.log(t);
       const token = await AsyncStorage.getItem("jwtToken");
       setJwtToken(token);
     } catch (error) {
@@ -1039,7 +1042,8 @@ const HouseholdManagementScreen = () => {
             style={[styles.orangeButton, styles.testButton]}
             onPress={() => {
               // Just paste your JWT token here and tap the button
-              testWithToken("eyJhbGciOiJIUzUxMiJ9.eyJpYXQiOjE3NjExMDAyODgsInVzZXJfaWQiOiI0MzRiNGFkNi00NmJlLTQ2NjItOTEzOC0xODExZTNmYzcwNDQiLCJleHAiOjE3NjIzMDk4ODh9.ZvDn5kOmGC6dzABR4KsNA917Kxiogqlh7IzFfyWTCLxqCP2dfOB2DprOp5kkuMjElOeXx4uyHJlJ_8N1-DUm_g");
+              loadToken();
+              // testWithToken("eyJhbGciOiJIUzUxMiJ9.eyJpYXQiOjE3NjExMDAyODgsInVzZXJfaWQiOiI0MzRiNGFkNi00NmJlLTQ2NjItOTEzOC0xODExZTNmYzcwNDQiLCJleHAiOjE3NjIzMDk4ODh9.ZvDn5kOmGC6dzABR4KsNA917Kxiogqlh7IzFfyWTCLxqCP2dfOB2DprOp5kkuMjElOeXx4uyHJlJ_8N1-DUm_g");
             }}
           >
             <Text style={styles.orangeButtonText}>Test Token</Text>
