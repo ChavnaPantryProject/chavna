@@ -41,22 +41,22 @@ export default function ModalFoodCategory({ visible, onClose, title, children }:
           {/* column headers with the filter icon */}
           <View style={style.columnFilters}>
 
-            <View style={style.specificFilterColumn}>
+            <View style={[style.specificFilterColumn, {flex:1}]}>
               <Text style={style.filterText}>Name</Text>
               <Entypo name="triangle-down" size={20} />
             </View>
 
-            <View style={style.specificFilterColumn}>
+            <View style={[style.specificFilterColumn, {flex:1}]}>
               <Text style={style.filterText}>Weight</Text>
               <Entypo name="triangle-down" size={20} />
             </View>
 
-            <View style={style.specificFilterColumn}>
+            <View style={[style.specificFilterColumn, {flex:1}]}>
               <Text style={style.filterText}>Qty</Text>
               <Entypo name="triangle-down" size={20} />
             </View>
 
-            <View style={style.specificFilterColumn}>
+            <View style={[style.specificFilterColumn, {flex:2}]}>
               <Text style={style.filterText}>Exp Date</Text>
               <Entypo name="triangle-down" size={20} />
             </View>
@@ -68,10 +68,10 @@ export default function ModalFoodCategory({ visible, onClose, title, children }:
               {arrOfFood.map((foodItem, index) =>{
                 return (
                   <View key={index} style={style.entryOfFood}>
-                    <Text>{foodItem.name}</Text>
-                    <Text>{foodItem.weight}</Text>
-                    <Text>{foodItem.qty}</Text>
-                    <Text>{foodItem.expDate}</Text>
+                    <Text style={[style.specficFoodEntryColumn, {flex:1}]}>{foodItem.name}</Text>
+                    <Text style={[style.specficFoodEntryColumn, {flex:1}]}>{foodItem.weight}</Text>
+                    <Text style={[style.specficFoodEntryColumn, {flex:1}]}>{foodItem.qty}</Text>
+                    <Text style={[style.specficFoodEntryColumn, {flex:2}]}>{foodItem.expDate}</Text>
                   </View>
                 )
               }) }
@@ -150,4 +150,8 @@ const style = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between'
     },
+
+    specficFoodEntryColumn:{
+      textAlign: 'center',
+    }
 });
