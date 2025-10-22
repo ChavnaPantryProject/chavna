@@ -1,5 +1,3 @@
 # VSCode workspace settings
 .vscode
 frontend/package-lock.json
-frontend/package.json
-frontend/app.json
