@@ -89,7 +89,7 @@ const MealScreen = () => {
           {/* Eat Button */}
           <TouchableOpacity 
             style={styles.actionBtn} 
-            onPress={() => router.push("/meals/editmeal")}
+            onPress={() => router.push("/meals/meal_ingredient")}
           >
             <Ionicons name="restaurant" size={20} color="white" />
           </TouchableOpacity>
