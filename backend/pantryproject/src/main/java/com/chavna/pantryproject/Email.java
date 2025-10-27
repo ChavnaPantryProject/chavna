@@ -4,12 +4,26 @@ import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.sesv2.SesV2Client;
 import software.amazon.awssdk.services.sesv2.model.Body;
 import software.amazon.awssdk.services.sesv2.model.Content;
+import software.amazon.awssdk.services.sesv2.model.CreateEmailIdentityRequest;
 import software.amazon.awssdk.services.sesv2.model.Destination;
 import software.amazon.awssdk.services.sesv2.model.EmailContent;
 import software.amazon.awssdk.services.sesv2.model.Message;
 import software.amazon.awssdk.services.sesv2.model.SendEmailRequest;
 
 public class Email {
+    public static void verifyEmailAddress(String email) {
+        Region region = Region.US_EAST_1;
+        SesV2Client client = SesV2Client.builder()
+            .region(region)
+            .build();
+        
+        CreateEmailIdentityRequest request = CreateEmailIdentityRequest.builder()
+            .emailIdentity(email)
+            .build();
+        
+        client.createEmailIdentity(request);
+    }
+
     public static void sendEmail(String from, String to, String htmlContent, String subject) {
         Region region = Region.US_EAST_1;
         SesV2Client client = SesV2Client.builder()

@@ -23,6 +23,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.chavna.pantryproject.Authorization.Login;
+
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwe;
 import io.jsonwebtoken.Jws;
@@ -77,17 +79,18 @@ public class UserController {
         
         Connection con = Database.getRemoteConnection();
 
-        PreparedStatement statement = con.prepareStatement("SELECT password_hash, id FROM " + USERS_TABLE + " where email = ?");
+        PreparedStatement statement = con.prepareStatement("SELECT password_hash, id, login_state FROM " + USERS_TABLE + " where email = ?");
         statement.setString(1, request.email);
         ResultSet results = statement.executeQuery();
 
         if (results.next()) {
             byte[] hash = results.getBytes(1);
             UUID id = (UUID) results.getObject(2);
+            UUID loginState = (UUID) results.getObject(3);
 
             BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(BCryptVersion.$2B, 8);
             if (encoder.matches(request.password, new String(hash, StandardCharsets.UTF_8))) {
-                String jws = Authorization.createToken(id);
+                String jws = Authorization.createLoginToken(id, loginState);
                         
                 return ResponseEntity.ok(OkResponse.Success("Succesful login.", new LoginResponse(jws)));
             }
@@ -237,9 +240,9 @@ public class UserController {
     @GetMapping("/refresh-token")
     public ResponseEntity<OkResponse> refreshToken(@RequestHeader("Authorization") String authorizationHeader) {
         try {
-            UUID user = Authorization.authorize(authorizationHeader);
+            Login login = Authorization.authorize(authorizationHeader);
 
-            String newToken = Authorization.createToken(user);
+            String newToken = Authorization.createLoginToken(login.userId, login.loginState);
             return ResponseEntity.ok(OkResponse.Success("Authorized.", new LoginResponse(newToken)));
         } catch (JwtException ex) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, ex.toString());
@@ -272,7 +275,7 @@ public class UserController {
 
         UUID authorizedUser;
         if (authorizationHeader != null)
-            authorizedUser = Authorization.authorize(authorizationHeader);
+            authorizedUser = Authorization.authorize(authorizationHeader).userId;
         else
             authorizedUser = null;
         
@@ -340,7 +343,7 @@ public class UserController {
     @PostMapping("/set-personal-info")
     public ResponseEntity<OkResponse> setPersonalInfo(@RequestHeader("Authorization") String authorizationHeader, @RequestBody HashMap<String, Object> requestBody) {
         Connection con = Database.getRemoteConnection();
-        UUID user = Authorization.authorize(authorizationHeader);
+        UUID user = Authorization.authorize(authorizationHeader).userId;
         if (requestBody.containsKey("user_id"))
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid column: \"user_id\"");
         
@@ -398,7 +401,7 @@ public class UserController {
 
     @PostMapping("create-family")
     public ResponseEntity<OkResponse> createFamily(@RequestHeader("Authorization") String authorizationHeader) {
-        UUID user = Authorization.authorize(authorizationHeader);
+        UUID user = Authorization.authorize(authorizationHeader).userId;
         
         try {
             Connection con = Database.getRemoteConnection();
@@ -461,7 +464,7 @@ public class UserController {
 
     @PostMapping("leave-family")
     public ResponseEntity<OkResponse> leaveFamily(@RequestHeader("Authorization") String authorizationHeader) {
-        UUID user = Authorization.authorize(authorizationHeader);
+        UUID user = Authorization.authorize(authorizationHeader).userId;
         
         try {
             Connection con = Database.getRemoteConnection();
@@ -504,7 +507,7 @@ public class UserController {
 
     @PostMapping("delete-family")
     public ResponseEntity<OkResponse> deleteFamily(@RequestHeader("Authorization") String authorizationHeader) {
-        UUID user = Authorization.authorize(authorizationHeader);
+        UUID user = Authorization.authorize(authorizationHeader).userId;
         
         try {
             Connection con = Database.getRemoteConnection();
@@ -554,14 +557,14 @@ public class UserController {
     public ResponseEntity<OkResponse> inviteToFamily(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody InvitationRequest requestBody, Errors errors) {
         if (errors.hasErrors())
            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, errors.getAllErrors().get(0).toString());
-        UUID user = Authorization.authorize(authorizationHeader);
+        UUID user = Authorization.authorize(authorizationHeader).userId;
         
         try {
             Connection con = Database.getRemoteConnection();
             // Verify email
             PreparedStatement emailQuery = con.prepareStatement(String.format(
                 """
-                SELECT id FROM %s WHERE email = ?
+                SELECT id, invite_state FROM %s WHERE email = ?
                 """, USERS_TABLE));
             emailQuery.setString(1, requestBody.email);
             ResultSet result = emailQuery.executeQuery();
@@ -570,6 +573,7 @@ public class UserController {
                 throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User with email does not exist.");
             
             UUID recipientId = (UUID) result.getObject(1);
+            UUID inviteState = (UUID) result.getObject(2);
 
             if (recipientId.equals(user))
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot invite yourself.");
@@ -594,7 +598,7 @@ public class UserController {
             if (role != FamilyRole.Owner)
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "Only owner can invite members.");
 
-            String token = Authorization.createInviteToken(recipientId, familyId);
+            String token = Authorization.createInviteToken(recipientId, familyId, inviteState);
 
             // TODO: Get the user's name.
             String userIdentity = "&lt;user_id: " + user.toString() + "&gt;";
@@ -626,7 +630,6 @@ public class UserController {
 
     @GetMapping("/accept-invite")
     public ResponseEntity<String> acceptInvite(@RequestParam("token") String token) {
-        // TODO: Make invite tokens one time use
         JwtParser parser = Jwts.parser()
             .verifyWith(Authorization.jwtKey)
             .build();
@@ -636,6 +639,7 @@ public class UserController {
         class Invite {
             public UUID recipientId;
             public UUID familyId;
+            public UUID inviteState;
         }
 
         JwtVisitor<Invite> visitor = new JwtVisitor<Invite>() {
@@ -651,6 +655,7 @@ public class UserController {
                 Invite claim = new Invite();
                 claim.recipientId = UUID.fromString((String) payload.get("recipient"));
                 claim.familyId = UUID.fromString((String) payload.get("family_id"));
+                claim.inviteState = UUID.fromString((String) payload.get("invite_state"));
 
                 return claim;
             }
@@ -667,10 +672,9 @@ public class UserController {
         try {
             Connection con = Database.getRemoteConnection();
 
-            // Error if alreayd part of family
             PreparedStatement checkFamilyQuery = con.prepareStatement(String.format(
                 """
-                SELECT family_membership FROM %s WHERE id = ?
+                SELECT family_membership, invite_state FROM %s WHERE id = ?
                 """, USERS_TABLE));
             checkFamilyQuery.setObject(1, invite.recipientId);
             ResultSet result = checkFamilyQuery.executeQuery();
@@ -679,9 +683,15 @@ public class UserController {
                 throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Recipient id not found.");
 
             UUID memberId = (UUID) result.getObject(1);
+            UUID inviteState = (UUID) result.getObject(2);
 
+            // Error if alreayd part of family
             if (memberId != null)
                 return ResponseEntity.ok("You are already part of a family.");
+
+            // Check invite_state
+            if (!inviteState.equals(invite.inviteState))
+                return ResponseEntity.ok("Invalid invite.");
 
             // Create family membership
             PreparedStatement createMembershipQuery = con.prepareStatement(String.format(
@@ -696,11 +706,11 @@ public class UserController {
             result.next();
             memberId = (UUID) result.getObject(1);
 
-            // Update member_id
+            // Update member_id and invite_state
             PreparedStatement updateQuery = con.prepareStatement(String.format(
                 """
                 UPDATE %s
-                SET family_membership = ?
+                SET family_membership = ?, invite_state = gen_random_uuid()
                 WHERE id = ?;
                 """, USERS_TABLE));
             updateQuery.setObject(1, memberId);
@@ -728,7 +738,7 @@ public class UserController {
 
     @GetMapping("/get-family-members")
     public ResponseEntity<OkResponse> getFamilyMembers(@RequestHeader("Authorization") String authorizationHeader) {
-        UUID user = Authorization.authorize(authorizationHeader);
+        UUID user = Authorization.authorize(authorizationHeader).userId;
 
         try {
             Connection con = Database.getRemoteConnection();
@@ -778,7 +788,7 @@ public class UserController {
         else if (requestBody.email != null && requestBody.userId != null)
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Request body may only contain email or user id, not both.");
 
-        UUID user = Authorization.authorize(authorizationHeader);
+        UUID user = Authorization.authorize(authorizationHeader).userId;
         
         try {
             Connection con = Database.getRemoteConnection();
@@ -868,5 +878,12 @@ public class UserController {
             ex.printStackTrace();
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, null, ex);
         }
+    }
+
+    @GetMapping("/verify")
+    public ResponseEntity<String> sendVerificationEmail(@RequestParam("email") String email) {
+        Email.verifyEmailAddress(email);
+
+        return ResponseEntity.ok("Verification email sent.");
     }
 }
