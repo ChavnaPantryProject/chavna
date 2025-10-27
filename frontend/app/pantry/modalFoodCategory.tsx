@@ -43,22 +43,22 @@ export default function ModalFoodCategory({ visible, onClose, title, children }:
 
             <View style={[style.specificFilterColumn, {flex:1}]}>
               <Text style={style.filterText}>Name</Text>
-              <Entypo name="triangle-down" size={20} />
+              <Entypo name="triangle-down" size={15} />
             </View>
 
-            <View style={[style.specificFilterColumn, {flex:1}]}>
+            <View style={[style.specificFilterColumn, {flex:1.1}]}>
               <Text style={style.filterText}>Weight</Text>
-              <Entypo name="triangle-down" size={20} />
+              <Entypo name="triangle-down" size={15} />
             </View>
 
             <View style={[style.specificFilterColumn, {flex:1}]}>
               <Text style={style.filterText}>Qty</Text>
-              <Entypo name="triangle-down" size={20} />
+              <Entypo name="triangle-down" size={15} />
             </View>
 
-            <View style={[style.specificFilterColumn, {flex:2}]}>
+            <View style={[style.specificFilterColumn, {flex:1.2}]}>
               <Text style={style.filterText}>Exp Date</Text>
-              <Entypo name="triangle-down" size={20} />
+              <Entypo name="triangle-down" size={15} />
             </View>
 
           </View>
@@ -125,6 +125,7 @@ const style = StyleSheet.create({
     flexDirection: 'row',
     paddingBottom: 10,
     marginTop:0,
+    marginBottom:5,
     paddingRight: 10,
     paddingLeft: 10,
   },
@@ -135,7 +136,7 @@ const style = StyleSheet.create({
     alignItems: 'center',
   },
     filterText:{
-    fontSize:14,
+    fontSize:13,
     fontWeight:'500'
   },
 
@@ -145,7 +146,8 @@ const style = StyleSheet.create({
     borderWidth: 2,
     borderColor: 'rgba(73,159,68,1)',
     borderRadius: 5,
-    marginTop: 10,
+    backgroundColor: 'white',
+    marginTop: 5,
     padding: 3,
     flexDirection: 'row',
     justifyContent: 'space-between'
