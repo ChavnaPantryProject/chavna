@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -226,15 +227,6 @@ const HouseholdManagementScreen = () => {
         </View>
       </View>
 
-      {/* Debug Info - Only shows in development mode */}
-      {__DEV__ && (
-        <View style={styles.debugContainer}>
-          <Text style={styles.debugText}>
-            Token: {jwtToken ? `${jwtToken.substring(0, 20)}...` : "No token"}
-          </Text>
-        </View>
-      )}
-
       {/* Member List Card */}
       <View style={styles.card}>
         <Text style={styles.subtitle}>Household Members</Text>
@@ -454,9 +446,6 @@ const styles = StyleSheet.create({
   refreshButton: {
     backgroundColor: "#499f44",
   },
-  testButton: {
-    backgroundColor: "#6c63ff",
-  },
   orangeButtonText: { color: "#fff", fontWeight: "bold" },
   modalContainer: {
     flex: 1,
@@ -494,17 +483,5 @@ const styles = StyleSheet.create({
     textAlign: "center",
     paddingVertical: 8,
     marginBottom: 15,
-  },
-  debugContainer: {
-    backgroundColor: "#f0f0f0",
-    padding: 10,
-    borderRadius: 5,
-    marginBottom: 10,
-    width: "90%",
-  },
-  debugText: {
-    fontSize: 10,
-    color: "#666",
-    fontFamily: "monospace",
   },
 });
