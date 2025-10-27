@@ -34,15 +34,15 @@ import io.jsonwebtoken.Jwts;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 
+import static com.chavna.pantryproject.Database.FAMILY_MEMBER_TABLE;
+import static com.chavna.pantryproject.Database.FAMILY_TABLE;
+import static com.chavna.pantryproject.Database.PERSONAL_INFO_TABLE;
+import static com.chavna.pantryproject.Database.USERS_TABLE;
+
 import lombok.AllArgsConstructor;
 
 @RestController
 public class UserController {
-    public static final String USERS_TABLE = "users";
-    public static final String PERSONAL_INFO_TABLE = "personal_info";
-    public static final String FAMILY_TABLE = "family";
-    public static final String FAMILY_MEMBER_TABLE = "family_member";
-
     public static final String CHAVNA_URL = Env.getenvNotNull("SERVER_URL");
 
     public static enum FamilyRole {
@@ -304,20 +304,7 @@ public class UserController {
                     throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User with provided id does not exist.");
             }
 
-            PreparedStatement personalInfoStatement = con.prepareStatement(String.format("""
-                SELECT * FROM %s WHERE user_id = ?
-            """, PERSONAL_INFO_TABLE));
-            personalInfoStatement.setObject(1, requestedUser);
-            ResultSet query2 = personalInfoStatement.executeQuery();
-            
-            HashMap<String, Object> jsonObject;
-            if (query2.next()) {
-                jsonObject = Database.objectFromResultSet(query2);
-            } else {
-                jsonObject = Database.getDefaultTableEntry(con, PERSONAL_INFO_TABLE);
-            }
-            
-            jsonObject.remove("user_id");
+            HashMap<String, Object> jsonObject = Database.getUserPersonalInfo(con, requestedUser);
 
             // Check authorization if user's profie isn't public
             if (!(boolean) jsonObject.get("public")) {
@@ -326,7 +313,7 @@ public class UserController {
                     throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User has private personal info. Authorization required.");
             }
 
-            return ResponseEntity.ok().body(OkResponse.Success(new GetPersonalInfoResponse(jsonObject)));
+            return ResponseEntity.ok().body(OkResponse.Success(jsonObject));
         } catch (SQLException ex) {
             ex.printStackTrace();
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, null, ex);
@@ -596,9 +583,16 @@ public class UserController {
 
             String token = Authorization.createInviteToken(recipientId, familyId);
 
-            // TODO: Get the user's name.
-            String userIdentity = "&lt;user_id: " + user.toString() + "&gt;";
+            String userIdentity = String.format("the family of %s", Database.getUserEmail(con, user));
             String url = CHAVNA_URL + "accept-invite?token=" + token;
+
+            HashMap<String, Object> personalInfo = Database.getUserPersonalInfo(con, user);
+            String name = (String) personalInfo.get("first_name");
+            if (name != null)
+                userIdentity = String.format("%s's", name);
+
+            String message = String.format("You have been invited to %s family.", userIdentity);
+
             String emailContent = String.format(
                 """
                 <!DOCTYPE html>
@@ -609,11 +603,11 @@ public class UserController {
                     <title></title>
                 </head>
                 <body>
-                    You have been invited to join the family of %s!<br><a href="%s">Click here to accept the invitation.</a>
+                    %s<br><a href="%s">Click here to accept the invitation.</a>
                 </body>
                 </html>
                 """
-            , userIdentity, url);
+            , message, url);
 
             Email.sendEmail("noreply@email.chavnapantry.com", requestBody.email, emailContent, "Family Invitation Request.");
         } catch (SQLException ex) {
@@ -626,7 +620,6 @@ public class UserController {
 
     @GetMapping("/accept-invite")
     public ResponseEntity<String> acceptInvite(@RequestParam("token") String token) {
-        // TODO: Make invite tokens one time use
         JwtParser parser = Jwts.parser()
             .verifyWith(Authorization.jwtKey)
             .build();
