@@ -13,6 +13,7 @@ import { Ionicons } from "@expo/vector-icons";
 import Feather from "@expo/vector-icons/Feather";
 import { useRouter } from "expo-router";
 import * as ImagePicker from 'expo-image-picker';
+import * as SecureStore from 'expo-secure-store';
 
 const SettingScreen = () => {
   const router = useRouter();
@@ -113,10 +114,32 @@ const SettingScreen = () => {
         },
         { 
           text: "Sign Out", 
-          onPress: () => console.log("Sign out pressed") 
+          onPress: performSignOut,
+          style: "destructive"
         }
       ]
     );
+  };
+
+  const performSignOut = async () => {
+    try {
+      // Clear JWT token from SecureStore
+      await SecureStore.deleteItemAsync('jwt');
+      
+      // Also try to clear from localStorage as fallback
+      try {
+        localStorage.removeItem('jwt');
+      } catch {}
+
+      // Redirect to login screen
+      router.replace('/login');
+      
+      // Optional: Show success message
+      // Alert.alert("Signed Out", "You have been successfully signed out");
+    } catch (error) {
+      console.error('Sign out error:', error);
+      Alert.alert('Error', 'Failed to sign out. Please try again.');
+    }
   };
 
   return (
