@@ -12,6 +12,9 @@ import {
   type ImageSourcePropType,
   ScrollView,
   Platform,
+  Alert,
+  Modal,
+  Animated
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack } from 'expo-router';
@@ -27,6 +30,13 @@ const initialItems = Array.from({ length: 5 }).map((_, i) => ({
 
 export default function HomeScreen() {
   const [items, setItems] = useState(initialItems);
+    // Bottom sheet open/close + derived count
+  const [menuOpen, setMenuOpen] = useState(false);
+  const selectedCount = items.filter(i => i.done).length;
+
+  // Open from the ellipsis
+  const openListMenu = () => setMenuOpen(true);
+
 
   const toggle = (id: string) =>
     setItems(prev => prev.map(it => (it.id === id ? { ...it, done: !it.done } : it)));
@@ -46,6 +56,40 @@ export default function HomeScreen() {
       return undefined;
     }, [])
   );
+
+  
+
+    const clearAll = () => {
+    if (items.length === 0) return;
+    Alert.alert(
+      'Clear all items?',
+      'This will remove every item from your shopping list.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Clear All', style: 'destructive', onPress: () => setItems([]) },
+      ],
+      { cancelable: true }
+    );
+  };
+
+  const clearSelected = React.useCallback(() => {
+  const selected = items.filter(i => i.done).length;
+  if (selected === 0) {
+    Alert.alert('No items selected', 'Tap the circles to select items to clear.');
+    return;
+  }
+  Alert.alert(
+    'Clear selected items?',
+    `This will remove ${selected} selected item${selected > 1 ? 's' : ''}.`,
+    [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Clear Selected', style: 'destructive', onPress: () =>
+          setItems(prev => prev.filter(i => !i.done))
+      },
+    ],
+    { cancelable: true }
+  );
+}, [items]);
 
   useEffect(() => {
     scrollRef.current?.scrollToEnd({ animated: true });
@@ -85,10 +129,21 @@ export default function HomeScreen() {
           </View> */}
         </View>
 
-        {/* Shopping List */}
-        <View style={styles.listArea}>
+          {/* Shopping List */}
           <View style={styles.sectionHeaderContainer}>
-            <Text style={styles.sectionHeader}>Shopping List</Text>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionHeader}>Shopping List</Text>
+
+              {/* absolutely positioned ellipsis, not affecting centering */}
+              <Pressable
+                hitSlop={10}
+                onPress={openListMenu}
+                style={styles.ellipsisButton}
+              >
+                <Ionicons name="ellipsis-horizontal" size={22} color="gray" />
+              </Pressable>
+            </View>
+
             <View style={styles.sectionUnderline} />
           </View>
 
@@ -151,18 +206,29 @@ export default function HomeScreen() {
         </View>
 
         {/* Favorite Meals Section */}
+        
         <View style={styles.favWrap}>
           <Text style={styles.favTitle}>Favorite Meals</Text>
           <View style={styles.favRow}>
             <FavMeal source={require('../../assets/images/FETTUCCINE_ALFREDO_HOMEPAGE.jpg')} />
             <FavMeal source={require('../../assets/images/CHICKEN_AND_RICE_HOMEPAGE.jpg')} />
             <FavMeal source={require('../../assets/images/BURGER_HOMEPAGE.jpg')} />
+            
           </View>
         </View>
-      </View>
+          <OptionsSheet
+          visible={menuOpen}
+          onClose={() => setMenuOpen(false)}
+          onClearSelected={() => { setMenuOpen(false); clearSelected(); }}
+          onClearAll={() => { setMenuOpen(false); clearAll(); }}
+          selectedCount={selectedCount}
+/>
+
     </SafeAreaView>
   );
 }
+
+
 
 function FavMeal({ source }: { source: ImageSourcePropType }) {
   return (
@@ -195,6 +261,165 @@ function ScrollOnlyRows({
     </ScrollView>
   );
 }
+function OptionsSheet({
+  visible,
+  onClose,
+  onClearSelected,
+  onClearAll,
+  selectedCount,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onClearSelected: () => void;
+  onClearAll: () => void;
+  selectedCount: number;
+}) {
+  const slide = React.useRef(new Animated.Value(0)).current;
+  const [mounted, setMounted] = React.useState(visible); // controls unmount after animation
+
+  
+  React.useEffect(() => {
+    if (visible) {
+      setMounted(true);
+    } else {
+      const t = setTimeout(() => setMounted(false), 220); // match animation duration
+      return () => clearTimeout(t);
+    }
+  }, [visible]);
+
+  
+  React.useEffect(() => {
+    Animated.timing(slide, {
+      toValue: visible ? 1 : 0,
+      duration: 220,
+      useNativeDriver: true,
+    }).start();
+  }, [visible, slide]);
+
+  const translateY = slide.interpolate({
+    inputRange: [0, 1],
+    outputRange: [260, 0],
+  });
+
+  
+  if (!mounted) return null;
+
+  const Row = ({
+    title,
+    subtitle,
+    destructive,
+    disabled,
+    onPress,
+  }: {
+    title: string;
+    subtitle?: string;
+    destructive?: boolean;
+    disabled?: boolean;
+    onPress?: () => void;
+  }) => (
+    <Pressable
+      onPress={disabled ? undefined : onPress}
+      style={({ pressed }) => [
+        sheetStyles.row,
+        pressed && !disabled && { backgroundColor: '#F3F5F4' },
+        disabled && { opacity: 0.4 },
+      ]}
+    >
+      <View style={{ flex: 1 }}>
+        <Text
+          style={[
+            sheetStyles.rowTitle,
+            destructive && { color: '#C62828', fontWeight: '700' },
+          ]}
+          numberOfLines={1}
+        >
+          {title}
+        </Text>
+        {subtitle ? (
+          <Text style={sheetStyles.rowSub} numberOfLines={1}>
+            {subtitle}
+          </Text>
+        ) : null}
+      </View>
+    </Pressable>
+  );
+
+  return (
+    <Modal
+      visible={true} // mounted controls visibility/unmount
+      transparent
+      animationType="none"
+      statusBarTranslucent
+      onRequestClose={onClose}
+    >
+      <Pressable
+        style={sheetStyles.backdrop}
+        onPress={onClose}
+        pointerEvents={visible ? 'auto' : 'none'}
+      />
+      <Animated.View
+        style={[
+          sheetStyles.sheet,
+          {
+            transform: [{ translateY }],
+            pointerEvents: visible ? 'auto' : 'none',
+          },
+        ]}
+      >
+        <View style={sheetStyles.grabber} />
+
+        <Text style={sheetStyles.title}>Shopping List</Text>
+        <Text style={sheetStyles.subtitle}>Choose an action</Text>
+        <View style={sheetStyles.divider} />
+
+        <Row
+          title="Clear selected"
+          subtitle={selectedCount ? `${selectedCount} selected` : 'No items selected'}
+          onPress={onClearSelected}
+          disabled={selectedCount === 0}
+        />
+
+        <Row
+          title="Clear all"
+          subtitle="Remove every item in the list"
+          destructive
+          onPress={onClearAll}
+        />
+
+        <View style={{ height: 8 }} />
+        <Pressable onPress={onClose} style={sheetStyles.cancelBtn}>
+          <Text style={sheetStyles.cancelText}>Cancel</Text>
+        </Pressable>
+      </Animated.View>
+    </Modal>
+  );
+}
+
+const sheetStyles = StyleSheet.create({
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.35)' },
+  sheet: {
+    position: 'absolute',
+    left: 0, right: 0, bottom: 0,
+    paddingTop: 10, paddingBottom: 20, paddingHorizontal: 16,
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 18, borderTopRightRadius: 18,
+    shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 12, shadowOffset: { width: 0, height: -4 },
+    elevation: 20,
+  },
+  grabber: {
+    alignSelf: 'center',
+    width: 44, height: 4, borderRadius: 999,
+    backgroundColor: '#E0E0E0', marginBottom: 8,
+  },
+  title: { textAlign: 'center', fontSize: 16, fontWeight: '700', color: '#111' },
+  subtitle: { textAlign: 'center', fontSize: 12, color: '#6A6A6A', marginTop: 2, marginBottom: 8 },
+  divider: { height: 1, backgroundColor: '#E6E6E6', marginVertical: 8 },
+  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 10, borderRadius: 10 },
+  rowTitle: { fontSize: 15, color: '#1D3B25', fontWeight: '600' },
+  rowSub: { fontSize: 12, color: '#6A6A6A', marginTop: 2 },
+  cancelBtn: { alignSelf: 'center', paddingVertical: 10, paddingHorizontal: 18, borderRadius: 12 },
+  cancelText: { fontSize: 15, color: '#333', fontWeight: '600' },
+});
 
 const LINE_GREEN = '#499F44';
 
@@ -266,7 +491,7 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     color: 'black',
     textAlign: 'center',
-    marginTop: -12,
+    marginTop: 10,
   },
   // Underline
   sectionUnderline: {
@@ -319,6 +544,7 @@ const styles = StyleSheet.create({
   // Add button (Plus Sign)
   addBtn: {
     marginBottom: 12,
+    marginTop: 10,
     alignSelf: 'center',
     width: 45,
     height: 45,
@@ -367,4 +593,22 @@ const styles = StyleSheet.create({
   },
   // Image adjustments in container
   favImage: { width: '100%', height: '100%' },
+
+sectionHeaderRow: {
+  position: 'relative',       // allows absolute-positioned ellipsis
+  alignItems: 'center',
+  justifyContent: 'center',   // keeps "Shopping List" perfectly centered
+  width: '100%',              // span full width so 'right' aligns to screen edge
+  paddingHorizontal: 16,      // matches list content padding
+  marginTop: -12,
+  minHeight: 24,              // ensures room for the icon
+},
+
+ellipsisButton: {
+  position: 'absolute',
+  right: 16,                  // aligns with the right edge of your input rows
+  top: 0,
+  padding: 6,
+},
+
 });
