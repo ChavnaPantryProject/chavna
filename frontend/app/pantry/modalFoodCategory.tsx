@@ -1,5 +1,5 @@
 // pantry/ModalFoodCategory.tsx
-import React from "react";
+import React , {useState} from "react";
 import { Modal, View, Text, Pressable, StyleSheet } from "react-native";
 import { Feather, Entypo } from "@expo/vector-icons";
 
@@ -11,6 +11,13 @@ type Props = {
   children?: React.ReactNode;
 };
 
+type FoodItem = {
+  name: String;
+  weight: number;
+  qty: number;
+  expDate: String;
+}
+
 export default function ModalFoodCategory({ visible, onClose, title, children }: Props) {
 
   //hard coding food in this category for now
@@ -21,6 +28,25 @@ export default function ModalFoodCategory({ visible, onClose, title, children }:
     { name: 'milk', weight: 1, qty: 1, expDate: '2025-10-28' },
     { name: 'bacon', weight: 0.3, qty: 2, expDate: '2025-11-05' },
   ]
+  //saying this state will be an array of the FoodItem type, and then we initalize a COPY of the arrOfFood array
+  const [displayArr, setDisplayArr] = useState<FoodItem[] > (() => [...arrOfFood])
+
+  //Functions for sorting
+    //name ascending
+    
+    //name descending
+
+    //weight ascending
+  function sortAscWeight(){
+    return [...arrOfFood].sort((a , b) => a.weight - b.weight)
+  }
+    //weight descending
+
+    //qty ascending
+    //qty descending
+
+    //exp date ascending
+    //exp date descending
 
   return (
     <Modal
@@ -43,29 +69,37 @@ export default function ModalFoodCategory({ visible, onClose, title, children }:
 
             <View style={[style.specificFilterColumn, {flex:1}]}>
               <Text style={style.filterText}>Name</Text>
-              <Entypo name="triangle-down" size={15} />
+              <Pressable>
+                <Entypo name="triangle-down" size={15} />
+              </Pressable>
             </View>
 
             <View style={[style.specificFilterColumn, {flex:1.1}]}>
               <Text style={style.filterText}>Weight</Text>
-              <Entypo name="triangle-down" size={15} />
+              <Pressable onPress={() => setDisplayArr(sortAscWeight())}>
+                <Entypo name="triangle-down" size={15} />
+              </Pressable>
             </View>
 
             <View style={[style.specificFilterColumn, {flex:1}]}>
               <Text style={style.filterText}>Qty</Text>
-              <Entypo name="triangle-down" size={15} />
+              <Pressable>
+                <Entypo name="triangle-down" size={15} />
+              </Pressable>
             </View>
 
             <View style={[style.specificFilterColumn, {flex:1.2}]}>
               <Text style={style.filterText}>Exp Date</Text>
-              <Entypo name="triangle-down" size={15} />
+              <Pressable>
+                <Entypo name="triangle-down" size={15} />
+              </Pressable>
             </View>
 
           </View>
 
           {/* loop through each item they have in this category */}
             <View style={{width: '100%'}}>
-              {arrOfFood.map((foodItem, index) =>{
+              {displayArr.map((foodItem, index) =>{
                 return (
                   <View key={index} style={style.entryOfFood}>
                     <Text style={[style.specficFoodEntryColumn, {flex:1}]}>{foodItem.name}</Text>
