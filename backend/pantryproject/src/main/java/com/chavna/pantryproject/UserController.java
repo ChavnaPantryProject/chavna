@@ -109,7 +109,7 @@ public class UserController {
         public boolean exists;
     }
 
-    @GetMapping("/user-exists")
+    @PostMapping("/user-exists")
     public ResponseEntity<OkResponse> userExists(@Valid @RequestBody UserExistsRequest request, Errors errors) throws SQLException {
         if (errors.hasErrors())
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, errors.getAllErrors().get(0).toString());
@@ -264,7 +264,7 @@ public class UserController {
         public HashMap<String, Object> personal_info;
     }
 
-    @GetMapping("/get-personal-info")
+    @PostMapping("/get-personal-info")
     public ResponseEntity<OkResponse> getPersonalInfo(@RequestHeader(value = "Authorization", required = false) String authorizationHeader, @RequestBody GetPersonalInfoRequest requestBody) {
         if (requestBody == null || (requestBody.email == null && requestBody.userId == null))
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Request body must contain a user email or a user id.");
