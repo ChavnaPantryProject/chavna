@@ -31,22 +31,68 @@ export default function ModalFoodCategory({ visible, onClose, title, children }:
   //saying this state will be an array of the FoodItem type, and then we initalize a COPY of the arrOfFood array
   const [displayArr, setDisplayArr] = useState<FoodItem[] > (() => [...arrOfFood])
 
-  //Functions for sorting
-    //name ascending
-    
-    //name descending
+  // States for sorting direction arrow 
+  //            ALL ARROWS WITH TRUE ARE THE DEFAULT, TRUE POINTS ARROW DOWN, FALSE POINTS ARROW UP
+  const [nameArrow, setNameArrow] = useState<boolean>(true)
+  const [weightArrow, setWeightArrow] = useState<boolean>(true)
+  const [qtyArrow, setQtyArrow] = useState<boolean>(true)
+  const [expDateArrow, setExpDateArrow] = useState<boolean>(true)
 
+  //function to reset all arrrows to defualt
+  function resetAllArrows(){
+    setNameArrow(true)
+    setWeightArrow(true)
+    setQtyArrow(true)
+    setExpDateArrow(true)
+  }
+
+  //----------------------- Functions for sorting -----------------------
+    //name ascending
+  function sortAscName(){
+    resetAllArrows()
+    return [...arrOfFood].sort((a , b) => a.name.localeCompare(b.name))
+  }
+    //name descending
+  function sortDescName(){
+    resetAllArrows()
+    setNameArrow(false) //make arrow point up
+    return[...arrOfFood].sort((a , b) => b.name.localeCompare(a.name))
+  }
     //weight ascending
   function sortAscWeight(){
+    resetAllArrows()
     return [...arrOfFood].sort((a , b) => a.weight - b.weight)
   }
     //weight descending
-
+  function sortDescWeight(){
+    resetAllArrows()
+    setWeightArrow(false) //make arrow point up
+    return [...arrOfFood].sort((a , b)=> b.weight - a.weight)
+  }
     //qty ascending
+  function sortAscQty(){
+    resetAllArrows()
+    return [...arrOfFood].sort((a , b) => a.qty - b.qty)
+  }
     //qty descending
-
+  function sortDescQty(){
+    resetAllArrows()
+    setQtyArrow(false) //make arrow point up
+    return [...arrOfFood].sort((a , b) => b.qty - a.qty) 
+  }
     //exp date ascending
+  function sortAscExpDate(){
+    resetAllArrows()
+    return [...arrOfFood].sort((a , b) => new Date(a.expDate as string).getTime() - new Date(b.expDate as string).getTime())
+  }
     //exp date descending
+  function sortDescExpDate(){
+    resetAllArrows()
+    setExpDateArrow(false) //make arrow point up
+    return [...arrOfFood].sort((a , b) => new Date(b.expDate as string).getTime() - new Date(a.expDate as string).getTime())
+  }
+  // --------------------------End of sorting functions ----------------------------------------
+
 
   return (
     <Modal
@@ -69,29 +115,35 @@ export default function ModalFoodCategory({ visible, onClose, title, children }:
 
             <View style={[style.specificFilterColumn, {flex:1}]}>
               <Text style={style.filterText}>Name</Text>
-              <Pressable>
-                <Entypo name="triangle-down" size={15} />
+
+              <Pressable onPress={() => setDisplayArr(nameArrow ? sortDescName() : sortAscName())}>
+                <Entypo name={nameArrow ? "triangle-down" : "triangle-up"} size={15}/>
               </Pressable>
+
             </View>
 
             <View style={[style.specificFilterColumn, {flex:1.1}]}>
               <Text style={style.filterText}>Weight</Text>
-              <Pressable onPress={() => setDisplayArr(sortAscWeight())}>
-                <Entypo name="triangle-down" size={15} />
+
+              <Pressable onPress={() => setDisplayArr(weightArrow ? sortDescWeight() : sortAscWeight())}>
+                <Entypo name={weightArrow ? "triangle-down" : "triangle-up"} size={15} />
               </Pressable>
+
             </View>
 
             <View style={[style.specificFilterColumn, {flex:1}]}>
               <Text style={style.filterText}>Qty</Text>
-              <Pressable>
-                <Entypo name="triangle-down" size={15} />
+
+              <Pressable onPress={() => setDisplayArr(qtyArrow ? sortDescQty() : sortAscQty())}>
+                <Entypo name={qtyArrow ? "triangle-down" : "triangle-up"} size={15} />
               </Pressable>
+
             </View>
 
             <View style={[style.specificFilterColumn, {flex:1.2}]}>
               <Text style={style.filterText}>Exp Date</Text>
-              <Pressable>
-                <Entypo name="triangle-down" size={15} />
+              <Pressable onPress={() => setDisplayArr( expDateArrow ? sortDescExpDate() : sortAscExpDate())}>
+                <Entypo name={ expDateArrow ? "triangle-down" : "triangle-up"} size={15} />
               </Pressable>
             </View>
 
