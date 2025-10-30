@@ -246,7 +246,7 @@ const style = StyleSheet.create({
     alignItems: 'center',
   },
     filterText:{
-    fontSize:13,
+    fontSize:17,
     fontWeight:'500'
   },
 
@@ -265,5 +265,6 @@ const style = StyleSheet.create({
 
     specficFoodEntryColumn:{
       textAlign: 'center',
+      fontSize: 17,
     }
 });
