@@ -28,6 +28,20 @@ export default function ModalFoodCategory({ visible, onClose, title, children }:
     { name: 'milk', weight: 1, qty: 1, expDate: '2025-10-28' },
     { name: 'bacon', weight: 0.3, qty: 2, expDate: '2025-11-05' },
   ]
+
+  //function to reset all arrrows to defualt
+  function resetAllArrows(){
+    setNameArrow(true)
+    setWeightArrow(true)
+    setQtyArrow(true)
+    setExpDateArrow(true)
+  }
+  //function to clear all states for when modal closes
+  function resetState(){
+    resetAllArrows()
+    setActiveFilter('')
+    setDisplayArr([...arrOfFood])
+  }
   //saying this state will be an array of the FoodItem type, and then we initalize a COPY of the arrOfFood array
   const [displayArr, setDisplayArr] = useState<FoodItem[] > (() => [...arrOfFood])
 
@@ -44,14 +58,6 @@ export default function ModalFoodCategory({ visible, onClose, title, children }:
 
   //state for the active filter
   const [activeFilter, setActiveFilter] = useState<string>('')
-
-  //function to reset all arrrows to defualt
-  function resetAllArrows(){
-    setNameArrow(true)
-    setWeightArrow(true)
-    setQtyArrow(true)
-    setExpDateArrow(true)
-  }
 
   //----------------------- Functions for sorting -----------------------
     //name ascending
@@ -117,7 +123,10 @@ export default function ModalFoodCategory({ visible, onClose, title, children }:
       onRequestClose={onClose} 
     >
       {/* backdrop that also dismisses */}
-      <Pressable style={style.backdrop} onPress={onClose}>
+      <Pressable style={style.backdrop} onPress={() => {
+        resetState()
+        onClose()
+      }}>
 
         {/* stop backdrop press from closing when tapping inside */}
         <Pressable style={style.sheet} onPress={(e) => e.stopPropagation()}>
