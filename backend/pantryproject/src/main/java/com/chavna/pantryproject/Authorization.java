@@ -1,5 +1,9 @@
 package com.chavna.pantryproject;
 
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
@@ -14,6 +18,7 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwe;
 import io.jsonwebtoken.Jws;
 import io.jsonwebtoken.Jwt;
+import io.jsonwebtoken.JwtParser;
 import io.jsonwebtoken.JwtVisitor;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
@@ -31,10 +36,11 @@ public class Authorization {
         return Keys.hmacShaKeyFor(Decoders.BASE64.decode(secret));
     }
 
-    public static String createToken(UUID user_id) {
+    public static String createLoginToken(UUID userId, UUID loginState) {
         String jws = Jwts.builder()
             .issuedAt(Date.from(Instant.now()))
-            .claim("user_id", user_id)
+            .claim("user_id", userId)
+            .claim("login_state", loginState)
             .expiration(Date.from(Instant.now().plus(TOKEN_DURATION)))
             .signWith(jwtKey)
             .compact();
@@ -42,11 +48,12 @@ public class Authorization {
         return jws;
     }
 
-    public static String createInviteToken(UUID recipient, UUID familyId) {
+    public static String createInviteToken(UUID recipient, UUID familyId, UUID inviteState) {
         String jws = Jwts.builder()
             .issuedAt(Date.from(Instant.now()))
             .claim("recipient", recipient)
             .claim("family_id", familyId)
+            .claim("invite_state", inviteState)
             .expiration(Date.from(Instant.now().plus(INVITE_DURATION)))
             .signWith(jwtKey)
             .compact();
@@ -66,12 +73,17 @@ public class Authorization {
         return jwe;
     }
 
+    public static class Login {
+        public UUID userId;
+        public UUID loginState;
+    }
+
     /**
     * Verifies JWS token and returns the user id associated with it.
     * @param  authorizationHeader  the full HTTP header containing the JWS token
     * @return      the user id assocciated with the token.
     */
-    public static UUID authorize(String authorizationHeader) {
+    public static Login authorize(String authorizationHeader) {
         String[] split = authorizationHeader.split(" ");
 
         if (split.length != 2 || !split[0].equals("Bearer"))
@@ -79,33 +91,63 @@ public class Authorization {
 
         String token = split[1];
 
-        var parser = Jwts.parser()
+        JwtParser parser = Jwts.parser()
             .verifyWith(jwtKey)
             .build();
 
-        var parsed = parser.parse(token);
+        Jwt<?, ?> parsed = parser.parse(token);
 
-        var visitor = new JwtVisitor<UUID>() {
+        var visitor = new JwtVisitor<Login>() {
 
             @Override
-            public UUID visit(Jwt<?, ?> jwt) {
+            public Login visit(Jwt<?, ?> jwt) {
                 throw new UnsupportedOperationException("Unimplemented method 'visit'");
             }
 
             @Override
-            public UUID visit(Jws<?> jws) {
+            public Login visit(Jws<?> jws) {
                 Claims payload = (Claims) jws.getPayload();
 
-                return UUID.fromString((String) payload.get("user_id"));
+                Login login = new Login();
+                login.userId = UUID.fromString((String) payload.get("user_id"));
+                login.loginState = UUID.fromString((String) payload.get("login_state"));
+
+                return login;
             }
 
             @Override
-            public UUID visit(Jwe<?> jwe) {
+            public Login visit(Jwe<?> jwe) {
                 throw new UnsupportedOperationException("Unimplemented method 'visit'");
             }
             
         };
 
-        return parsed.accept(visitor);
+        Login login = parsed.accept(visitor);
+
+        // Get current login state
+        try {
+            Connection con = Database.getRemoteConnection();
+
+            PreparedStatement query = con.prepareStatement(String.format(
+                """
+                SELECT login_state FROM %s
+                WHERE id = ?
+                """, UserController.USERS_TABLE));
+            query.setObject(1, login.userId);
+            ResultSet result = query.executeQuery();
+            
+            if (!result.next())
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User does not exist.");
+            
+            UUID loginState = (UUID) result.getObject(1);
+
+            if (!loginState.equals(login.loginState))
+                throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid login token.");
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "SQL Error.");
+        }
+
+        return login;
     }
 }
