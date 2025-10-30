@@ -12,10 +12,10 @@ type Props = {
 };
 
 type FoodItem = {
-  name: String;
+  name: string;
   weight: number;
   qty: number;
-  expDate: String;
+  expDate: string;
 }
 
 export default function ModalFoodCategory({ visible, onClose, title, children }: Props) {
@@ -38,6 +38,13 @@ export default function ModalFoodCategory({ visible, onClose, title, children }:
   const [qtyArrow, setQtyArrow] = useState<boolean>(true)
   const [expDateArrow, setExpDateArrow] = useState<boolean>(true)
 
+  //color scheme for active an dnon active filters
+  const ACTIVEFILTERCOLOR = 'rgba(73,159,68,1)' //green
+  const NONACTIVEFILTERCOLOR = 'gray'
+
+  //state for the active filter
+  const [activeFilter, setActiveFilter] = useState<string>('')
+
   //function to reset all arrrows to defualt
   function resetAllArrows(){
     setNameArrow(true)
@@ -50,44 +57,52 @@ export default function ModalFoodCategory({ visible, onClose, title, children }:
     //name ascending
   function sortAscName(){
     resetAllArrows()
+    setActiveFilter('name')
     return [...arrOfFood].sort((a , b) => a.name.localeCompare(b.name))
   }
     //name descending
   function sortDescName(){
     resetAllArrows()
+    setActiveFilter('name')
     setNameArrow(false) //make arrow point up
     return[...arrOfFood].sort((a , b) => b.name.localeCompare(a.name))
   }
     //weight ascending
   function sortAscWeight(){
     resetAllArrows()
+    setActiveFilter('weight')
     return [...arrOfFood].sort((a , b) => a.weight - b.weight)
   }
     //weight descending
   function sortDescWeight(){
     resetAllArrows()
+    setActiveFilter('weight')
     setWeightArrow(false) //make arrow point up
     return [...arrOfFood].sort((a , b)=> b.weight - a.weight)
   }
     //qty ascending
   function sortAscQty(){
     resetAllArrows()
+    setActiveFilter('qty')
     return [...arrOfFood].sort((a , b) => a.qty - b.qty)
   }
     //qty descending
   function sortDescQty(){
     resetAllArrows()
+    setActiveFilter('qty')
     setQtyArrow(false) //make arrow point up
     return [...arrOfFood].sort((a , b) => b.qty - a.qty) 
   }
     //exp date ascending
   function sortAscExpDate(){
     resetAllArrows()
+    setActiveFilter('expDate')
     return [...arrOfFood].sort((a , b) => new Date(a.expDate as string).getTime() - new Date(b.expDate as string).getTime())
   }
     //exp date descending
   function sortDescExpDate(){
     resetAllArrows()
+    setActiveFilter('expDate')
     setExpDateArrow(false) //make arrow point up
     return [...arrOfFood].sort((a , b) => new Date(b.expDate as string).getTime() - new Date(a.expDate as string).getTime())
   }
@@ -117,7 +132,7 @@ export default function ModalFoodCategory({ visible, onClose, title, children }:
               <Text style={style.filterText}>Name</Text>
 
               <Pressable onPress={() => setDisplayArr(nameArrow ? sortDescName() : sortAscName())}>
-                <Entypo name={nameArrow ? "triangle-down" : "triangle-up"} size={15}/>
+                <Entypo name={nameArrow ? "triangle-down" : "triangle-up"} size={15} color={activeFilter == "name" ? ACTIVEFILTERCOLOR : NONACTIVEFILTERCOLOR}/>
               </Pressable>
 
             </View>
@@ -126,7 +141,7 @@ export default function ModalFoodCategory({ visible, onClose, title, children }:
               <Text style={style.filterText}>Weight</Text>
 
               <Pressable onPress={() => setDisplayArr(weightArrow ? sortDescWeight() : sortAscWeight())}>
-                <Entypo name={weightArrow ? "triangle-down" : "triangle-up"} size={15} />
+                <Entypo name={weightArrow ? "triangle-down" : "triangle-up"} size={15} color={activeFilter == "weight" ? ACTIVEFILTERCOLOR : NONACTIVEFILTERCOLOR} />
               </Pressable>
 
             </View>
@@ -135,7 +150,7 @@ export default function ModalFoodCategory({ visible, onClose, title, children }:
               <Text style={style.filterText}>Qty</Text>
 
               <Pressable onPress={() => setDisplayArr(qtyArrow ? sortDescQty() : sortAscQty())}>
-                <Entypo name={qtyArrow ? "triangle-down" : "triangle-up"} size={15} />
+                <Entypo name={qtyArrow ? "triangle-down" : "triangle-up"} size={15} color={activeFilter == "qty" ? ACTIVEFILTERCOLOR : NONACTIVEFILTERCOLOR} />
               </Pressable>
 
             </View>
@@ -143,7 +158,7 @@ export default function ModalFoodCategory({ visible, onClose, title, children }:
             <View style={[style.specificFilterColumn, {flex:1.2}]}>
               <Text style={style.filterText}>Exp Date</Text>
               <Pressable onPress={() => setDisplayArr( expDateArrow ? sortDescExpDate() : sortAscExpDate())}>
-                <Entypo name={ expDateArrow ? "triangle-down" : "triangle-up"} size={15} />
+                <Entypo name={ expDateArrow ? "triangle-down" : "triangle-up"} size={15} color={activeFilter == "expDate" ? ACTIVEFILTERCOLOR : NONACTIVEFILTERCOLOR} />
               </Pressable>
             </View>
 
