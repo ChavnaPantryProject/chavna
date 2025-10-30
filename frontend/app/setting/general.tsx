@@ -1,8 +1,13 @@
-import React, { useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Modal, Platform } from "react-native"; // Added Platform
+import React, { useState, useEffect } from "react";
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Modal, Platform, Alert, ActivityIndicator } from "react-native";
 import { Picker } from "@react-native-picker/picker"; 
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import * as SecureStore from 'expo-secure-store';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const API_BASE_URL = "https://api.chavnapantry.com";
+
 // --- Data for the dropdowns ---
 const UNIT_OPTIONS = ["g", "oz", "cups", "tbsp", "tsp", "lbs"];
 const CURRENCY_OPTIONS = ["USD", "EUR", "GBP", "JPY", "CNY"];
@@ -14,6 +19,7 @@ interface SettingsModalProps {
   title: string;
   children: React.ReactNode; 
   onSave: () => void;
+  loading?: boolean;
 }
 
 // --- Shared Modal Component for Reusability ---
@@ -23,6 +29,7 @@ const SettingsModal = ({
   title,
   children,
   onSave,
+  loading = false,
 }: SettingsModalProps) => (
   <Modal
     animationType="fade"
@@ -37,15 +44,21 @@ const SettingsModal = ({
         {children}
 
         <TouchableOpacity
-          style={styles.saveBtn}
+          style={[styles.saveBtn, loading && styles.disabledBtn]}
           onPress={onSave}
+          disabled={loading}
         >
-          <Text style={styles.btnText}>Save</Text>
+          {loading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.btnText}>Save</Text>
+          )}
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.cancelBtn}
           onPress={onClose}
+          disabled={loading}
         >
           <Text style={styles.btnText}>Cancel</Text>
         </TouchableOpacity>
@@ -56,10 +69,14 @@ const SettingsModal = ({
 
 const GeneralScreen = () => {
   const router = useRouter();
+  const [jwtToken, setJwtToken] = useState<string | null>(null);
 
   // State for Change Name Modal
   const [nameModalVisible, setNameModalVisible] = useState(false);
-  const [name, setName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [nickname, setNickname] = useState("");
+  const [loadingName, setLoadingName] = useState(false);
 
   // State for Edit Units Modal
   const [unitsModalVisible, setUnitsModalVisible] = useState(false);
@@ -69,20 +86,120 @@ const GeneralScreen = () => {
   const [currencyModalVisible, setCurrencyModalVisible] = useState(false);
   const [selectedCurrency, setSelectedCurrency] = useState(CURRENCY_OPTIONS[0]);
 
-  // --- Handlers for Save Buttons ---
-  const handleSaveName = () => {
-    console.log("Saved name:", name);
-    setNameModalVisible(false);
+  // Load JWT token and saved preferences on mount
+  useEffect(() => {
+    loadToken();
+    loadSavedPreferences();
+  }, []);
+
+  const loadToken = async () => {
+    try {
+      let token = await SecureStore.getItemAsync('jwt');
+      if (!token) {
+        try {
+          token = localStorage.getItem('jwt');
+        } catch {}
+      }
+      setJwtToken(token);
+      
+      if (!token) {
+        Alert.alert("Not Authenticated", "Please login first");
+        router.replace('/login');
+      }
+    } catch (error) {
+      console.error("Error loading token:", error);
+    }
   };
 
-  const handleSaveUnit = () => {
-    console.log("Saved unit:", selectedUnit);
-    setUnitsModalVisible(false);
+  const loadSavedPreferences = async () => {
+    try {
+      // Load saved unit preference
+      const savedUnit = await AsyncStorage.getItem('defaultUnit');
+      if (savedUnit && UNIT_OPTIONS.includes(savedUnit)) {
+        setSelectedUnit(savedUnit);
+      }
+
+      // Load saved currency preference
+      const savedCurrency = await AsyncStorage.getItem('defaultCurrency');
+      if (savedCurrency && CURRENCY_OPTIONS.includes(savedCurrency)) {
+        setSelectedCurrency(savedCurrency);
+      }
+    } catch (error) {
+      console.error("Error loading preferences:", error);
+    }
   };
 
-  const handleSaveCurrency = () => {
-    console.log("Saved currency:", selectedCurrency);
-    setCurrencyModalVisible(false);
+  // --- Handler for Save Name ---
+  const handleSaveName = async () => {
+    if (!firstName.trim() && !lastName.trim() && !nickname.trim()) {
+      Alert.alert("Error", "Please enter at least one field");
+      return;
+    }
+
+    if (!jwtToken) {
+      Alert.alert("Error", "Not authenticated");
+      return;
+    }
+
+    try {
+      setLoadingName(true);
+
+      const requestBody: any = {};
+      if (firstName.trim()) requestBody.first_name = firstName.trim();
+      if (lastName.trim()) requestBody.last_name = lastName.trim();
+      if (nickname.trim()) requestBody.nickname = nickname.trim();
+
+      const response = await fetch(`${API_BASE_URL}/set-personal-info`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${jwtToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success === "success") {
+        Alert.alert("Success", "Name updated successfully");
+        setNameModalVisible(false);
+        // Clear the fields
+        setFirstName("");
+        setLastName("");
+        setNickname("");
+      } else {
+        Alert.alert("Error", data.message || "Failed to update name");
+      }
+    } catch (error) {
+      console.error("Error updating name:", error);
+      Alert.alert("Error", "Failed to update name");
+    } finally {
+      setLoadingName(false);
+    }
+  };
+
+  // --- Handler for Save Unit ---
+  const handleSaveUnit = async () => {
+    try {
+      await AsyncStorage.setItem('defaultUnit', selectedUnit);
+      Alert.alert("Success", `Default unit set to ${selectedUnit}`);
+      setUnitsModalVisible(false);
+    } catch (error) {
+      console.error("Error saving unit:", error);
+      Alert.alert("Error", "Failed to save unit preference");
+    }
+  };
+
+  // --- Handler for Save Currency ---
+  const handleSaveCurrency = async () => {
+    try {
+      await AsyncStorage.setItem('defaultCurrency', selectedCurrency);
+      Alert.alert("Success", `Default currency set to ${selectedCurrency}`);
+      setCurrencyModalVisible(false);
+    } catch (error) {
+      console.error("Error saving currency:", error);
+      Alert.alert("Error", "Failed to save currency preference");
+    }
   };
 
   return (
@@ -121,16 +238,38 @@ const GeneralScreen = () => {
       {/* --- Change Name Modal --- */}
       <SettingsModal
         visible={nameModalVisible}
-        onClose={() => setNameModalVisible(false)}
+        onClose={() => {
+          setNameModalVisible(false);
+          setFirstName("");
+          setLastName("");
+          setNickname("");
+        }}
         title="Change Name" 
         onSave={handleSaveName}
+        loading={loadingName}
       >
         <TextInput
           style={styles.input}
-          placeholder="Change Name"
-          value={name}
-          onChangeText={setName}
+          placeholder="First Name"
+          value={firstName}
+          onChangeText={setFirstName}
+          editable={!loadingName}
         />
+        <TextInput
+          style={styles.input}
+          placeholder="Last Name"
+          value={lastName}
+          onChangeText={setLastName}
+          editable={!loadingName}
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="Nickname (Optional)"
+          value={nickname}
+          onChangeText={setNickname}
+          editable={!loadingName}
+        />
+        <Text style={styles.helperText}>Fill in at least one field</Text>
       </SettingsModal>
 
       {/* --- Edit Unit Modal --- */}
@@ -239,8 +378,14 @@ const styles = StyleSheet.create({
     borderColor: "green",
     borderRadius: 8,
     padding: 10,
-    marginBottom: 20,
+    marginBottom: 15,
     textAlign: "center",
+  },
+  helperText: {
+    fontSize: 12,
+    color: 'gray',
+    marginBottom: 15,
+    fontStyle: 'italic',
   },
   // --- Dropdown/Picker Styles ---
   dropdownLabel: {
@@ -270,6 +415,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     width: "100%",
     marginBottom: 10,
+  },
+  disabledBtn: {
+    backgroundColor: "#ccc",
   },
   cancelBtn: {
     backgroundColor: "#f89d5d",
