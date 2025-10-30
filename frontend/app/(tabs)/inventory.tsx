@@ -9,7 +9,7 @@ const InventoryScreen = () => {
   const [searchEntry, setSearchEntry] = useState('')
 
   // hard coded for now
-  const foodCategories: string[] = ['Protein', 'Seafood', 'Vegetables', 'Herbs & Spices', 'test']
+  const [foodCategories, setFoodCategories] = useState<string[]> (['Protein', 'Seafood', 'Vegetables', 'Herbs & Spices', 'test'])
 
   //states for modal visibility
     //modal for users food categories
@@ -28,7 +28,7 @@ const InventoryScreen = () => {
 
   //setting type to be a string or null <string | null >
   const [foodCategoryTitle, setFoodCategoryTitle] = useState<string | null >(null) 
-
+  
 
 
   return (
@@ -71,7 +71,7 @@ const InventoryScreen = () => {
       </View>
 
       {/* This is a modal which will be a pop up for the food category, it is invisble until a user clicks on a category */}
-       <ModalFoodCategory visible={modalCategoryVisible} onClose={closeCategory} title={foodCategoryTitle ?? undefined}/>
+      <ModalFoodCategory visible={modalCategoryVisible} onClose={closeCategory} title={foodCategoryTitle ?? undefined}/>
 
       {/* plus icon to add another category */}
       <Pressable onPress={() => {openCreateCategory()}}>
@@ -80,6 +80,7 @@ const InventoryScreen = () => {
           visible={modalCreateCategory}
           onClose={closeCreateCategory}
           title="New Group"
+          onSubmit={(name) => setFoodCategories(prev => [...prev, name])}
           />
           
         <Text style={style.addButton}>+</Text>
