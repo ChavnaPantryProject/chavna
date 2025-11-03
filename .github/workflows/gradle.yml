@@ -9,13 +9,13 @@ name: Java CI with Gradle
 
 on:
   push:
+    branches: [ "main" ]
     paths:
       - 'backend/**'
-    branches: [ "main" ]
   pull_request:
+    branches: [ "main" ]
     paths:
       - 'backend/**'
-    branches: [ "main" ]
 
 env:
   ELASTIC_BEANSTALK_NAME: chavna2
