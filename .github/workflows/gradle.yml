@@ -13,6 +13,10 @@ on:
   pull_request:
     branches: [ "main" ]
 
+env:
+  ELASTIC_BEANSTALK_NAME: chavna2
+  ELASTIC_BEANSTALK_ENV_NAME: Chavna2-env
+
 jobs:
   build:
 
@@ -48,6 +52,9 @@ jobs:
       run: gradle bootJar
       working-directory: ./backend/pantryproject
 
+    - name: Rename Output
+      run: mv /build/libs/pantryproject-0.0.1-SNAPSHOT.jar ${{github.run_id}}.jar
+
   dependency-submission:
 
     runs-on: ubuntu-latest
@@ -69,3 +76,25 @@ jobs:
       with:
         gradle-version: '8.14.3'
         build-root-directory: ./backend/pantryproject
+        
+  deploy:
+  
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    needs: build
+
+    steps:
+    - uses: actions/download-artifact@v4.1.7
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-region: us-east-1
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+        aws-secret-access-key: ${{ secrets.AWS_ACCESS_KEY_SECRET }}
+    - name: Deploy
+      run: |
+        aws s3 cp "${{github.run_id}}.jar" s3://elasticbeanstalk-us-east-1-${{ secrets.AWS_ACCOUNT_ID }}/artifact/java-app/
+        aws elasticbeanstalk create-application-version --application-name $ELASTIC_BEANSTALK_NAME --version-label ${{github.run_id}} --description ${{github.run_id}} --source-bundle S3Bucket="elasticbeanstalk-us-east-1-${{ secrets.AWS_ACCOUNT_ID }}",S3Key="artifact/java-app/${{github.run_id}}.jar"
+        aws elasticbeanstalk update-environment --application-name $ELASTIC_BEANSTALK_NAME --environment-name $ELASTIC_BEANSTALK_ENV_NAME --version-label ${{github.run_id}}
+        aws elasticbeanstalk wait environment-updated --application-name $ELASTIC_BEANSTALK_NAME --environment-name $ELASTIC_BEANSTALK_ENV_NAME
+
