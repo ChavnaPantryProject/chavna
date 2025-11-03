@@ -132,7 +132,7 @@ public class Authorization {
                 """
                 SELECT login_state FROM %s
                 WHERE id = ?
-                """, UserController.USERS_TABLE));
+                """, Database.USERS_TABLE));
             query.setObject(1, login.userId);
             ResultSet result = query.executeQuery();
             
