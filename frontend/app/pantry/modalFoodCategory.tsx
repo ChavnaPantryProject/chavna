@@ -137,36 +137,32 @@ export default function ModalFoodCategory({ visible, onClose, title, children }:
           {/* column headers with the filter icon */}
           <View style={style.columnFilters}>
 
-            <View style={[style.specificFilterColumn, {flex:1}]}>
-              <Text style={style.filterText}>Name</Text>
-
-              <Pressable onPress={() => setDisplayArr(nameArrow ? sortDescName() : sortAscName())}>
+            <View style={{flex:1}}>
+              <Pressable style={style.specificFilterColumn} onPress={() => setDisplayArr(nameArrow ? sortDescName() : sortAscName())}>
+                <Text style={style.filterText}>Name</Text>
                 <Entypo name={nameArrow ? "triangle-down" : "triangle-up"} size={15} color={activeFilter == "name" ? ACTIVEFILTERCOLOR : NONACTIVEFILTERCOLOR}/>
               </Pressable>
-
             </View>
 
-            <View style={[style.specificFilterColumn, {flex:1.1}]}>
-              <Text style={style.filterText}>Weight</Text>
-
-              <Pressable onPress={() => setDisplayArr(weightArrow ? sortDescWeight() : sortAscWeight())}>
+            <View style={{flex:1.1}}>
+              <Pressable style={style.specificFilterColumn} onPress={() => setDisplayArr(weightArrow ? sortDescWeight() : sortAscWeight())}>
+                <Text style={style.filterText}>Weight</Text>
                 <Entypo name={weightArrow ? "triangle-down" : "triangle-up"} size={15} color={activeFilter == "weight" ? ACTIVEFILTERCOLOR : NONACTIVEFILTERCOLOR} />
               </Pressable>
 
             </View>
 
-            <View style={[style.specificFilterColumn, {flex:1}]}>
-              <Text style={style.filterText}>Qty</Text>
-
-              <Pressable onPress={() => setDisplayArr(qtyArrow ? sortDescQty() : sortAscQty())}>
+            <View style={{flex:1}}>
+              <Pressable style={style.specificFilterColumn} onPress={() => setDisplayArr(qtyArrow ? sortDescQty() : sortAscQty())}>
+                <Text style={style.filterText}>Qty</Text>
                 <Entypo name={qtyArrow ? "triangle-down" : "triangle-up"} size={15} color={activeFilter == "qty" ? ACTIVEFILTERCOLOR : NONACTIVEFILTERCOLOR} />
               </Pressable>
 
             </View>
 
-            <View style={[style.specificFilterColumn, {flex:1.2}]}>
-              <Text style={style.filterText}>Exp Date</Text>
-              <Pressable onPress={() => setDisplayArr( expDateArrow ? sortDescExpDate() : sortAscExpDate())}>
+            <View style={ {flex:1.2}}>
+              <Pressable style={style.specificFilterColumn} onPress={() => setDisplayArr( expDateArrow ? sortDescExpDate() : sortAscExpDate())}>
+                <Text style={style.filterText}>Exp Date</Text>
                 <Entypo name={ expDateArrow ? "triangle-down" : "triangle-up"} size={15} color={activeFilter == "expDate" ? ACTIVEFILTERCOLOR : NONACTIVEFILTERCOLOR} />
               </Pressable>
             </View>

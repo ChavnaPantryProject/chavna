@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
-import { Text, View, StyleSheet, TextInput, Pressable, FlatList } from 'react-native'
+import { Text, View, StyleSheet, TextInput, Pressable, FlatList, ScrollView } from 'react-native'
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import ModalFoodCategory from "../pantry/modalFoodCategory";
 import ModalCreateFoodCategory from "../pantry/modalAddCategory"
@@ -32,7 +33,7 @@ const InventoryScreen = () => {
 
 
   return (
-    <View style={style.container}>
+    <SafeAreaView style={style.container} edges={['left' ,'right' , 'bottom']}>
       {/* view for meat ball icon, the three dots */}
     <View style={style.header}>
       <Pressable onPress={() => console.log("Menu pressed")} hitSlop={8}>
@@ -55,7 +56,9 @@ const InventoryScreen = () => {
         />
       </View>
 
-    {/* list of food categories */}
+    {/* scollable area */}
+    <ScrollView>
+      {/* list of food categories */}
       <View style={style.catergoryContainer}>
         {/* looping through foodCategories array to create a card for each category */}
         {foodCategories.map((category) => (
@@ -72,8 +75,8 @@ const InventoryScreen = () => {
 
       {/* This is a modal which will be a pop up for the food category, it is invisble until a user clicks on a category */}
       <ModalFoodCategory visible={modalCategoryVisible} onClose={closeCategory} title={foodCategoryTitle ?? undefined}/>
-
-      {/* plus icon to add another category */}
+    </ScrollView>
+    {/* plus icon to add another category */}
       <Pressable onPress={() => {openCreateCategory()}}>
 
         <ModalCreateFoodCategory
@@ -85,7 +88,7 @@ const InventoryScreen = () => {
           
         <Text style={style.addButton}>+</Text>
       </Pressable>
-    </View>
+    </SafeAreaView>
   )
 }
 
@@ -117,7 +120,8 @@ const style = StyleSheet.create({
     padding: 10,
     alignItems: 'center',
     marginBottom: 16,
-    flexDirection: 'row'
+    flexDirection: 'row',
+    backgroundColor: "rgba(227, 234, 225, .1)",
   },
 
   catergoryContainer: { 
