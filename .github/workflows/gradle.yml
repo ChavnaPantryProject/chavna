@@ -46,6 +46,7 @@ jobs:
     
     - name: Build with Gradle 8.14.3
       run: gradle bootJar
+      working-directory: ./backend/pantryproject
 
   dependency-submission:
 
