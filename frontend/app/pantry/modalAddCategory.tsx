@@ -45,6 +45,7 @@ export default function ModalCreateFoodCategory({ visible, onClose, title, child
                 onPress={()=>{
                   onSubmit(newCategoryName)
                   onClose()
+                  setNewCateogoryName("")
                 }}
                 >
                   <Text style={style.textInButton}>Add</Text>
@@ -52,7 +53,10 @@ export default function ModalCreateFoodCategory({ visible, onClose, title, child
 
                 <Pressable 
                 style={style.buttonsForAddCategory}
-                onPress={onClose}
+                onPress={() => {
+                  onClose()
+                  setNewCateogoryName("")
+                }}
                 >
                   <Text style={style.textInButton}>Cancel</Text>
                 </Pressable>
