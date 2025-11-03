@@ -53,7 +53,7 @@ jobs:
       working-directory: ./backend/pantryproject
 
     - name: Rename Output
-      run: mv /build/libs/pantryproject-0.0.1-SNAPSHOT.jar ${{github.run_id}}.jar
+      run: mv ./build/libs/pantryproject-0.0.1-SNAPSHOT.jar ${{github.run_id}}.jar
 
   dependency-submission:
 
