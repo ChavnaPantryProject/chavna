@@ -1,5 +1,3 @@
-// fix it so that when clicking the info button, it'll go to the respective page.
-
 import React from 'react'
 import { 
   Text, 
@@ -16,7 +14,6 @@ import { useRouter } from "expo-router";
 import { Ionicons, MaterialIcons } from '@expo/vector-icons'
 
 // example meal card data used in our figma
-// replace this so thatt user has an option to delete it
 const meals = [
   {
     id: "1",

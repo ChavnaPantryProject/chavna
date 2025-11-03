@@ -2,15 +2,13 @@
 // make sure to add the three dots at the top right corner to enter edit mode/to deleete meal
 // "go to nutrition info" at the bottom right corner.
 
-// FIX!!!!
-// when user clicks save, it goes back to the original screen
-
 import React, {useState} from "react";
 import { 
     View, 
     Text, 
     Image, 
-    TouchableOpacity,
+    TouchableOpacity, 
+    FlatList,
     StyleSheet,
     SafeAreaView,
     ScrollView,
@@ -23,16 +21,6 @@ import { Ionicons } from "@expo/vector-icons";
 export default function MealIngredientScreen() {
     const router = useRouter();
     const [menuVisible, setMenuVisible] = useState(false);
-
-    // ingredient list data
-    const ingredients = [
-        { name: "Dry Fettuccine Pasta", amount: "680g" },
-        { name: "Butter", amount: "240g" },
-        { name: "Heavy Cream", amount: "360g" },
-        { name: "Garlic Salt", amount: ".5g" },
-        { name: "Roman Cheese", amount: "75g" },
-        { name: "Parmesan Cheese", amount: "45g" },
-    ];
 
     return (
         <SafeAreaView style={styles.container}>
@@ -54,10 +42,7 @@ export default function MealIngredientScreen() {
                 animationType="fade"
                 onRequestClose={() => setMenuVisible(false)}
             >
-                <Pressable 
-                    style={styles.modalOverlay} 
-                    onPress={() => setMenuVisible(false)}
-                >
+                <Pressable style={styles.modalOverlay} onPress={() => setMenuVisible(false)}>
                     <View style={styles.dropdownMenu}>
                         <TouchableOpacity
                             style={styles.dropdownItem}
@@ -86,8 +71,12 @@ export default function MealIngredientScreen() {
             </Modal>
 
             {/* Main content */}
-            <View style={styles.fixedSection}>
-                <View style={styles.mealHeader}>
+            <ScrollView
+                contentContainerStyle={styles.scrollContainer}
+                showsVerticalScrollIndicator={false}
+            >
+                {/* Title */}
+                <View style={styles.titleContainer}>
                     <Text style={styles.mealTitle}>Fettuccine Alfredo</Text>
                 </View>
 
@@ -96,32 +85,28 @@ export default function MealIngredientScreen() {
                     source={require('../../assets/images/FETTUCCINE_ALFREDO_HOMEPAGE.jpg')}
                     style={styles.mealImage}
                 />
-            </View>
-            
-            {/* scrollable ingredient list */}
-            <ScrollView
-                style={styles.scrollContainer}
-                showsVerticalScrollIndicator={false}
-            >
 
-                {/* Table Header */}
-                <View style={styles.tableHeader}>
-                    <Text style={styles.headerText}>Ingredients</Text>
-                    <Text style={styles.headerText}>Measurement</Text>
-                </View>
-
-                {/* Ingredient list with separators */}
-                {ingredients.map((item, index) => (
-                    <View key={index} style={styles.rowContainer}>
-                        <View style={styles.row}>
-                            <Text style={styles.ingredientText}>{item.name}</Text>
-                            <Text style={styles.amountText}>{item.amount}</Text>
-                        </View>
-
-                        {/* Separator line */}
-                        {index < ingredients.length - 1 && <View style={styles.divider} />}
+                {/* Ingredients List */}
+                <View style={styles.tableContainer}>
+                    <View style={styles.tableHeader}>
+                        <Text style={styles.headerText}>Ingredients</Text>
+                        <Text style={styles.headerText}>Measurement</Text>
                     </View>
-                ))}
+
+                    {[
+                        ["Dry Fettuccine Pasta", "680g"],
+                        ["Butter", "240g"],
+                        ["Heavy Cream", "360g"],
+                        ["Garlic Salt", ".5g"],
+                        ["Roman Cheese", "75g"],
+                        ["Parmesan Cheese", "45g"],
+                    ].map(([label, value], index) => (
+                        <View key={index} style={styles.tableRow}>
+                            <Text style={styles.tableLabel}>{label}</Text>
+                            <Text style={styles.tableValue}>{value}</Text>
+                        </View>
+                    ))}
+                </View>
 
                 {/* Navigation Button to Nutrition Info */}
                 <TouchableOpacity
@@ -145,29 +130,24 @@ const styles = StyleSheet.create({
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        width: "100%",
         paddingHorizontal: 20,
-        paddingTop: 50,
-    },
-
-    fixedSection: {
-        alignItems: "center",
+        paddingTop: 60,
     },
 
     scrollContainer: {
-        flex: 1,
-        paddingHorizontal: 25,
-        marginTop: 5,
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        paddingBottom: 40,
     },
 
-    mealHeader: {
+    titleContainer: {
         backgroundColor: "#E3F0E3",
         borderRadius: 10,
         paddingVertical: 8,
         paddingHorizontal: 20,
         marginVertical: 10,
         borderWidth: 1,
-        borderColor: "499F44",
+        borderColor: "#499F44",
     },
 
     mealTitle: {
@@ -182,29 +162,29 @@ const styles = StyleSheet.create({
         height: 180,
         borderRadius: 15,
         borderColor: "#499F44",
+        marginTop: 10,
         marginVertical: 10,
+    },
+
+    tableContainer: {
+        width: '100%',
+        borderTopWidth: 1,
+        borderColor: '#499F44',
     },
 
     tableHeader: {
         flexDirection: "row",
         justifyContent: "space-between",
-        marginTop: 15,
+        width: "85%",
+        marginTop: 20,
         marginBottom: 5,
     },
 
     headerText: {
-        fontSize: 22,
+        fontSize: 23,
         fontWeight: "700",
         color: "#000",
-    },
-
-    rowContainer: {
-        alignSelf: "stretch",
-    },
-
-    tableBody: {
-        width: "90%",
-        alignItems: "center",
+        marginHorizontal: 19,
     },
 
     tableRow: {
@@ -227,37 +207,12 @@ const styles = StyleSheet.create({
 
     linkContainer: {
         alignSelf: 'flex-end',
-        marginTop: 12,
-        marginRight: 0,
+        marginTop: 10,
     },
 
     linkText: {
         color: '#499F44',
         fontWeight: '500',
-    },
-
-    row: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        paddingVertical: 8,
-        paddingHorizontal: 10,
-    },
-
-    ingredientText: {
-        fontSize: 15,
-        color: "#000",
-    },
-
-    amountText: {
-        fontSize: 15,
-        color: "#000",
-    },
-
-    divider: {
-        width: "100%",
-        height: 1,
-        backgroundColor: "#499F44",
-        alignSelf: "center",
     },
 
     // dropdown menu styles
