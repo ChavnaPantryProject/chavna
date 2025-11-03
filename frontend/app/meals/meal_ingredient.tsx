@@ -2,9 +2,6 @@
 // make sure to add the three dots at the top right corner to enter edit mode/to deleete meal
 // "go to nutrition info" at the bottom right corner.
 
-// FIX!!!!
-// when user clicks save, it goes back to the original screen
-
 import React, {useState} from "react";
 import { 
     View, 
