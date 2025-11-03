@@ -8,6 +8,9 @@ import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.util.HashMap;
 
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
+
 public class Database {
     public static Connection getRemoteConnection() {
         try {
@@ -76,5 +79,9 @@ public class Database {
         }
 
         return object;
+    }
+
+    public static ResponseStatusException getSQLErrorHTTPResponse() {
+        return new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "SQL Error.");
     }
 }
