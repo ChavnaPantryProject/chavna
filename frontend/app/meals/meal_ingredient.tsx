@@ -3,6 +3,9 @@
 // "go to nutrition info" at the bottom right corner.
 
 // FIX!!!!
+// add dividers, take out the gree divider that separates the image fron the list
+// adjust the format so that it aligns.
+// make the list scrollable butt he image stays put.
 // when user clicks save, it goes back to the original screen
 
 import React, {useState} from "react";
