@@ -39,37 +39,34 @@ jobs:
             CURRENT_PROJECT_VERSION=${BASH_REMATCH[1]}
           fi
 
-          compare_versions() {
-            # Return 1 if a leq b
-            major_a=$(echo "$1" | cut -d'.' -f1)
-            minor_a=$(echo "$1" | cut -d'.' -f2)
-            patch_a=$(echo "$1" | cut -d'.' -f3)
+          # Return 1 if a leq b
+          major_a=$(echo "$CURRENT_PROJECT_VERSION" | cut -d'.' -f1)
+          minor_a=$(echo "$CURRENT_PROJECT_VERSION" | cut -d'.' -f2)
+          patch_a=$(echo "$CURRENT_PROJECT_VERSION" | cut -d'.' -f3)
 
-            major_b=$(echo "$2" | cut -d'.' -f1)
-            minor_b=$(echo "$2" | cut -d'.' -f2)
-            patch_b=$(echo "$2" | cut -d'.' -f3)
+          major_b=$(echo "$PREVIOUS_PROJECT_VERSION" | cut -d'.' -f1)
+          minor_b=$(echo "$PREVIOUS_PROJECT_VERSION" | cut -d'.' -f2)
+          patch_b=$(echo "$PREVIOUS_PROJECT_VERSION" | cut -d'.' -f3)
 
-            if [[ $major_a -lt $major_b ]]; then
-              return 1
-            elif [[ $major_a -gt $major_b ]]; then
-              return 0
-            fi
+          if [[ $major_a -lt $major_b ]]; then
+            LTE=1
+          elif [[ $major_a -gt $major_b ]]; then
+            LTE=0
+          fi
 
-            if [[ $minor_a -lt $minor_b ]]; then
-              return 1
-            elif [[ $minor_a -gt $minor_b ]]; then
-              return 0
-            fi  
+          if [[ $minor_a -lt $minor_b ]]; then
+            LTE=1
+          elif [[ $minor_a -gt $minor_b ]]; then
+            LTE=0
+          fi  
 
-            if [[ $patch_a -le $patch_b ]]; then
-              return 1
-            fi
+          if [[ $patch_a -le $patch_b ]]; then
+            LTE=1
+          else
+            LTE=0
+          fi
 
-            return 0
-          }
-
-          compare_versions "$CURRENT_PROJECT_VERSION" "$PREVIOUS_PROJECT_VERSION"
-          if [[ $? -eq 1 ]]; then
+          if [[ $LTE -eq 1 ]]; then
             version="$CURRENT_PROJECT_VERSION"
             major=$(echo "$version" | cut -d'.' -f1)
             minor=$(echo "$version" | cut -d'.' -f2)
