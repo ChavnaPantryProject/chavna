@@ -3,8 +3,7 @@ name: Deployment Workflow
 
 on:
   workflow_run:
-    workflows: ["Backend Workflow"]
-    branches: ["main"]
+    workflows: ["Backend Workflow", "Frontend Workflow"]
     types:
       - completed
 
