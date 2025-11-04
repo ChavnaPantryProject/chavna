@@ -49,34 +49,27 @@ jobs:
             minor_b=$(echo "$2" | cut -d'.' -f2)
             patch_b=$(echo "$2" | cut -d'.' -f3)
 
-            echo "$1 $2"
-
             if [[ $major_a -lt $major_b ]]; then
-              echo "a"
               return 1
             elif [[ $major_a -gt $major_b ]]; then
-              echo "b"
               return 0
             fi
 
             if [[ $minor_a -lt $minor_b ]]; then
-              echo "c"
               return 1
             elif [[ $minor_a -gt $minor_b ]]; then
-              echo "d"
               return 0
             fi  
 
             if [[ $patch_a -le $patch_b ]]; then
-              echo "e"
               return 1
             fi
 
             return 0
           }
 
-          result=$(compare_versions "$CURRENT_PROJECT_VERSION" "$PREVIOUS_PROJECT_VERSION")
-          if [[ $result -eq 1 ]]; then
+          compare_versions "$CURRENT_PROJECT_VERSION" "$PREVIOUS_PROJECT_VERSION"
+          if [[ $? -eq 1 ]]; then
             version="$CURRENT_PROJECT_VERSION"
             major=$(echo "$version" | cut -d'.' -f1)
             minor=$(echo "$version" | cut -d'.' -f2)
