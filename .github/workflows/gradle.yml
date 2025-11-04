@@ -11,11 +11,11 @@ on:
   push:
     branches: [ "main" ]
     paths:
-      - 'backend/**'
+      - 'backendadsfa/**'
   pull_request:
     branches: [ "main" ]
     paths:
-      - 'backend/**'
+      - 'backasdfadend/**'
 
 env:
   ELASTIC_BEANSTALK_NAME: chavna2
