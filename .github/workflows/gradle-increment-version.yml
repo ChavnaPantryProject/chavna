@@ -16,30 +16,30 @@ jobs:
             fetch-depth: 2
       - name: Update Version
         run: |
-          FILE_PATH="./backend/pantryproject/build.gradle"
+            FILE_PATH="./backend/pantryproject/build.gradle"
 
-          PREVIOUS_COMMIT_SHA="${{ github.event.before }}"
+            PREVIOUS_COMMIT_SHA="${{ github.event.before }}"
 
-          git checkout "$PREVIOUS_COMMIT_SHA" -- "$FILE_PATH"
+            git checkout "$PREVIOUS_COMMIT_SHA" -- "$FILE_PATH"
 
-          PREVIOUS_PROJECT_VERSION=""
+            PREVIOUS_PROJECT_VERSION=""
 
-          regex="version = '([^\n]*)'"
-          file_contents=$(cat $FILE_PATH)
-          if [[ "$file_contents" =~ $regex ]]; then
+            regex="version = '([^\n]*)'"
+            file_contents=$(cat $FILE_PATH)
+            if [[ "$file_contents" =~ $regex ]]; then
             PREVIOUS_PROJECT_VERSION=${BASH_REMATCH[1]}
-          fi
+            fi
 
-          git restore $FILE_PATH
+            git restore $FILE_PATH
 
-          CURRENT_PROJECT_VERSION=""
+            CURRENT_PROJECT_VERSION=""
 
-          file_contents=$(cat $FILE_PATH)
-          if [[ "$file_contents" =~ $regex ]]; then
+            file_contents=$(cat $FILE_PATH)
+            if [[ "$file_contents" =~ $regex ]]; then
             CURRENT_PROJECT_VERSION=${BASH_REMATCH[1]}
-          fi
+            fi
 
-          compare_versions() {
+            compare_versions() {
             # Return 1 if a leq b
             major_a=$(echo "$1" | cut -d'.' -f1)
             minor_a=$(echo "$1" | cut -d'.' -f2)
@@ -49,26 +49,33 @@ jobs:
             minor_b=$(echo "$2" | cut -d'.' -f2)
             patch_b=$(echo "$2" | cut -d'.' -f3)
 
+            echo "$1 $2"
+
             if [[ $major_a -lt $major_b ]]; then
-              return 1
+                echo "a"
+                return 1
             elif [[ $major_a -gt $major_b ]]; then
-              return 0
+                echo "b"
+                return 0
             fi
 
             if [[ $minor_a -lt $minor_b ]]; then
-              return 1
+                echo "c"
+                return 1
             elif [[ $minor_a -gt $minor_b ]]; then
-              return 0
+                echo "d"
+                return 0
             fi  
 
             if [[ $patch_a -le $patch_b ]]; then
-              return 1
+                echo "e"
+                return 1
             fi
 
             return 0
-          }
-         
-          if [[ $(compare_versions "$CURRENT_PROJECT_VERSION" "$PREVIOUS_PROJECT_VERSION") -eq 1 ]]; then
+            }
+
+            if [[ $(compare_versions $CURRENT_PROJECT_VERSION $PREVIOUS_PROJECT_VERSION) -eq 1]]; then
             version="$CURRENT_PROJECT_VERSION"
             major=$(echo "$version" | cut -d'.' -f1)
             minor=$(echo "$version" | cut -d'.' -f2)
@@ -86,4 +93,4 @@ jobs:
             git add $FILE_PATH
             git commit -m "Increment Version"
             git push
-          fi
+            fi
