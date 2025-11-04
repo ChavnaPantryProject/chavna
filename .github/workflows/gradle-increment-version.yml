@@ -24,7 +24,7 @@ jobs:
 
           PREVIOUS_PROJECT_VERSION=""
 
-          regex="version = '(.*)'"
+          regex="version = '([^\n]*)'"
           file_contents=$(cat $FILE_PATH)
           if [[ "$file_contents" =~ $regex ]]; then
             PREVIOUS_PROJECT_VERSION=${BASH_REMATCH[1]}
