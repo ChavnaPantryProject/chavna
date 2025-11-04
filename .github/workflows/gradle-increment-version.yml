@@ -37,5 +37,6 @@ jobs:
           file_contents=$(cat $FILE_PATH)
           if [[ "$file_contents" =~ $regex ]]; then
             CURRENT_PROJECT_VERSION=${BASH_REMATCH[1]}
+          fi
          
           echo "$PREVIOUS_PROJECT_VERSION $CURRENT_PROJECT_VERSION"
