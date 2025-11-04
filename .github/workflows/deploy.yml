@@ -20,12 +20,12 @@ jobs:
     - uses: actions/download-artifact@v4.1.7
     - name: Get Backend Run Id
       run: |
-        BACKEND_RUN_ID=gh run list --workflow "Backend Workflow" --status success --json databaseId --jq '.[0].databaseId'
+        BACKEND_RUN_ID=$(gh run list --workflow "Backend Workflow" --status success --json databaseId --jq '.[0].databaseId')
         echo "Backend run id: $BACKEND_RUN_ID"
         echo "BACKEND_RUN_ID=$BACKEND_RUN_ID" >> $GITHUB_ENV
     - name: Get Frontend Run Id
       run: |
-        FRONTEND_RUN_ID=gh run list --workflow "Frontend Workflow" --status success --json databaseId --jq '.[0].databaseId'
+        FRONTEND_RUN_ID=$(gh run list --workflow "Frontend Workflow" --status success --json databaseId --jq '.[0].databaseId')
         echo "Frontend run id: $FRONTEND_RUN_ID"
         echo "FRONTEND_RUN_ID=$FRONTEND_RUN_ID" >> $GITHUB_ENV
     # - name: Configure AWS Credentials
