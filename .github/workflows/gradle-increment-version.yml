@@ -1,0 +1,39 @@
+name: Increment Project Version
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+
+jobs:
+  increment:
+    runs-on: ubuntu-latest
+    permissions: write-all
+    steps:
+      - uses: actions/checkout@v4
+      - name: Update Version
+        run: |
+          FILE_PATH="./backend/pantryproject/build.gradle"
+
+          PREVIOUS_COMMIT_SHA="${{ github.event.before }}"
+
+          git checkout "$PREVIOUS_COMMIT_SHA" -- "$FILE_PATH"
+
+          PREVIOUS_PROJECT_VERSION=""
+
+          regex="version = '(.*)'"
+          file_contents=$(cat $FILE_PATH)
+          if [[ "$file_contents" =~ $regex ]]; then
+            PREVIOUS_PROJECT_VERSION=${BASH_REMATCH[1]}
+          fi
+
+          git restore $FILE_PATH
+
+          CURRENT_PROJECT_VERSION=""
+
+          file_contents=$(cat $FILE_PATH)
+          if [[ "$file_contents" =~ $regex ]]; then
+            CURRENT_PROJECT_VERSION=${BASH_REMATCH[1]}
+         
+          echo "$PREVIOUS_PROJECT_VERSION $CURRENT_PROJECT_VERSION"
