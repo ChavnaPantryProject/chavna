@@ -45,3 +45,9 @@ dependencies {
 tasks.named('test') {
 	useJUnitPlatform()
 }
+
+task jarName {
+	doLast {
+		println rootProject.name + '-' + version + '.jar'
+	}
+}
