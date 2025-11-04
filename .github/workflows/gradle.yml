@@ -90,6 +90,7 @@ jobs:
   deploy:
   
     runs-on: ubuntu-latest
+    permissions: write-all
     if: github.ref == 'refs/heads/main'
     needs: build
 
