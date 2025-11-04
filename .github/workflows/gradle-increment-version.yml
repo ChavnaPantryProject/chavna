@@ -38,8 +38,37 @@ jobs:
           if [[ "$file_contents" =~ $regex ]]; then
             CURRENT_PROJECT_VERSION=${BASH_REMATCH[1]}
           fi
+
+          compare_versions() {
+            # Return 1 if a leq b
+            major_a=$(echo "$1" | cut -d'.' -f1)
+            minor_a=$(echo "$1" | cut -d'.' -f2)
+            patch_a=$(echo "$1" | cut -d'.' -f3)
+
+            major_b=$(echo "$2" | cut -d'.' -f1)
+            minor_b=$(echo "$2" | cut -d'.' -f2)
+            patch_b=$(echo "$2" | cut -d'.' -f3)
+
+            if [[ $major_a -lt $major_b ]]; then
+              return 1
+            elif [[ $major_a -gt $major_b ]]; then
+              return 0
+            fi
+
+            if [[ $minor_a -lt $minor_b ]]; then
+              return 1
+            elif [[ $minor_a -gt $minor_b ]]; then
+              return 0
+            fi  
+
+            if [[ $patch_a -le $patch b ]]; then
+              return 1
+            fi
+
+            return 0
+          }
          
-          if [[ "$CURRENT_PROJECT_VERSION" == "$PREVIOUS_PROJECT_VERSION" ]]; then
+          if compare_versions $CURRENT_PROJECT_VERSION $PREVIOUS_PROJECT_VERSION; then
             version="$CURRENT_PROJECT_VERSION"
             major=$(echo "$version" | cut -d'.' -f1)
             minor=$(echo "$version" | cut -d'.' -f2)
