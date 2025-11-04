@@ -39,4 +39,17 @@ jobs:
             CURRENT_PROJECT_VERSION=${BASH_REMATCH[1]}
           fi
          
-          echo "$PREVIOUS_PROJECT_VERSION $CURRENT_PROJECT_VERSION"
+          if [[ "$CURRENT_PROJECT_VERSION" == "$PREVIOUS_PROJECT_VERSION" ]]; then
+            version="$CURRENT_PROJECT_VERSION"
+            major=$(echo "$version" | cut -d'.' -f1)
+            minor=$(echo "$version" | cut -d'.' -f2)
+            patch=$(echo "$version" | cut -d'.' -f3)
+
+            patch=$((patch + 1))
+
+            NEW_VERSION="$major.$minor.$patch"
+
+            sed "/s/version = '[^\n]*'/version = '$NEW_VERSION'" $FILE_PATH
+          fi
+
+          echo NEW_VERSION
