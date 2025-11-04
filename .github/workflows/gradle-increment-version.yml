@@ -52,4 +52,4 @@ jobs:
             sed -i "s/version = '[^\n]*'/version = '$NEW_VERSION'/" $FILE_PATH
           fi
 
-          echo NEW_VERSION
+          echo $NEW_VERSION
