@@ -50,6 +50,8 @@ jobs:
             NEW_VERSION="$major.$minor.$patch"
 
             sed -i "s/version = '[^\n]*'/version = '$NEW_VERSION'/" $FILE_PATH
-          fi
 
-          echo $NEW_VERSION
+            git add $FILE_PATH
+            git commit -m "Increment Version"
+            git push
+          fi
