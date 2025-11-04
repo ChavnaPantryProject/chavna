@@ -3,7 +3,7 @@ name: Deployment Workflow
 
 on:
   workflow_run:
-    workflows: ["Backend Workflow", "Frontend Workflow"]
+    workflows: [Backend Workflow, Frontend Workflow]
     types:
       - completed
 
