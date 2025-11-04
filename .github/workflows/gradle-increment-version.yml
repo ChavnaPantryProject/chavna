@@ -61,7 +61,7 @@ jobs:
               return 0
             fi  
 
-            if [[ $patch_a -le $patch b ]]; then
+            if [[ $patch_a -le $patch_b ]]; then
               return 1
             fi
 
