@@ -75,7 +75,7 @@ jobs:
             return 0
             }
 
-            if [[ $(compare_versions "$CURRENT_PROJECT_VERSION" "$PREVIOUS_PROJECT_VERSION") -eq 1]]; then
+            if [[ $(compare_versions "$CURRENT_PROJECT_VERSION" "$PREVIOUS_PROJECT_VERSION") -eq 1 ]]; then
             version="$CURRENT_PROJECT_VERSION"
             major=$(echo "$version" | cut -d'.' -f1)
             minor=$(echo "$version" | cut -d'.' -f2)
