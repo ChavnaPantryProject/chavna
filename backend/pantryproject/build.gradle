@@ -1,11 +1,11 @@
 plugins {
-	id 'java'
+	id 'java' 
 	id 'org.springframework.boot' version '3.5.6'
 	id 'io.spring.dependency-management' version '1.1.7'
 }
 
 group = 'com.chavna'
-version = '0.0.12'
+version = '0.0.7'
 description = 'REST API for pantry project backend'
 
 java {
