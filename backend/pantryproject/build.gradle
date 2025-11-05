@@ -47,9 +47,13 @@ tasks.named('test') {
 }
 
 task jarName {
-	println rootProject.name + '-' + version + '.jar'
+	doLast {
+		println rootProject.name + '-' + version + '.jar'
+	}
 }
 
 task versionLabel {
-	println version
+	doLast {
+		println version
+	}
 }
