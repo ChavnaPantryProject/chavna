@@ -103,8 +103,8 @@ jobs:
 
             sed -i "s/version = '[^\n]*'/version = '$NEW_VERSION'/" $BUILD_FILE_PATH
 
-            git config user.name github-actions
-            git config user.email github-actions@github.com
+            git config user.name chavna-actions-bot
+            git config user.email chavnaactions@gmail.com
 
             git add $BUILD_FILE_PATH
             git commit -m "Increment Version"
