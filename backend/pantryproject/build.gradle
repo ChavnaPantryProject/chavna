@@ -5,7 +5,7 @@ plugins {
 }
 
 group = 'com.chavna'
-version = '0.0.1-SNAPSHOT'
+version = '0.0.7'
 description = 'REST API for pantry project backend'
 
 java {
@@ -44,4 +44,12 @@ dependencies {
 
 tasks.named('test') {
 	useJUnitPlatform()
+}
+
+task jarName {
+	println rootProject.name + '-' + version + '.jar'
+}
+
+task versionLabel {
+	println version
 }
