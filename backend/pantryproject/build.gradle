@@ -53,5 +53,7 @@ task jarName {
 }
 
 task versionLabel {
-	println version
+	doLast {
+		println version
+	}
 }
