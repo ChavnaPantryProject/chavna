@@ -1,0 +1,87 @@
+name: Increment Project Version
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+
+jobs:
+  increment:
+    runs-on: ubuntu-latest
+    permissions: write-all
+    steps:
+      - uses: actions/checkout@v4
+        with:
+            fetch-depth: 2
+      - name: Update Version
+        run: |
+          FILE_PATH="./backend/pantryproject/build.gradle"
+
+          PREVIOUS_COMMIT_SHA="${{ github.event.before }}"
+
+          git checkout "$PREVIOUS_COMMIT_SHA" -- "$FILE_PATH"
+
+          PREVIOUS_PROJECT_VERSION=""
+
+          regex="version = '([^\n]*)'"
+          file_contents=$(cat $FILE_PATH)
+          if [[ "$file_contents" =~ $regex ]]; then
+            PREVIOUS_PROJECT_VERSION=${BASH_REMATCH[1]}
+          fi
+
+          git restore $FILE_PATH
+
+          CURRENT_PROJECT_VERSION=""
+
+          file_contents=$(cat $FILE_PATH)
+          if [[ "$file_contents" =~ $regex ]]; then
+            CURRENT_PROJECT_VERSION=${BASH_REMATCH[1]}
+          fi
+
+          # Return 1 if a leq b
+          major_a=$(echo "$CURRENT_PROJECT_VERSION" | cut -d'.' -f1)
+          minor_a=$(echo "$CURRENT_PROJECT_VERSION" | cut -d'.' -f2)
+          patch_a=$(echo "$CURRENT_PROJECT_VERSION" | cut -d'.' -f3)
+
+          major_b=$(echo "$PREVIOUS_PROJECT_VERSION" | cut -d'.' -f1)
+          minor_b=$(echo "$PREVIOUS_PROJECT_VERSION" | cut -d'.' -f2)
+          patch_b=$(echo "$PREVIOUS_PROJECT_VERSION" | cut -d'.' -f3)
+
+          if [[ $major_a -lt $major_b ]]; then
+            LTE=1
+          elif [[ $major_a -gt $major_b ]]; then
+            LTE=0
+          fi
+
+          if [[ $minor_a -lt $minor_b ]]; then
+            LTE=1
+          elif [[ $minor_a -gt $minor_b ]]; then
+            LTE=0
+          fi  
+
+          if [[ $patch_a -le $patch_b ]]; then
+            LTE=1
+          else
+            LTE=0
+          fi
+
+          if [[ $LTE -eq 1 ]]; then
+            version="$CURRENT_PROJECT_VERSION"
+            major=$(echo "$version" | cut -d'.' -f1)
+            minor=$(echo "$version" | cut -d'.' -f2)
+            patch=$(echo "$version" | cut -d'.' -f3)
+
+            patch=$((patch + 1))
+
+            NEW_VERSION="$major.$minor.$patch"
+
+            sed -i "s/version = '[^\n]*'/version = '$NEW_VERSION'/" $FILE_PATH
+
+            git config user.name github-actions
+            git config user.email github-actions@github.com
+
+            git add $FILE_PATH
+            git commit -m "Increment Version"
+            git push
+          fi

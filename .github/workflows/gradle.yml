@@ -5,17 +5,13 @@
 # This workflow will build a Java project with Gradle and cache/restore any dependencies to improve the workflow execution time
 # For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-java-with-gradle
 
-name: Java CI with Gradle
+name: Backend Build
 
 on:
-  push:
-    branches: [ "main" ]
-    paths:
-      - 'backend/**'
-  pull_request:
-    branches: [ "main" ]
-    paths:
-      - 'backend/**'
+  workflow_run:
+    workflows: [Increment Project Version]
+    types:
+      - completed
 
 env:
   ELASTIC_BEANSTALK_NAME: chavna2
@@ -25,6 +21,9 @@ jobs:
   build:
 
     runs-on: ubuntu-latest
+    outputs:
+      jar-name: ${{ steps.jar.outputs.JAR_NAME }}
+      version-label: ${{ steps.jar.outputs.VERSION_LABEL }}
     permissions:
       contents: read
 
@@ -56,14 +55,20 @@ jobs:
       run: gradle bootJar
       working-directory: ./backend/pantryproject
 
-    - name: Rename Output
-      run: mv ./backend/pantryproject/build/libs/pantryproject-0.0.1-SNAPSHOT.jar ${{github.run_id}}.jar
+    - name: Get Jar Name
+      id: jar
+      run: |
+        JAR_NAME=$(gradle jarName -q)
+        echo "JAR_NAME=$JAR_NAME" >> $GITHUB_ENV
+        VERSION_LABEL=$(gradle versionLabel -q)
+        echo "VERSION_LABEL=$VERSION_LABEL" >> $GITHUB_ENV
+      working-directory: ./backend/pantryproject
       
     - name: Upload Artifacts
       uses: actions/upload-artifact@v4.3.3
       with: 
         name: deploy-files
-        path: ${{github.run_id}}.jar
+        path: ./backend/pantryproject/build/libs/$JAR_NAME
 
   dependency-submission:
 
@@ -86,13 +91,17 @@ jobs:
       with:
         gradle-version: '8.14.3'
         build-root-directory: ./backend/pantryproject
-        
+
   deploy:
   
     runs-on: ubuntu-latest
     permissions: write-all
     if: github.ref == 'refs/heads/main'
     needs: build
+
+    env:
+      JAR_NAME: ${{ needs.build.outputs.jar-name }}
+      VERSION_LABEL: ${{ needs.build.outputs.version-label }}
 
     steps:
     - uses: actions/download-artifact@v4.1.7
@@ -104,9 +113,9 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_ACCESS_KEY_SECRET }}
     - name: Deploy to AWS
       run: |
-        aws s3 cp "deploy-files/${{github.run_id}}.jar" s3://elasticbeanstalk-us-east-1-${{ secrets.AWS_ACCOUNT_ID }}/artifact/java-app/
-        aws elasticbeanstalk create-application-version --application-name $ELASTIC_BEANSTALK_NAME --version-label ${{github.run_id}} --description ${{github.run_id}} --source-bundle S3Bucket="elasticbeanstalk-us-east-1-${{ secrets.AWS_ACCOUNT_ID }}",S3Key="artifact/java-app/${{github.run_id}}.jar"
-        aws elasticbeanstalk update-environment --application-name $ELASTIC_BEANSTALK_NAME --environment-name $ELASTIC_BEANSTALK_ENV_NAME --version-label ${{github.run_id}}
+        aws s3 cp "deploy-files/${{ env.JAR_NAME }}" s3://elasticbeanstalk-us-east-1-${{ secrets.AWS_ACCOUNT_ID }}/artifact/java-app/
+        aws elasticbeanstalk create-application-version --application-name $ELASTIC_BEANSTALK_NAME --version-label ${{ env.VERSION_LABEL }} --description ${{github.run_id}} --source-bundle S3Bucket="elasticbeanstalk-us-east-1-${{ secrets.AWS_ACCOUNT_ID }}",S3Key="artifact/java-app/${{ env.JAR_NAME }}"
+        aws elasticbeanstalk update-environment --application-name $ELASTIC_BEANSTALK_NAME --environment-name $ELASTIC_BEANSTALK_ENV_NAME --version-label ${{ env.VERSION_LABEL }}
         aws elasticbeanstalk wait environment-updated --application-name $ELASTIC_BEANSTALK_NAME --environment-name $ELASTIC_BEANSTALK_ENV_NAME
     - name: Create Release
       id: create_release
@@ -115,7 +124,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         tag_name: ${{github.run_id}}
-        release_name: Release ${{github.run_id}}
+        release_name: Release ${{ env.VERSION_LABEL }}
         draft: false
         prerelease: false
     - name: Upload Release Asset
@@ -125,7 +134,6 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
-        asset_path: deploy-files/${{github.run_id}}.jar
-        asset_name: server.jar
+        asset_path: deploy-files/${{ env.JAR_NAME }}
+        asset_name: ${{ env.JAR_NAME }}
         asset_content_type: application/java-archive
-
