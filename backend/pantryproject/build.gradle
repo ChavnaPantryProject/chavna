@@ -51,3 +51,7 @@ task jarName {
 		println rootProject.name + '-' + version + '.jar'
 	}
 }
+
+task versionLabel {
+	println version
+}
