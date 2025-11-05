@@ -151,9 +151,9 @@ jobs:
     - name: Get Jar Name
       id: jar
       run: |
-        JAR_NAME=$(gradle jarName -q)
+        JAR_NAME="$(gradle jarName -q)"
         echo "JAR_NAME=$JAR_NAME" >> $GITHUB_ENV
-        VERSION_LABEL=$(gradle versionLabel -q)
+        VERSION_LABEL="$(gradle versionLabel -q)"
         echo "VERSION_LABEL=$VERSION_LABEL" >> $GITHUB_ENV
       working-directory: ./backend/pantryproject
       
