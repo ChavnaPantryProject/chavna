@@ -1,7 +1,7 @@
 # Pantry Manager - Less Waste, More Taste
 ## CECS Senior Project at CSULB
 
-Description
+Description 
 
 ---
 ## Features

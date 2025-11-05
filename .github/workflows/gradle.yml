@@ -1,0 +1,240 @@
+# This workflow uses actions that are not certified by GitHub.
+# They are provided by a third-party and are governed by
+# separate terms of service, privacy policy, and support
+# documentation.
+# This workflow will build a Java project with Gradle and cache/restore any dependencies to improve the workflow execution time
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-java-with-gradle
+
+name: Backend Build
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'backend/**'
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'backend/**'
+
+env:
+  ELASTIC_BEANSTALK_NAME: chavna2
+  ELASTIC_BEANSTALK_ENV_NAME: Chavna2-env
+
+jobs:
+  increment:
+    runs-on: ubuntu-latest
+    permissions: write-all
+    if: github.ref != 'refs/heads/main'
+    env:
+      BUILD_FILE_PATH: ./backend/pantryproject/build.gradle
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          github_token: ${{ secrets.BOT_ACCESS_TOKEN }}
+      - name: Get Main Version
+        run: |
+          VERSION=""
+
+          regex="version = '([^\n]*)'"
+          file_contents=$(cat $BUILD_FILE_PATH)
+          if [[ "$file_contents" =~ $regex ]]; then
+            VERSION=${BASH_REMATCH[1]}
+          fi
+
+          echo "MAIN_VERSION=$VERSION" >> $GITHUB_ENV
+          
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          github_token: ${{ secrets.BOT_ACCESS_TOKEN }}
+      - name: Get Current Version
+        run: |
+          VERSION=""
+
+          regex="version = '([^\n]*)'"
+          file_contents=$(cat $BUILD_FILE_PATH)
+          if [[ "$file_contents" =~ $regex ]]; then
+            VERSION=${BASH_REMATCH[1]}
+          fi
+
+          echo "CURRENT_VERSION=$VERSION" >> $GITHUB_ENV
+          
+          
+      - name: Update Versions
+        run: |
+          # Return 1 if a leq b
+          major_a=$(echo "$CURRENT_VERSION" | cut -d'.' -f1)
+          minor_a=$(echo "$CURRENT_VERSION" | cut -d'.' -f2)
+          patch_a=$(echo "$CURRENT_VERSION" | cut -d'.' -f3)
+
+          major_b=$(echo "$MAIN_VERSION" | cut -d'.' -f1)
+          minor_b=$(echo "$MAIN_VERSION" | cut -d'.' -f2)
+          patch_b=$(echo "$MAIN_VERSION" | cut -d'.' -f3)
+
+          if [[ $major_a -lt $major_b ]]; then
+            LTE=1
+          elif [[ $major_a -gt $major_b ]]; then
+            LTE=0
+          fi
+
+          if [[ $minor_a -lt $minor_b ]]; then
+            LTE=1
+          elif [[ $minor_a -gt $minor_b ]]; then
+            LTE=0
+          fi  
+
+          if [[ $patch_a -le $patch_b ]]; then
+            LTE=1
+          else
+            LTE=0
+          fi
+
+          if [[ $LTE -eq 1 ]]; then
+            version="$MAIN_VERSION"
+            major=$(echo "$version" | cut -d'.' -f1)
+            minor=$(echo "$version" | cut -d'.' -f2)
+            patch=$(echo "$version" | cut -d'.' -f3)
+
+            patch=$((patch + 1))
+
+            NEW_VERSION="$major.$minor.$patch"
+
+            sed -i "s/version = '[^\n]*'/version = '$NEW_VERSION'/" $BUILD_FILE_PATH
+
+            git config user.name chavna-actions-bot
+            git config user.email chavnaactions@gmail.com
+
+            git add $BUILD_FILE_PATH
+            git commit -m "Increment Version"
+            git push
+          fi          
+
+  build:
+
+    runs-on: ubuntu-latest
+    needs: increment
+    if: ${{ ! failure() && ! cancelled() }}
+    outputs:
+      jar-name: ${{ steps.jar.outputs.JAR_NAME }}
+      version-label: ${{ steps.jar.outputs.VERSION_LABEL }}
+    permissions:
+      contents: read
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+
+    # Configure Gradle for optimal use in GitHub Actions, including caching of downloaded dependencies.
+    # See: https://github.com/gradle/actions/blob/main/setup-gradle/README.md
+    # - name: Setup Gradle
+    #   uses: gradle/actions/setup-gradle@af1da67850ed9a4cedd57bfd976089dd991e2582 # v4.0.0
+
+    # - name: Build with Gradle Wrapper
+    #   run: ./gradlew bootJar
+
+    # NOTE: The Gradle Wrapper is the default and recommended way to run Gradle (https://docs.gradle.org/current/userguide/gradle_wrapper.html).
+    # If your project does not have the Gradle Wrapper configured, you can use the following configuration to run Gradle with a specified version.
+    #
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@af1da67850ed9a4cedd57bfd976089dd991e2582 # v4.0.0
+      with:
+        gradle-version: '8.14.3'
+    
+    - name: Build with Gradle 8.14.3
+      run: gradle bootJar
+      working-directory: ./backend/pantryproject
+
+    - name: Get Jar Name
+      id: jar
+      run: |
+        JAR_NAME="$(gradle jarName -q)"
+        VERSION_LABEL="$(gradle versionLabel -q)"
+        
+        echo "JAR_NAME=$JAR_NAME" >> $GITHUB_ENV
+        echo "VERSION_LABEL=$VERSION_LABEL" >> $GITHUB_ENV
+
+        echo "JAR_NAME=$JAR_NAME" >> $GITHUB_OUTPUT
+        echo "VERSION_LABEL=$VERSION_LABEL" >> $GITHUB_OUTPUT
+
+        cat $GITHUB_ENV
+      working-directory: ./backend/pantryproject
+      
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v4.3.3
+      with: 
+        name: deploy-files
+        path: ./backend/pantryproject/build/libs/$JAR_NAME
+
+  dependency-submission:
+
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+
+    # Generates and submits a dependency graph, enabling Dependabot Alerts for all project dependencies.
+    # See: https://github.com/gradle/actions/blob/main/dependency-submission/README.md
+    - name: Generate and submit dependency graph
+      uses: gradle/actions/dependency-submission@af1da67850ed9a4cedd57bfd976089dd991e2582 # v4.0.0
+      with:
+        gradle-version: '8.14.3'
+        build-root-directory: ./backend/pantryproject
+
+  deploy:
+  
+    runs-on: ubuntu-latest
+    permissions: write-all
+    if: ${{ ! failure() && ! cancelled() && github.ref == 'refs/heads/main' }}
+    needs: build
+
+    env:
+      JAR_NAME: ${{ needs.build.outputs.jar-name }}
+      VERSION_LABEL: ${{ needs.build.outputs.version-label }}
+
+    steps:
+    - uses: actions/download-artifact@v4.1.7
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-region: us-east-1
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+        aws-secret-access-key: ${{ secrets.AWS_ACCESS_KEY_SECRET }}
+    - name: Deploy to AWS
+      run: |
+        aws s3 cp "deploy-files/${{ env.JAR_NAME }}" s3://elasticbeanstalk-us-east-1-${{ secrets.AWS_ACCOUNT_ID }}/artifact/java-app/
+        aws elasticbeanstalk create-application-version --application-name $ELASTIC_BEANSTALK_NAME --version-label ${{ env.VERSION_LABEL }} --description ${{github.run_id}} --source-bundle S3Bucket="elasticbeanstalk-us-east-1-${{ secrets.AWS_ACCOUNT_ID }}",S3Key="artifact/java-app/${{ env.JAR_NAME }}"
+        aws elasticbeanstalk update-environment --application-name $ELASTIC_BEANSTALK_NAME --environment-name $ELASTIC_BEANSTALK_ENV_NAME --version-label ${{ env.VERSION_LABEL }}
+        aws elasticbeanstalk wait environment-updated --application-name $ELASTIC_BEANSTALK_NAME --environment-name $ELASTIC_BEANSTALK_ENV_NAME
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{github.run_id}}
+        release_name: Release ${{ env.VERSION_LABEL }}
+        draft: false
+        prerelease: false
+    - name: Upload Release Asset
+      id: upload-release-asset 
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
+        asset_path: deploy-files/${{ env.JAR_NAME }}
+        asset_name: ${{ env.JAR_NAME }}
+        asset_content_type: application/java-archive
