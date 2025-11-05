@@ -36,8 +36,6 @@ jobs:
         run: |
           VERSION=""
 
-          exit 1
-
           regex="version = '([^\n]*)'"
           file_contents=$(cat $BUILD_FILE_PATH)
           if [[ "$file_contents" =~ $regex ]]; then
@@ -124,6 +122,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+    - run: exit 1
     - name: Set up JDK 17
       uses: actions/setup-java@v4
       with:

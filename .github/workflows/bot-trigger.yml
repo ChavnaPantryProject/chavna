@@ -12,5 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.ref != 'refs/heads/main'
     steps:
+      - name: Test
+        run: echo ${{ github.actor }}
       - name: Trigger Build
         run: echo "Triggering build..."
