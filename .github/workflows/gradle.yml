@@ -157,8 +157,8 @@ jobs:
         echo "JAR_NAME=$JAR_NAME" >> $GITHUB_ENV
         echo "VERSION_LABEL=$VERSION_LABEL" >> $GITHUB_ENV
 
-        echo JAR_NAME="$JAR_NAME" >> $GITHUB_OUTPUT
-        echo VERSION_LABEL="$VERSION_LABEL" >> $GITHUB_OUTPUT
+        echo "JAR_NAME=$JAR_NAME" >> $GITHUB_OUTPUT
+        echo "VERSION_LABEL=$VERSION_LABEL" >> $GITHUB_OUTPUT
 
         cat $GITHUB_ENV
       working-directory: ./backend/pantryproject
