@@ -42,7 +42,7 @@ jobs:
             VERSION=${BASH_REMATCH[1]}
           fi
 
-          echo "MAIN_VERSION=\"$VERSION\"" >> $GITHUB_ENV
+          echo "MAIN_VERSION=$VERSION" >> $GITHUB_ENV
           
       - uses: actions/checkout@v4
         with:
@@ -57,7 +57,7 @@ jobs:
             VERSION=${BASH_REMATCH[1]}
           fi
 
-          echo "CURRENT_VERSION=\"$VERSION\"" >> $GITHUB_ENV
+          echo "CURRENT_VERSION=$VERSION" >> $GITHUB_ENV
           
           
       - name: Update Versions
