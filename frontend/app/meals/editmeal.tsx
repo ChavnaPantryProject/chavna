@@ -83,7 +83,10 @@ export default function EditMealScreen() {
             </TouchableOpacity>
 
             {/* Save Button */}
-            <TouchableOpacity style={styles.saveButton}>
+            <TouchableOpacity 
+                style={styles.saveButton}
+                onPress={() => router.push("/meals/meal_ingredient")}
+            >
                 <Text style={styles.saveButtonText}>Save</Text>
             </TouchableOpacity>
         </SafeAreaView>
