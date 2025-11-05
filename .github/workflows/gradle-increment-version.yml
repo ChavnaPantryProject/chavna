@@ -29,6 +29,8 @@ jobs:
           echo "MAIN_VERSION=$VERSION" >> $GITHUB_ENV
           
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
       - name: Get Current Version
         run: |
           VERSION=""
