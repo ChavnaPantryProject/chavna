@@ -1,7 +1,8 @@
 // meal nutrition facts screen
-// make sure to add the three dots at the top right corner to enter edit mode/to delete meal
-// "go to ingredients" at the bottom right corner
-// the. nurtirion will update depending on what ingredients were inputted
+
+// the nurtirion will update depending on what ingredients were inputted
+// must fix back button to navigate to the meal screen instead of the order sequence it was selected in
+// work on delete meal logic
 
 import React, {useState} from "react";
 import { 

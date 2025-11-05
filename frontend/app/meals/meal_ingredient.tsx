@@ -4,6 +4,8 @@
 
 // FIX!!!!
 // when user clicks save, it goes back to the original screen
+// add delete meal logic
+// must work on meal logic (delete, add ingredient, measurements, etc)
 
 import React, {useState} from "react";
 import { 
