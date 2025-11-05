@@ -155,7 +155,7 @@ jobs:
       uses: actions/upload-artifact@v4.3.3
       with: 
         name: deploy-files
-        path: ./backend/pantryproject/build/libs/$JAR_NAME
+        path: ./backend/pantryproject/build/libs/${{ steps.jar.outputs.JAR_NAME }}
 
   dependency-submission:
 
