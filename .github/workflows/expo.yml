@@ -16,6 +16,7 @@ on:
 jobs:
   preview:
     runs-on: ubuntu-latest
+    permissions: write-all
     steps:
       - name: 🏗 Setup repo
         uses: actions/checkout@v3
