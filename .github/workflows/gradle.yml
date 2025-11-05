@@ -189,7 +189,7 @@ jobs:
   
     runs-on: ubuntu-latest
     permissions: write-all
-    if: github.ref == 'refs/heads/main'
+    if: ${{ ! failure() && ! cancelled() && github.ref == 'refs/heads/main' }}
     needs: build
 
     env:
