@@ -19,12 +19,11 @@ on:
 
 env:
   ELASTIC_BEANSTALK_NAME: chavna2
-  ELASTIC_BEANSTALK_ENV_NAME: Chavna2-env
+  ELASTIC_BEANSTALK_ENV_NAME: Chavna2-env 
 
 jobs:
-  increment:
+  version-test:
     runs-on: ubuntu-latest
-    permissions: write-all
     if: github.ref != 'refs/heads/main'
     env:
       BUILD_FILE_PATH: ./backend/pantryproject/build.gradle
@@ -32,7 +31,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: main
-          github_token: ${{ secrets.BOT_ACCESS_TOKEN }}
       - name: Get Main Version
         run: |
           VERSION=""
@@ -47,8 +45,7 @@ jobs:
           
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.head_ref }}
-          github_token: ${{ secrets.BOT_ACCESS_TOKEN }}
+          ref: ${{ github.event.workflow_run.head_branch }}
       - name: Get Current Version
         run: |
           VERSION=""
@@ -62,7 +59,7 @@ jobs:
           echo "CURRENT_VERSION=$VERSION" >> $GITHUB_ENV
           
           
-      - name: Update Versions
+      - name: Compare Versions
         run: |
           # Return 1 if a leq b
           major_a=$(echo "$CURRENT_VERSION" | cut -d'.' -f1)
@@ -74,7 +71,7 @@ jobs:
           patch_b=$(echo "$MAIN_VERSION" | cut -d'.' -f3)
 
           if [[ $major_a -lt $major_b ]]; then
-            LTE=1
+            LTE=1 
           elif [[ $major_a -gt $major_b ]]; then
             LTE=0
           fi
@@ -92,35 +89,24 @@ jobs:
           fi
 
           if [[ $LTE -eq 1 ]]; then
-            version="$MAIN_VERSION"
-            major=$(echo "$version" | cut -d'.' -f1)
-            minor=$(echo "$version" | cut -d'.' -f2)
-            patch=$(echo "$version" | cut -d'.' -f3)
+            echo "Project version must be greater than verson on main."
+            echo "Main version: $MAIN_VERSION"
+            echo "Branch version: $CURRENT_VERSION"
+            echo "Please update the version in $BUILD_FILE_PATH"
 
-            patch=$((patch + 1))
-
-            NEW_VERSION="$major.$minor.$patch"
-
-            sed -i "s/version = '[^\n]*'/version = '$NEW_VERSION'/" $BUILD_FILE_PATH
-
-            git config user.name chavna-actions-bot
-            git config user.email chavnaactions@gmail.com
-
-            git add $BUILD_FILE_PATH
-            git commit -m "Increment Version"
-            git push
+            exit 1
           fi          
 
   build:
 
     runs-on: ubuntu-latest
-    needs: increment
-    if: ${{ ! failure() && ! cancelled() }}
     outputs:
       jar-name: ${{ steps.jar.outputs.JAR_NAME }}
       version-label: ${{ steps.jar.outputs.VERSION_LABEL }}
     permissions:
       contents: read
+    needs: version-test
+    if: ${{ ! failure() && ! cancelled() }}
 
     steps:
     - uses: actions/checkout@v4
