@@ -32,6 +32,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: main
+          github_token: ${{ secrets.BOT_ACCESS_TOKEN }}
       - name: Get Main Version
         run: |
           VERSION=""
