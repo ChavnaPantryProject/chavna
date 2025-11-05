@@ -14,7 +14,7 @@ on:
       - 'frontend/**'
 
 jobs:
-  preview:
+  build:
     runs-on: ubuntu-latest
     permissions: write-all
     steps:
