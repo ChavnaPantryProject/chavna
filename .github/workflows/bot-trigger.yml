@@ -2,15 +2,14 @@
 name: Bot Push
 
 on:
-  pull_request:
-    branches: [ "main" ]
+  push:
+    branches-ignore: [ "main" ]
     paths:
       - 'backend/**'
 
 jobs:
   increment:
     runs-on: ubuntu-latest
-    if: github.actor == 'chavna-actions-bot'
     steps:
       - name: Test
         run: echo ${{ github.actor }}
