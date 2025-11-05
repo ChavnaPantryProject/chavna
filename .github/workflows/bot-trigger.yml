@@ -10,7 +10,7 @@ on:
 jobs:
   increment:
     runs-on: ubuntu-latest
-    if: github.ref != 'refs/heads/main'
+    if: github.actor == 'chavna-actions-bot'
     steps:
       - name: Test
         run: echo ${{ github.actor }}
