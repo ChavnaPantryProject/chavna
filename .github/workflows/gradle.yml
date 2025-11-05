@@ -154,11 +154,11 @@ jobs:
         JAR_NAME="$(gradle jarName -q)"
         VERSION_LABEL="$(gradle versionLabel -q)"
         
-        echo "JAR_NAME=$JAR_NAME" >> $GITHUB_ENV
-        echo "VERSION_LABEL=\"$VERSION_LABEL\""
+        echo "JAR_NAME=$JAR_NAME\n" >> $GITHUB_ENV
+        echo "VERSION_LABEL=$VERSION_LABEL\n" >> $GITHUB_ENV
 
-        echo JAR_NAME="$JAR_NAME" >> $GITHUB_OUTPUT
-        echo "VERSION_LABEL=\"$VERSION_LABEL\""
+        echo JAR_NAME="$JAR_NAME\n" >> $GITHUB_OUTPUT
+        echo "VERSION_LABEL=$VERSION_LABEL\n" >> $GITHUB_OUTPUT
       working-directory: ./backend/pantryproject
       
     - name: Upload Artifacts
