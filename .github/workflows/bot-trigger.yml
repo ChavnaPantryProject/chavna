@@ -1,0 +1,16 @@
+
+name: Bot Push
+
+on:
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'backend/**'
+
+jobs:
+  increment:
+    runs-on: ubuntu-latest
+    if: github.ref != 'refs/heads/main'
+    steps:
+      - name: Trigger Build
+        run: echo "Triggering build..."
