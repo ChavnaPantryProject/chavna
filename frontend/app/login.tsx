@@ -8,11 +8,17 @@ import {
     KeyboardAvoidingView,
     Platform,
     ActivityIndicator,
+    GestureResponderEvent,
+    AppState
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as SecureStore from 'expo-secure-store';
 import { router, type Href } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
+import * as crypto from "expo-crypto";
+import { Buffer } from 'buffer';
 
 type Mode = 'login' | 'signup';
 
@@ -192,6 +198,40 @@ export default function AuthScreen() {
         }
 
     };
+
+    const googleLogin = async () => {
+        // Google's OAuth 2.0 endpoint for requesting an access token
+        var oauth2Endpoint = 'https://accounts.google.com/o/oauth2/v2/auth';
+
+        var redirect = Linking.createURL("google-login");
+
+        var buffer = Buffer.from(crypto.getRandomBytes(16));
+        // Parameters to pass to OAuth 2.0 endpoint.
+        const params: Record<string, string> = {
+            'client_id': '520081347859-d4rrpbh5em9rfqhju73b4mq0jmoiu3f8.apps.googleusercontent.com',
+            'redirect_uri': API_URL + '/google-login',
+            'response_type': 'id_token',
+            'scope': 'openid%20' + 'https://www.googleapis.com/auth/userinfo.email',
+            'state': redirect,
+            'nonce': buffer.toString('base64')
+        };
+        var url = oauth2Endpoint;
+        // Create url
+        for (var p in params) {
+            if (url == oauth2Endpoint)
+                url += '?';
+            else
+                url += '&';
+            url += p + '=' + params[p];
+        }
+        
+        var result = await WebBrowser.openAuthSessionAsync(url, redirect);
+
+        console.log(result);
+
+        if (result.type == "success")
+            router.replace("/(tabs)/home");
+    }
 
     const goToSplash = () => {
         const target: Href = '/';
@@ -407,6 +447,7 @@ export default function AuthScreen() {
                         <SocialButton
                             icon={<Ionicons name="logo-google" size={18} color="#DB4437" />}
                             label={mode === 'login' ? 'Login With Google' : 'Continue With Google'}
+                            onPress={googleLogin}
                         />
                         <SocialButton
                             icon={<Ionicons name="logo-facebook" size={18} color="#1877F2" />}
@@ -440,9 +481,9 @@ export default function AuthScreen() {
 }
 
 // Socials
-function SocialButton({ icon, label }: { icon: React.ReactNode; label: string }) {
+function SocialButton({ icon, label, onPress }: { icon: React.ReactNode; label: string, onPress?: (event: GestureResponderEvent) => void }) {
     return (
-        <Pressable style={styles.socialBtn}>
+        <Pressable style={styles.socialBtn} onPress={onPress}>
             <View style={styles.socialIcon}>{icon}</View>
             <Text style={styles.socialText}>{label}</Text>
         </Pressable>
