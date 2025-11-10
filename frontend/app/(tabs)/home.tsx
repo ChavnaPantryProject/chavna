@@ -14,13 +14,13 @@ import {
   Platform,
   Alert,
   Modal,
-  Animated
+  Animated,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
-import { Menu, Provider } from 'react-native-paper';
 
 // Adjust the initial list length by changing the { length: 5 }
 const initialItems = Array.from({ length: 5 }).map((_, i) => ({
@@ -31,11 +31,31 @@ const initialItems = Array.from({ length: 5 }).map((_, i) => ({
 
 export default function HomeScreen() {
   const [items, setItems] = useState(initialItems);
-  const [notifOpen, setNotifOpen] = useState(false);
-  const [menuVisible, setMenuVisible] = useState(false);
 
-  const openMenu = () => setMenuVisible(true);
-  const closeMenu = () => setMenuVisible(false);
+    // SAMPLE DATA FOR EXPIRATION WARNING
+  const [expiringOpen, setExpiringOpen] = useState(false);
+  const expiringItems = [
+    { id: 'e1', name: 'Spinach', daysLeft: 1 },
+    { id: 'e2', name: 'Milk', daysLeft: 2 },
+    { id: 'e3', name: 'Strawberries', daysLeft: 3 },
+    { id: 'e4', name: 'Bananas', daysLeft: 4 },
+    { id: 'e5', name: 'Yogurt', daysLeft: 1 },
+    { id: 'e6', name: 'Avocado', daysLeft: 2 },
+    { id: 'e7', name: 'Blueberries', daysLeft: 3 },
+    { id: 'e8', name: 'Romaine Lettuce', daysLeft: 2 },
+    { id: 'e9', name: 'Chicken Breast', daysLeft: 1 },
+    { id: 'e10', name: 'Ground Beef', daysLeft: 2 },
+    { id: 'e11', name: 'Sliced Turkey', daysLeft: 3 },
+    { id: 'e12', name: 'Mozzarella Cheese', daysLeft: 4 },
+    { id: 'e13', name: 'Heavy Cream', daysLeft: 1 },
+    { id: 'e14', name: 'Eggs', daysLeft: 5 },
+    { id: 'e15', name: 'Carrots', daysLeft: 6 },
+    { id: 'e16', name: 'Bell Peppers', daysLeft: 4 },
+    { id: 'e17', name: 'Onions', daysLeft: 7 },
+    { id: 'e18', name: 'Hummus', daysLeft: 3 },
+    { id: 'e19', name: 'Tortillas', daysLeft: 5 },
+    { id: 'e20', name: 'Sour Cream', daysLeft: 2 },
+  ];
 
     // Bottom sheet open/close + derived count
   const [menuOpen, setMenuOpen] = useState(false);
@@ -103,8 +123,7 @@ export default function HomeScreen() {
   }, [items.length]);
 
   return (
-    <Provider>
-      <SafeAreaView style={styles.safe} edges={[]}>
+    <SafeAreaView style={styles.safe} edges={[]}>
       <Stack.Screen options={{ headerShown: false }} />
 
       <View style={styles.content}>
@@ -120,7 +139,8 @@ export default function HomeScreen() {
             </View>
 
             <Pressable
-              onPress={() => setNotifOpen(true)}
+              onPress={() => setExpiringOpen(true)}
+              hitSlop={10}
               style={[
                 styles.alertDot,
                 { position: 'absolute', top: 5, right: 16, zIndex: 10, elevation: 10 },
@@ -128,15 +148,9 @@ export default function HomeScreen() {
             >
               <Text style={styles.alertExcl}>!</Text>
             </Pressable>
-
           </View>
-
           <View style={styles.divider} />
 
-          {/* Commented out ellipsis for now */}
-          {/* <View style={{ alignItems: 'flex-end', paddingRight: 22, marginTop: 0 }}>
-            <Ionicons name="ellipsis-horizontal" size={28} color="gray" />
-          </View> */}
         </View>
 
           {/* Shopping List */}
@@ -145,37 +159,13 @@ export default function HomeScreen() {
               <Text style={styles.sectionHeader}>Shopping List</Text>
 
               {/* absolutely positioned ellipsis, not affecting centering */}
-          <Menu
-            visible={menuVisible}
-            onDismiss={closeMenu}
-            anchor={
               <Pressable
-                onPress={openMenu}
-                style={styles.ellipsisButton}
                 hitSlop={10}
+                onPress={openListMenu}
+                style={styles.ellipsisButton}
               >
                 <Ionicons name="ellipsis-horizontal" size={22} color="gray" />
               </Pressable>
-            }
-          >
-            <Menu.Item
-              onPress={() => {
-                closeMenu();
-                clearSelected();
-              }}
-              title={`Clear selected${items.filter(i => i.done).length ? ` (${items.filter(i => i.done).length})` : ''}`}
-              disabled={items.filter(i => i.done).length === 0}
-            />
-            <Menu.Item
-              onPress={() => {
-                closeMenu();
-                clearAll();
-              }}
-              title="Clear all"
-              titleStyle={{ color: '#C62828' }}
-            />
-          </Menu>
-
             </View>
 
             <View style={styles.sectionUnderline} />
@@ -256,12 +246,16 @@ export default function HomeScreen() {
           onClearSelected={() => { setMenuOpen(false); clearSelected(); }}
           onClearAll={() => { setMenuOpen(false); clearAll(); }}
           selectedCount={selectedCount}
-/>
+        />
 
-<NotificationsModal visible={notifOpen} onClose={() => setNotifOpen(false)} />
+      <ExpiringPopover
+        visible={expiringOpen}
+        onClose={() => setExpiringOpen(false)}
+        items={expiringItems}
+      />
+
 
     </SafeAreaView>
-    </Provider>
   );
 }
 
@@ -431,77 +425,95 @@ function OptionsSheet({
     </Modal>
   );
 }
-
-function NotificationsModal({
+function ExpiringPopover({
   visible,
   onClose,
+  items,
 }: {
   visible: boolean;
   onClose: () => void;
+  items: { id: string; name: string; daysLeft: number }[];
 }) {
+  const opacity = React.useRef(new Animated.Value(0)).current;
   const slide = React.useRef(new Animated.Value(0)).current;
 
   React.useEffect(() => {
-    Animated.timing(slide, {
-      toValue: visible ? 1 : 0,
-      duration: 220,
-      useNativeDriver: true,
-    }).start();
-  }, [visible]);
-
-  const translateY = slide.interpolate({
-    inputRange: [0, 1],
-    outputRange: [300, 0],
-  });
+    Animated.parallel([
+      Animated.timing(opacity, { toValue: visible ? 1 : 0, duration: 150, useNativeDriver: true }),
+      Animated.timing(slide, { toValue: visible ? 1 : 0, duration: 180, useNativeDriver: true }),
+    ]).start();
+  }, [visible, opacity, slide]);
 
   if (!visible) return null;
 
-  return (
-    <Modal visible transparent animationType="none" onRequestClose={onClose}>
-      <Pressable style={notifStyles.backdrop} onPress={onClose} />
-      <Animated.View style={[notifStyles.modal, { transform: [{ translateY }] }]}>
-        <Text style={notifStyles.title}>Notifications</Text>
-        <View style={notifStyles.divider} />
-        <View style={notifStyles.content}>
-          <Text style={notifStyles.text}>• New grocery deals added this week.</Text>
-          <Text style={notifStyles.text}>• You spent $60 this week — keep tracking your budget.</Text>
-          <Text style={notifStyles.text}>• Try adding your favorite meals to plan next week’s shopping list.</Text>
-        </View>
+  const translateY = slide.interpolate({ inputRange: [0, 1], outputRange: [-10, 0] });
+  const MAX_HEIGHT = Math.min(360, Dimensions.get('window').height * 0.5);
 
-        <Pressable onPress={onClose} style={notifStyles.button}>
-          <Text style={notifStyles.buttonText}>Close</Text>
-        </Pressable>
+  const Row = ({ name, daysLeft }: { name: string; daysLeft: number }) => (
+    <View style={expStyles.row}>
+      <Text style={expStyles.rowName} numberOfLines={1}>{name}</Text>
+      <View style={[
+        expStyles.badge,
+        daysLeft <= 1 ? { backgroundColor: '#FCE4E4' } :
+          daysLeft === 2 ? { backgroundColor: '#FFF4D6' } :
+            { backgroundColor: '#E7F3E9' },
+      ]}>
+        <Text style={expStyles.badgeText}>
+          {daysLeft} {daysLeft === 1 ? 'day' : 'days'}
+        </Text>
+      </View>
+    </View>
+  );
+
+  return (
+    <Modal visible transparent animationType="none" statusBarTranslucent onRequestClose={onClose}>
+      <Animated.View style={[expStyles.backdrop, { opacity }]} />
+      <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+
+      <Animated.View
+        pointerEvents="box-none"
+        style={[
+          expStyles.anchorWrap,
+          { transform: [{ translateY }] },
+        ]}
+      >
+        <View style={expStyles.card}>
+          <Text style={expStyles.title}>Expiring Soon</Text>
+          <View style={expStyles.divider} />
+
+          {items.length === 0 ? (
+            <Text style={expStyles.empty}>No items expiring soon.</Text>
+          ) : (
+              <ScrollView
+                style={{ maxHeight: MAX_HEIGHT }}
+                contentContainerStyle={{ gap: 10, paddingBottom: 4 }}
+                showsVerticalScrollIndicator={false}
+                bounces={false}
+                alwaysBounceVertical={false}
+                contentInsetAdjustmentBehavior="never"
+                overScrollMode="never"
+              >
+                {[...items]
+                  .sort((a, b) => a.daysLeft - b.daysLeft)
+                  .map(it => (
+                    <Row key={it.id} name={it.name} daysLeft={it.daysLeft} />
+                  ))}
+              </ScrollView>
+
+          )}
+
+          <View style={{ height: 10 }} />
+          <View style={expStyles.actions}>
+            <Pressable onPress={onClose} style={expStyles.secondaryBtn}>
+              <Text style={expStyles.secondaryText}>Close</Text>
+            </Pressable>
+          </View>
+
+        </View>
       </Animated.View>
     </Modal>
   );
 }
-
-const notifStyles = StyleSheet.create({
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.3)' },
-  modal: {
-    position: 'absolute',
-    left: 0, right: 0, bottom: 0,
-    backgroundColor: 'white',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    elevation: 10,
-  },
-  title: { fontSize: 18, fontWeight: '700', textAlign: 'center', marginBottom: 8 },
-  divider: { height: 1, backgroundColor: '#E0E0E0', marginBottom: 10 },
-  content: { paddingHorizontal: 10 },
-  text: { fontSize: 15, color: '#333', marginVertical: 4 },
-  button: {
-    marginTop: 14,
-    alignSelf: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    backgroundColor: '#499F44',
-  },
-  buttonText: { color: 'white', fontWeight: '700', fontSize: 16 },
-});
-
 
 const sheetStyles = StyleSheet.create({
   backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.35)' },
@@ -703,20 +715,81 @@ const styles = StyleSheet.create({
   favImage: { width: '100%', height: '100%' },
 
 sectionHeaderRow: {
-  position: 'relative',       // allows absolute-positioned ellipsis
+  position: 'relative',      
   alignItems: 'center',
-  justifyContent: 'center',   // keeps "Shopping List" perfectly centered
-  width: '100%',              // span full width so 'right' aligns to screen edge
-  paddingHorizontal: 16,      // matches list content padding
+  justifyContent: 'center',
+  width: '100%',              
+  paddingHorizontal: 16,      
   marginTop: -12,
-  minHeight: 24,              // ensures room for the icon
+  minHeight: 24,           
 },
 
 ellipsisButton: {
   position: 'absolute',
-  right: 16,                  // aligns with the right edge of your input rows
+  right: 16,                
   top: 0,
   padding: 6,
 },
 
+});
+const expStyles = StyleSheet.create({
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.12)',
+  },
+  anchorWrap: {
+    position: 'absolute',
+    top: 56,
+    right: 12,
+  },
+  card: {
+    width: 280,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E6E6E6',
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 12,
+  },
+  title: { fontSize: 15, fontWeight: '700', color: '#1B1B1B' },
+  divider: { height: 1, backgroundColor: '#EFEFEF', marginVertical: 8 },
+  empty: { fontSize: 13, color: '#666' },
+
+  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  rowName: { fontSize: 14, fontWeight: '600', color: '#1D3B25', maxWidth: 180 },
+
+  badge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#E4E4E4',
+  },
+  badgeText: { fontSize: 12, fontWeight: '700', color: '#333' },
+
+  actions: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 4,
+  },
+
+  secondaryBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 18,
+    borderRadius: 10,
+    backgroundColor: '#bee2cfff',
+  },
+
+  secondaryText: { fontSize: 14, fontWeight: '600', color: '#333' },
+  primaryBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: '#59A463',
+  },
+  primaryText: { fontSize: 14, fontWeight: '700', color: '#fff' },
 });
