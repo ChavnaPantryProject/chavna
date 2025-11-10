@@ -14,15 +14,13 @@ possible usage:
   onSave={(data) => {
     console.log("Saved data:", data);
     setPopupVisible(false);
+    // You can also add it to your list, send to backend, etc.
   }}
-  dropdownOptions={[
-    { label: "Chicken Breast", value: "chicken" },
-    { label: "Beef", value: "beef" },
-    { label: "Fish", value: "fish" },
-    { label: "Vegetable", value: "vegetable" },
-  ]}
+  dropdownOptions={["Chicken Breast", "Beef", "Fish", "Vegetable"]}
 />
+
 */
+
 
 import React, { useState } from "react";
 import {
@@ -89,7 +87,9 @@ const PopupMenu: React.FC<PopupMenuProps> = ({
               style={styles.dropdown}
             >
               {dropdownOptions.map((option, index) => (
-                <Picker.Item key={index} label={option.label} value={option.value} />
+                <Picker.Item key={index}
+                  label={option.label}
+                  value={option.value}/>
               ))}
             </Picker>
           </View>
@@ -97,7 +97,7 @@ const PopupMenu: React.FC<PopupMenuProps> = ({
           {/* Textbox */}
           <TextInput
             style={styles.input}
-            placeholder="Name"
+            placeholder="Enter text..."
             value={textValue}
             onChangeText={setTextValue}
           />
@@ -119,9 +119,6 @@ const PopupMenu: React.FC<PopupMenuProps> = ({
             value={number2}
             onChangeText={setNumber2}
           />
-
-          {/* Expiration Date Title */}
-          <Text style={styles.sectionTitle}>Expiration Date</Text>
 
           {/* Date */}
           <TouchableOpacity
@@ -179,14 +176,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#2f4f2f",
     marginBottom: 15,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#2f4f2f",
-    alignSelf: "flex-start",
-    marginBottom: 6,
-    marginTop: 4,
   },
   row: {
     width: "100%",
