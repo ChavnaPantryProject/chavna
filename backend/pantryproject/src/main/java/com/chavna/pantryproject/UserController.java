@@ -1,12 +1,17 @@
 package com.chavna.pantryproject;
 
+import java.io.IOException;
+import java.lang.reflect.Array;
 import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 import org.apache.coyote.BadRequestException;
@@ -42,6 +47,11 @@ import static com.chavna.pantryproject.Database.FAMILY_MEMBER_TABLE;
 import static com.chavna.pantryproject.Database.FAMILY_TABLE;
 import static com.chavna.pantryproject.Database.PERSONAL_INFO_TABLE;
 import static com.chavna.pantryproject.Database.USERS_TABLE;
+
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
+import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.api.client.json.gson.GsonFactory;
 
 import lombok.AllArgsConstructor;
 
@@ -94,13 +104,155 @@ public class UserController {
             if (encoder.matches(request.password, new String(hash, StandardCharsets.UTF_8))) {
                 String jws = Authorization.createLoginToken(id, loginState);
                         
-                return ResponseEntity.ok(OkResponse.Success("Succesful login.", new LoginResponse(jws)));
+                return OkResponse.Success("Succesful login.", new LoginResponse(jws));
             }
         }
 
-        return ResponseEntity.ok(OkResponse.Error("Invalid login credentials"));
+        return OkResponse.Error("Invalid login credentials");
     }
 
+    static final String GOOGLE_PASSWORD_STRING = "GoogleAccount";
+    static final byte[] GOOGLE_PASSWORD_HASH = createGoogleHash();
+
+    static byte[] createGoogleHash() {
+        byte[] bytes = GOOGLE_PASSWORD_STRING.getBytes();
+
+        byte[] hash = new byte[60];
+
+        for (int i = 0; i < bytes.length; i++) {
+            hash[i] = bytes[i];
+        }
+        
+        return hash;
+    }
+
+    static final String GOOGLE_AUTH_FAIL = """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Redirect</title>
+        </head>
+        <body>
+            <script>
+                window.location.replace("%s" + '?success=false&message="' + "%s" + '"');
+            </script>
+        </body>
+        </html>
+    """;
+    @GetMapping("/google-login")
+    public ResponseEntity<String> googleLogin(@RequestParam Map<String, String> params) {
+        for (String param : params.keySet()) {
+            System.out.println(param + ": " + params.get(param));
+        }
+
+        String authHTML;
+        if (params.size() == 0) {
+            authHTML = """
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>Redirect</title>
+                </head>
+                <body>
+                    <script>
+                        if (window.location.hash.length > 1) {
+                            var newloc = window.location.href.split('#')[0] + "?" + window.location.hash.substring(1);
+                            console.log(newloc);
+                            window.location.replace(newloc);
+                        }
+                        else
+                            document.body.innerHTML = "args";
+                    </script>
+                </body>
+                </html>
+            """;
+        } else {
+            String clientId = Env.getenvNotNull("GOOGLE_CLIENT_ID");
+            System.out.println();
+            System.out.println(GsonFactory.getDefaultInstance());
+            GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(new NetHttpTransport(), GsonFactory.getDefaultInstance())
+                .setAudience(Arrays.asList(clientId))
+                .build();
+
+            System.out.println(verifier);
+
+            String accessToken = params.get("id_token");
+
+            GoogleIdToken googleIdToken;
+            try {
+                googleIdToken = verifier.verify(accessToken);
+            } catch (GeneralSecurityException | IOException ex) {
+                ex.printStackTrace();
+                throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Google login error.");
+            }
+
+            String email = googleIdToken.getPayload().getEmail();
+            System.out.println(email);
+            String loginToken;
+
+            // Check if account exists
+            try {
+                Connection con = Database.getRemoteConnection();
+
+                PreparedStatement emailStatement = con.prepareStatement("""
+                    SELECT id, password_hash FROM users
+                    WHERE email = ?
+                """);
+                emailStatement.setString(1, email);
+                ResultSet result = emailStatement.executeQuery();
+
+                if (!result.next()) {
+                    // Create user if not exists
+                    PreparedStatement createUserStatement = con.prepareStatement("""
+                        INSERT INTO users (email, password_hash)
+                        VALUES (?, ?)
+                        RETURNING id, password_hash
+                    """);
+                    createUserStatement.setString(1, email);
+                    createUserStatement.setBytes(2, GOOGLE_PASSWORD_HASH);
+
+                    result = createUserStatement.executeQuery();
+                    result.next();
+                }
+
+                UUID userId = (UUID) result.getObject(1);
+                byte[] passwordHash = result.getBytes(2);
+
+                if (!Arrays.equals(passwordHash, GOOGLE_PASSWORD_HASH)) {
+                    String html = String.format(GOOGLE_AUTH_FAIL, params.get("state"), "Non Google account with given email already exists.");
+
+                    return ResponseEntity.ok(html);
+                }
+
+                loginToken = Authorization.createGmailLoginToken(userId, accessToken);
+            } catch (SQLException ex) {
+                ex.printStackTrace();
+                throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "SQL Error.");
+            }
+
+            authHTML = String.format("""
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>Redirect</title>
+                </head>
+                <body>
+                    <script>
+                        window.location.replace("%s")
+                    </script>
+                </body>
+                </html>
+            """, params.get("state") + "?success=true&token=" + loginToken);
+        }
+        return ResponseEntity.ok(authHTML);
+    }
+    
     public static class UserExistsRequest {
         @NotNull
         public String email;
@@ -123,9 +275,9 @@ public class UserController {
         ResultSet results = statement.executeQuery();
 
         if (results.next())
-            return ResponseEntity.ok(OkResponse.Success(new UserExistsResponse(results.getInt(1) == 1)));
+            return OkResponse.Success(new UserExistsResponse(results.getInt(1) == 1));
 
-        return ResponseEntity.ok(OkResponse.Success(false));
+        return OkResponse.Success(false);
     }
 
     public static class CreateAccountRequest {
@@ -175,7 +327,7 @@ public class UserController {
 
         Email.sendEmail("noreply@email.chavnapantry.com", request.email, emailContent, "Account Confirmation");
 
-        return ResponseEntity.ok(OkResponse.Success("Confirmation email sent."));
+        return OkResponse.Success("Confirmation email sent.");
     }
 
     @GetMapping("/confirm-account")
@@ -253,7 +405,7 @@ public class UserController {
             newToken = Authorization.createGmailLoginToken(login.userId, ((GoogleLogin) login).googleToken);
         }
 
-        return ResponseEntity.ok(OkResponse.Success("Authorized.", new LoginResponse(newToken)));
+        return OkResponse.Success("Authorized.", new LoginResponse(newToken));
     }
 
     //                          //
@@ -323,7 +475,7 @@ public class UserController {
                     throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User has private personal info. Authorization required.");
             }
 
-            return ResponseEntity.ok().body(OkResponse.Success(jsonObject));
+            return OkResponse.Success(jsonObject);
         } catch (SQLException ex) {
             ex.printStackTrace();
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, null, ex);
@@ -386,7 +538,7 @@ public class UserController {
 
         }
 
-        return ResponseEntity.ok().body(OkResponse.Success());
+        return OkResponse.Success();
     }
 
     //                  //
@@ -453,7 +605,7 @@ public class UserController {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "SQL Error");
         }
 
-        return ResponseEntity.ok().body(OkResponse.Success("Family created"));
+        return OkResponse.Success("Family created");
     }
 
     @PostMapping("leave-family")
@@ -496,7 +648,7 @@ public class UserController {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "SQL Error");
         }
 
-        return ResponseEntity.ok().body(OkResponse.Success("Left family"));
+        return OkResponse.Success("Left family");
     }
 
     @PostMapping("delete-family")
@@ -539,7 +691,7 @@ public class UserController {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "SQL Error");
         }
 
-        return ResponseEntity.ok().body(OkResponse.Success("Deleted family"));
+        return OkResponse.Success("Deleted family");
     }
 
     public static class InvitationRequest {
@@ -626,7 +778,7 @@ public class UserController {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "SQL Error.");
         }
 
-        return ResponseEntity.ok().body(OkResponse.Success("Invitation sent."));
+        return OkResponse.Success("Invitation sent.");
     }
 
     @GetMapping("/accept-invite")
@@ -770,7 +922,7 @@ public class UserController {
                 members.add(new FamilyMember(id, email, role));
             }
 
-            return ResponseEntity.ok().body(OkResponse.Success(new GetFamilyMemembersResponse(members)));
+            return OkResponse.Success(new GetFamilyMemembersResponse(members));
         } catch (SQLException ex) {
             ex.printStackTrace();
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "SQL Error");
@@ -874,7 +1026,7 @@ public class UserController {
 
             removeMemberQuery.executeUpdate();
 
-            return ResponseEntity.ok().body(OkResponse.Success("Member removed."));
+            return OkResponse.Success("Member removed.");
         } catch (SQLException ex) {
             ex.printStackTrace();
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, null, ex);
