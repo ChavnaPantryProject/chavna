@@ -1,7 +1,6 @@
 package com.chavna.pantryproject;
 
 import java.io.IOException;
-import java.lang.reflect.Array;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.sql.Connection;
@@ -295,7 +294,7 @@ public class UserController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, errors.getAllErrors().get(0).toString());
 
         if (!emailValidation.matcher(request.email).matches())
-            return ResponseEntity.ok(OkResponse.Error("Invalid email address."));
+            return OkResponse.Error("Invalid email address.");
 
         try {
             Connection con = Database.getRemoteConnection();
