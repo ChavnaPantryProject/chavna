@@ -59,6 +59,12 @@ export default function HomeScreen() {
 
     // Bottom sheet open/close + derived count
   const [menuOpen, setMenuOpen] = useState(false);
+  // Confirm dialog for "Clear all"
+  const [confirmClearAllOpen, setConfirmClearAllOpen] = useState(false);
+
+  // Confirm dialog for "Clear selected"
+  const [confirmClearSelectedOpen, setConfirmClearSelectedOpen] = useState(false);
+
   const selectedCount = items.filter(i => i.done).length;
 
   // Open from the ellipsis
@@ -86,37 +92,20 @@ export default function HomeScreen() {
 
   
 
-    const clearAll = () => {
+  const clearAll = () => {
     if (items.length === 0) return;
-    Alert.alert(
-      'Clear all items?',
-      'This will remove every item from your shopping list.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Clear All', style: 'destructive', onPress: () => setItems([]) },
-      ],
-      { cancelable: true }
-    );
+    setConfirmClearAllOpen(true);
   };
 
+
   const clearSelected = React.useCallback(() => {
-  const selected = items.filter(i => i.done).length;
-  if (selected === 0) {
-    Alert.alert('No items selected', 'Tap the circles to select items to clear.');
-    return;
-  }
-  Alert.alert(
-    'Clear selected items?',
-    `This will remove ${selected} selected item${selected > 1 ? 's' : ''}.`,
-    [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Clear Selected', style: 'destructive', onPress: () =>
-          setItems(prev => prev.filter(i => !i.done))
-      },
-    ],
-    { cancelable: true }
-  );
-}, [items]);
+    if (selectedCount === 0) {
+      Alert.alert('No items selected', 'Tap the circles to select items to clear.');
+      return;
+    }
+    setConfirmClearSelectedOpen(true);
+  }, [selectedCount]);
+
 
   useEffect(() => {
     scrollRef.current?.scrollToEnd({ animated: true });
@@ -254,7 +243,29 @@ export default function HomeScreen() {
         items={expiringItems}
       />
 
+      <ConfirmDialog
+        visible={confirmClearAllOpen}
+        title="Clear All Items?"
+        message="This will remove every item from your shopping list."
+        confirmLabel="Clear all"
+        onCancel={() => setConfirmClearAllOpen(false)}
+        onConfirm={() => {
+          setItems([]);
+          setConfirmClearAllOpen(false);
+        }}
+      />
 
+      <ConfirmDialog
+        visible={confirmClearSelectedOpen}
+        title="Clear Selected Items?"
+        message={`${selectedCount} selected item${selectedCount > 1 ? 's' : ''} will be removed.`}
+        confirmLabel="Clear selected"
+        onCancel={() => setConfirmClearSelectedOpen(false)}
+        onConfirm={() => {
+          setItems(prev => prev.filter(i => !i.done));
+          setConfirmClearSelectedOpen(false);
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -305,34 +316,26 @@ function OptionsSheet({
   onClearAll: () => void;
   selectedCount: number;
 }) {
-  const slide = React.useRef(new Animated.Value(0)).current;
-  const [mounted, setMounted] = React.useState(visible); // controls unmount after animation
+  const [mounted, setMounted] = React.useState(visible);
+  const opacity = React.useRef(new Animated.Value(0)).current;
+  const scale = React.useRef(new Animated.Value(0.98)).current;
 
-  
   React.useEffect(() => {
-    if (visible) {
-      setMounted(true);
-    } else {
-      const t = setTimeout(() => setMounted(false), 220); // match animation duration
-      return () => clearTimeout(t);
-    }
-  }, [visible]);
+    if (visible) setMounted(true);
+    Animated.parallel([
+      Animated.timing(opacity, { toValue: visible ? 1 : 0, duration: 150, useNativeDriver: true }),
+      Animated.spring(scale, {
+        toValue: visible ? 1 : 0.98,
+        useNativeDriver: true,
+        damping: 20,
+        stiffness: 180,
+        mass: 0.9,
+      }),
+    ]).start(({ finished }) => {
+      if (finished && !visible) setMounted(false);
+    });
+  }, [visible, opacity, scale]);
 
-  
-  React.useEffect(() => {
-    Animated.timing(slide, {
-      toValue: visible ? 1 : 0,
-      duration: 220,
-      useNativeDriver: true,
-    }).start();
-  }, [visible, slide]);
-
-  const translateY = slide.interpolate({
-    inputRange: [0, 1],
-    outputRange: [260, 0],
-  });
-
-  
   if (!mounted) return null;
 
   const Row = ({
@@ -376,55 +379,134 @@ function OptionsSheet({
   );
 
   return (
-    <Modal
-      visible={true} // mounted controls visibility/unmount
-      transparent
-      animationType="none"
-      statusBarTranslucent
-      onRequestClose={onClose}
-    >
-      <Pressable
-        style={sheetStyles.backdrop}
-        onPress={onClose}
-        pointerEvents={visible ? 'auto' : 'none'}
-      />
-      <Animated.View
-        style={[
-          sheetStyles.sheet,
-          {
-            transform: [{ translateY }],
-            pointerEvents: visible ? 'auto' : 'none',
-          },
-        ]}
-      >
-        <View style={sheetStyles.grabber} />
+    <Modal visible transparent animationType="none" statusBarTranslucent onRequestClose={onClose}>
+      {/* Backdrop */}
+      <Animated.View style={[sheetStyles.backdrop, { opacity }]} />
+      <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
 
-        <Text style={sheetStyles.title}>Shopping List</Text>
-        <Text style={sheetStyles.subtitle}>Choose an action</Text>
-        <View style={sheetStyles.divider} />
+      {/* Centered card */}
+      <View style={sheetStyles.centerWrap} pointerEvents="box-none">
+        <Animated.View style={[sheetStyles.dialogCard, { transform: [{ scale }], opacity }]}>
+          <Text style={sheetStyles.title}>Shopping List</Text>
+          <Text style={sheetStyles.subtitle}>Choose an action</Text>
+          <View style={sheetStyles.divider} />
 
-        <Row
-          title="Clear selected"
-          subtitle={selectedCount ? `${selectedCount} selected` : 'No items selected'}
-          onPress={onClearSelected}
-          disabled={selectedCount === 0}
-        />
+          <Row
+            title="Clear selected"
+            subtitle={selectedCount ? `${selectedCount} selected` : 'No items selected'}
+            onPress={onClearSelected}
+            disabled={selectedCount === 0}
+          />
 
-        <Row
-          title="Clear all"
-          subtitle="Remove every item in the list"
-          destructive
-          onPress={onClearAll}
-        />
+          <Row
+            title="Clear all"
+            subtitle="Remove every item in the list"
+            destructive
+            onPress={onClearAll}
+          />
 
-        <View style={{ height: 8 }} />
-        <Pressable onPress={onClose} style={sheetStyles.cancelBtn}>
-          <Text style={sheetStyles.cancelText}>Cancel</Text>
-        </Pressable>
-      </Animated.View>
+          <View style={{ height: 8 }} />
+          <View style={{ alignItems: 'center', marginTop: 8 }}>
+            <Pressable
+              onPress={onClose}
+              style={({ pressed }) => [
+                confirmStyles.cancelPill,
+                pressed && { backgroundColor: '#D8D8D8' },
+                { alignSelf: 'center' }, // forces text-width pill
+              ]}
+            >
+              <Text style={confirmStyles.cancelText}>Cancel</Text>
+            </Pressable>
+          </View>
+
+
+        </Animated.View>
+      </View>
     </Modal>
   );
 }
+
+function ConfirmDialog({
+  visible,
+  title,
+  message,
+  confirmLabel = 'Confirm',
+  onCancel,
+  onConfirm,
+}: {
+  visible: boolean;
+  title: string;
+  message?: string;
+  confirmLabel?: string;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const [mounted, setMounted] = React.useState(visible);
+  const opacity = React.useRef(new Animated.Value(0)).current;
+  const scale = React.useRef(new Animated.Value(0.98)).current;
+
+  React.useEffect(() => {
+    if (visible) setMounted(true);
+    Animated.parallel([
+      Animated.timing(opacity, { toValue: visible ? 1 : 0, duration: 150, useNativeDriver: true }),
+      Animated.spring(scale, {
+        toValue: visible ? 1 : 0.98,
+        useNativeDriver: true,
+        damping: 20,
+        stiffness: 180,
+        mass: 0.9,
+      }),
+    ]).start(({ finished }) => {
+      if (finished && !visible) setMounted(false);
+    });
+  }, [visible, opacity, scale]);
+
+  if (!mounted) return null;
+
+  return (
+    <Modal visible transparent animationType="none" statusBarTranslucent onRequestClose={onCancel}>
+      {/* Backdrop */}
+      <Animated.View style={[sheetStyles.backdrop, { opacity }]} />
+      <Pressable style={StyleSheet.absoluteFill} onPress={onCancel} />
+
+      {/* Centered dialog card – reuses the same style as the ellipsis popup */}
+      <View style={sheetStyles.centerWrap} pointerEvents="box-none">
+        <Animated.View style={[sheetStyles.dialogCard, { transform: [{ scale }], opacity }]}>
+          <Text style={sheetStyles.title}>{title}</Text>
+          {message ? <Text style={sheetStyles.subtitle}>{message}</Text> : null}
+          <View style={sheetStyles.divider} />
+
+          {/* Action row */}
+          <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 14, marginTop: 12 }}>
+            <Pressable
+              onPress={onCancel}
+              style={({ pressed }) => [
+                confirmStyles.cancelPill,
+                pressed && { backgroundColor: '#D8D8D8' },
+              ]}
+            >
+              <Text style={confirmStyles.cancelText}>Cancel</Text>
+            </Pressable>
+
+            <Pressable
+              onPress={onConfirm}
+              style={({ pressed }) => [
+                confirmStyles.clearPill,
+                pressed && { backgroundColor: '#FFD6D6' },
+              ]}
+            >
+              <Text style={confirmStyles.clearText}>{confirmLabel}</Text>
+            </Pressable>
+          </View>
+
+
+        </Animated.View>
+      </View>
+    </Modal>
+  );
+}
+
+
 function ExpiringPopover({
   visible,
   onClose,
@@ -516,30 +598,53 @@ function ExpiringPopover({
 }
 
 const sheetStyles = StyleSheet.create({
+  // Dim backdrop
   backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.35)' },
-  sheet: {
-    position: 'absolute',
-    left: 0, right: 0, bottom: 0,
-    paddingTop: 10, paddingBottom: 20, paddingHorizontal: 16,
+
+  // Fullscreen wrapper that centers the dialog
+  centerWrap: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
+
+  // The centered dialog card
+  dialogCard: {
+    width: '92%',
+    maxWidth: 360,
     backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 18, borderTopRightRadius: 18,
-    shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 12, shadowOffset: { width: 0, height: -4 },
-    elevation: 20,
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: '#E6E6E6',
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 16,
+    paddingTop: 20, 
   },
-  grabber: {
-    alignSelf: 'center',
-    width: 44, height: 4, borderRadius: 999,
-    backgroundColor: '#E0E0E0', marginBottom: 8,
+
+  title: { textAlign: 'center', fontSize: 18, fontWeight: '700', color: '#111' },
+  subtitle: { textAlign: 'center', fontSize: 15, color: '#6A6A6A', marginTop: 2, marginBottom: 8 },
+  divider: { height: 1, backgroundColor: '#E6E6E6', marginVertical: 2 },
+
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    borderRadius: 10,
   },
-  title: { textAlign: 'center', fontSize: 16, fontWeight: '700', color: '#111' },
-  subtitle: { textAlign: 'center', fontSize: 12, color: '#6A6A6A', marginTop: 2, marginBottom: 8 },
-  divider: { height: 1, backgroundColor: '#E6E6E6', marginVertical: 8 },
-  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 10, borderRadius: 10 },
-  rowTitle: { fontSize: 15, color: '#1D3B25', fontWeight: '600' },
-  rowSub: { fontSize: 12, color: '#6A6A6A', marginTop: 2 },
+  rowTitle: { fontSize: 16, color: '#1D3B25', fontWeight: '600' },
+  rowSub: { fontSize: 14, color: '#6A6A6A', marginTop: 2 },
+
   cancelBtn: { alignSelf: 'center', paddingVertical: 10, paddingHorizontal: 18, borderRadius: 12 },
   cancelText: { fontSize: 15, color: '#333', fontWeight: '600' },
 });
+
 
 const LINE_GREEN = '#499F44';
 
@@ -793,3 +898,30 @@ const expStyles = StyleSheet.create({
   },
   primaryText: { fontSize: 14, fontWeight: '700', color: '#fff' },
 });
+
+const confirmStyles = StyleSheet.create({
+  cancelPill: {
+    backgroundColor: '#e7e7e7ff',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 50,
+  },
+  clearPill: {
+    backgroundColor: '#FFECEC',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 50,
+  },
+  cancelText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#111',
+  },
+  clearText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#C62828',
+  },
+});
+
+
