@@ -1,11 +1,5 @@
 import React, { useState } from "react";
-import {
-  Text,
-  View,
-  StyleSheet,
-  TouchableOpacity,
-  Button,
-} from "react-native";
+import {Text, View, StyleSheet, TouchableOpacity, Button,} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { CameraView, CameraType, useCameraPermissions } from "expo-camera";
