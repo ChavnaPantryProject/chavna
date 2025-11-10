@@ -1,9 +1,9 @@
 // app/index.tsx
 import React, { useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
-import { useLocalSearchParams, router } from 'expo-router';
-import * as SecureStore from 'expo-secure-store';
+import { useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
+import { storeValue } from './util';
 
 async function saveToken(success: string, token?: string, message?: string) {
     if (success != "true") {
@@ -12,12 +12,7 @@ async function saveToken(success: string, token?: string, message?: string) {
         return;
     }
 
-    try {
-        await SecureStore.setItemAsync('jwt', token!);
-    } catch {
-        try { localStorage.setItem('jwt', token!);
-            } catch { }
-    }
+    storeValue("jwt", token!);
 
     WebBrowser.maybeCompleteAuthSession();
 }

@@ -8,8 +8,7 @@ import {
     KeyboardAvoidingView,
     Platform,
     ActivityIndicator,
-    GestureResponderEvent,
-    AppState
+    GestureResponderEvent
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,6 +18,7 @@ import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import * as crypto from "expo-crypto";
 import { Buffer } from 'buffer';
+import { API_URL } from './util';
 
 type Mode = 'login' | 'signup';
 
@@ -26,12 +26,6 @@ const GREEN = '#2E7D32';
 const GREEN_MID = '#5FA868';
 const GRAY_LIGHT = '#E6E6E6';
 const TEXT = '#111';
-
-const API_URL = (process.env.EXPO_PUBLIC_API_URL || 'https://api.chavnapantry.com').replace(
-    /\/+$/,
-    ''
-);
-
 
 export default function AuthScreen() {
     const [mode, setMode] = useState<Mode>('login');

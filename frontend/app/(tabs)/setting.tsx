@@ -9,14 +9,13 @@ import {
   Modal,
   Alert,
   ActivityIndicator,
+  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Feather from "@expo/vector-icons/Feather";
 import { useRouter } from "expo-router";
 import * as ImagePicker from 'expo-image-picker';
-import * as SecureStore from 'expo-secure-store';
-
-const API_BASE_URL = "https://api.chavnapantry.com";
+import { API_URL, deleteValue, retrieveValue } from "../util";
 
 const SettingScreen = () => {
   const router = useRouter();
@@ -40,7 +39,7 @@ const SettingScreen = () => {
   const loadTokenAndUserInfo = async () => {
     try {
       // Load JWT token
-      let token = await SecureStore.getItemAsync('jwt');
+      let token = await retrieveValue('jwt');
       if (!token) {
         try {
           token = localStorage.getItem('jwt');
@@ -69,7 +68,7 @@ const SettingScreen = () => {
       console.log("Extracted userId from JWT:", userId);
       
       // Use POST method (after backend changes from GET to POST)
-      const response = await fetch(`${API_BASE_URL}/get-personal-info`, {
+      const response = await fetch(`${API_URL}/get-personal-info`, {
         method: "POST",
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -185,27 +184,34 @@ const SettingScreen = () => {
   };
 
   const handleSignOut = () => {
-    Alert.alert(
-      "Sign Out",
-      "Are you sure you want to sign out?",
-      [
-        {
-          text: "Cancel",
-          style: "cancel"
-        },
-        { 
-          text: "Sign Out", 
-          onPress: performSignOut,
-          style: "destructive"
-        }
-      ]
-    );
+    if (Platform.OS == "web") {
+      const result = window.confirm("Are you sure you want to sign out?");
+
+      if (result)
+        performSignOut();
+    } else {
+      Alert.alert(
+        "Sign Out",
+        "Are you sure you want to sign out?",
+        [
+          {
+            text: "Cancel",
+            style: "cancel"
+          },
+          { 
+            text: "Sign Out", 
+            onPress: performSignOut,
+            style: "destructive"
+          }
+        ]
+      );
+    }
   };
 
   const performSignOut = async () => {
     try {
       // Clear JWT token from SecureStore
-      await SecureStore.deleteItemAsync('jwt');
+      await deleteValue('jwt');
       
       // Also try to clear from localStorage as fallback
       try {

@@ -3,10 +3,8 @@ import { View, Text, StyleSheet, TouchableOpacity, TextInput, Modal, Platform, A
 import { Picker } from "@react-native-picker/picker"; 
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
-const API_BASE_URL = "https://api.chavnapantry.com";
+import { API_URL, retrieveValue } from "../util";
 
 // --- Data for the dropdowns ---
 const UNIT_OPTIONS = ["g", "oz", "cups", "tbsp", "tsp", "lbs"];
@@ -94,12 +92,7 @@ const GeneralScreen = () => {
 
   const loadToken = async () => {
     try {
-      let token = await SecureStore.getItemAsync('jwt');
-      if (!token) {
-        try {
-          token = localStorage.getItem('jwt');
-        } catch {}
-      }
+      let token = await retrieveValue('jwt');
       setJwtToken(token);
       
       if (!token) {
@@ -149,7 +142,7 @@ const GeneralScreen = () => {
       if (lastName.trim()) requestBody.last_name = lastName.trim();
       if (nickname.trim()) requestBody.nickname = nickname.trim();
 
-      const response = await fetch(`${API_BASE_URL}/set-personal-info`, {
+      const response = await fetch(`${API_URL}/set-personal-info`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${jwtToken}`,

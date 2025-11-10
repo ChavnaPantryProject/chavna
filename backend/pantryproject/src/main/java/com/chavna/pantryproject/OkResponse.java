@@ -1,5 +1,7 @@
 package com.chavna.pantryproject;
 
+import org.springframework.http.ResponseEntity;
+
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonInclude.Include;
 
@@ -20,27 +22,27 @@ public class OkResponse {
         this.message = message;
     }
 
-    public static OkResponse Success() {
-        return new OkResponse("success", null, null);
+    public static ResponseEntity<OkResponse> Success() {
+        return ResponseEntity.ok(new OkResponse("success", null, null));
     }
 
-    public static OkResponse Success(String message) {
-        return new OkResponse("success", null, message);
+    public static ResponseEntity<OkResponse> Success(String message) {
+        return ResponseEntity.ok(new OkResponse("success", null, message));
     }
 
-    public static OkResponse Success(Object payload) {
-        return new OkResponse("success", payload, null);
+    public static ResponseEntity<OkResponse> Success(Object payload) {
+        return ResponseEntity.ok(new OkResponse("success", payload, null));
     }
 
-    public static OkResponse Success(String message, Object payload) {
-        return new OkResponse("success", payload, message);
+    public static ResponseEntity<OkResponse> Success(String message, Object payload) {
+        return ResponseEntity.ok(new OkResponse("success", payload, message));
     }
 
-    public static OkResponse Error() {
-        return new OkResponse("error", null, null);
+    public static ResponseEntity<OkResponse> Error() {
+        return ResponseEntity.ok(new OkResponse("error", null, null));
     }
 
-    public static OkResponse Error(String message) {
-        return new OkResponse("error", null, message);
+    public static ResponseEntity<OkResponse> Error(String message) {
+        return ResponseEntity.ok(new OkResponse("error", null, message));
     }
 }
