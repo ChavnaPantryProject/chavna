@@ -20,6 +20,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import { Menu, Provider } from 'react-native-paper';
 
 // Adjust the initial list length by changing the { length: 5 }
 const initialItems = Array.from({ length: 5 }).map((_, i) => ({
@@ -30,6 +31,12 @@ const initialItems = Array.from({ length: 5 }).map((_, i) => ({
 
 export default function HomeScreen() {
   const [items, setItems] = useState(initialItems);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [menuVisible, setMenuVisible] = useState(false);
+
+  const openMenu = () => setMenuVisible(true);
+  const closeMenu = () => setMenuVisible(false);
+
     // Bottom sheet open/close + derived count
   const [menuOpen, setMenuOpen] = useState(false);
   const selectedCount = items.filter(i => i.done).length;
@@ -96,7 +103,8 @@ export default function HomeScreen() {
   }, [items.length]);
 
   return (
-    <SafeAreaView style={styles.safe} edges={[]}>
+    <Provider>
+      <SafeAreaView style={styles.safe} edges={[]}>
       <Stack.Screen options={{ headerShown: false }} />
 
       <View style={styles.content}>
@@ -111,14 +119,16 @@ export default function HomeScreen() {
               </View>
             </View>
 
-            <View
+            <Pressable
+              onPress={() => setNotifOpen(true)}
               style={[
                 styles.alertDot,
                 { position: 'absolute', top: 5, right: 16, zIndex: 10, elevation: 10 },
               ]}
             >
               <Text style={styles.alertExcl}>!</Text>
-            </View>
+            </Pressable>
+
           </View>
 
           <View style={styles.divider} />
@@ -135,13 +145,37 @@ export default function HomeScreen() {
               <Text style={styles.sectionHeader}>Shopping List</Text>
 
               {/* absolutely positioned ellipsis, not affecting centering */}
+          <Menu
+            visible={menuVisible}
+            onDismiss={closeMenu}
+            anchor={
               <Pressable
-                hitSlop={10}
-                onPress={openListMenu}
+                onPress={openMenu}
                 style={styles.ellipsisButton}
+                hitSlop={10}
               >
                 <Ionicons name="ellipsis-horizontal" size={22} color="gray" />
               </Pressable>
+            }
+          >
+            <Menu.Item
+              onPress={() => {
+                closeMenu();
+                clearSelected();
+              }}
+              title={`Clear selected${items.filter(i => i.done).length ? ` (${items.filter(i => i.done).length})` : ''}`}
+              disabled={items.filter(i => i.done).length === 0}
+            />
+            <Menu.Item
+              onPress={() => {
+                closeMenu();
+                clearAll();
+              }}
+              title="Clear all"
+              titleStyle={{ color: '#C62828' }}
+            />
+          </Menu>
+
             </View>
 
             <View style={styles.sectionUnderline} />
@@ -224,7 +258,10 @@ export default function HomeScreen() {
           selectedCount={selectedCount}
 />
 
+<NotificationsModal visible={notifOpen} onClose={() => setNotifOpen(false)} />
+
     </SafeAreaView>
+    </Provider>
   );
 }
 
@@ -394,6 +431,77 @@ function OptionsSheet({
     </Modal>
   );
 }
+
+function NotificationsModal({
+  visible,
+  onClose,
+}: {
+  visible: boolean;
+  onClose: () => void;
+}) {
+  const slide = React.useRef(new Animated.Value(0)).current;
+
+  React.useEffect(() => {
+    Animated.timing(slide, {
+      toValue: visible ? 1 : 0,
+      duration: 220,
+      useNativeDriver: true,
+    }).start();
+  }, [visible]);
+
+  const translateY = slide.interpolate({
+    inputRange: [0, 1],
+    outputRange: [300, 0],
+  });
+
+  if (!visible) return null;
+
+  return (
+    <Modal visible transparent animationType="none" onRequestClose={onClose}>
+      <Pressable style={notifStyles.backdrop} onPress={onClose} />
+      <Animated.View style={[notifStyles.modal, { transform: [{ translateY }] }]}>
+        <Text style={notifStyles.title}>Notifications</Text>
+        <View style={notifStyles.divider} />
+        <View style={notifStyles.content}>
+          <Text style={notifStyles.text}>• New grocery deals added this week.</Text>
+          <Text style={notifStyles.text}>• You spent $60 this week — keep tracking your budget.</Text>
+          <Text style={notifStyles.text}>• Try adding your favorite meals to plan next week’s shopping list.</Text>
+        </View>
+
+        <Pressable onPress={onClose} style={notifStyles.button}>
+          <Text style={notifStyles.buttonText}>Close</Text>
+        </Pressable>
+      </Animated.View>
+    </Modal>
+  );
+}
+
+const notifStyles = StyleSheet.create({
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.3)' },
+  modal: {
+    position: 'absolute',
+    left: 0, right: 0, bottom: 0,
+    backgroundColor: 'white',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    elevation: 10,
+  },
+  title: { fontSize: 18, fontWeight: '700', textAlign: 'center', marginBottom: 8 },
+  divider: { height: 1, backgroundColor: '#E0E0E0', marginBottom: 10 },
+  content: { paddingHorizontal: 10 },
+  text: { fontSize: 15, color: '#333', marginVertical: 4 },
+  button: {
+    marginTop: 14,
+    alignSelf: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    backgroundColor: '#499F44',
+  },
+  buttonText: { color: 'white', fontWeight: '700', fontSize: 16 },
+});
+
 
 const sheetStyles = StyleSheet.create({
   backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.35)' },
