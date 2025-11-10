@@ -12,11 +12,9 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import * as SecureStore from 'expo-secure-store';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { faCrown } from '@fortawesome/free-solid-svg-icons';
-
-const API_BASE_URL = "https://api.chavnapantry.com";
+import { API_URL, retrieveValue } from "../util";
 
 interface FamilyMember {
   userId: string;
@@ -58,7 +56,7 @@ const HouseholdManagementScreen = () => {
   const loadToken = async () => {
     try {
       // Try SecureStore first (matches login.tsx)
-      let token = await SecureStore.getItemAsync('jwt');
+      let token = await retrieveValue('jwt');
       
       // Fallback to localStorage if SecureStore fails
       if (!token) {
@@ -84,7 +82,7 @@ const HouseholdManagementScreen = () => {
 
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE_URL}/get-family-members`, {
+      const response = await fetch(`${API_URL}/get-family-members`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${jwtToken}`,
@@ -138,7 +136,7 @@ const HouseholdManagementScreen = () => {
 
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE_URL}/create-family`, {
+      const response = await fetch(`${API_URL}/create-family`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${jwtToken}`,
@@ -168,7 +166,7 @@ const HouseholdManagementScreen = () => {
 
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE_URL}/leave-family`, {
+      const response = await fetch(`${API_URL}/leave-family`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${jwtToken}`,
@@ -201,7 +199,7 @@ const HouseholdManagementScreen = () => {
 
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE_URL}/delete-family`, {
+      const response = await fetch(`${API_URL}/delete-family`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${jwtToken}`,
@@ -251,7 +249,7 @@ const HouseholdManagementScreen = () => {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/invite-to-family`, {
+      const response = await fetch(`${API_URL}/invite-to-family`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${jwtToken}`,
@@ -283,7 +281,7 @@ const HouseholdManagementScreen = () => {
     if (!selectedMember || !jwtToken) return;
 
     try {
-      const response = await fetch(`${API_BASE_URL}/remove-family-member`, {
+      const response = await fetch(`${API_URL}/remove-family-member`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${jwtToken}`,
