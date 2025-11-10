@@ -23,7 +23,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.chavna.pantryproject.Authorization.GoogleLogin;
 import com.chavna.pantryproject.Authorization.Login;
+import com.chavna.pantryproject.Authorization.NormalLogin;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwe;
@@ -239,14 +241,19 @@ public class UserController {
 
     @GetMapping("/refresh-token")
     public ResponseEntity<OkResponse> refreshToken(@RequestHeader("Authorization") String authorizationHeader) {
-        try {
-            Login login = Authorization.authorize(authorizationHeader);
-
-            String newToken = Authorization.createLoginToken(login.userId, login.loginState);
-            return ResponseEntity.ok(OkResponse.Success("Authorized.", new LoginResponse(newToken)));
-        } catch (JwtException ex) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, ex.toString());
+        Login login = Authorization.authorize(authorizationHeader);
+        String newToken;
+        if (login instanceof NormalLogin) {
+            try {
+                newToken = Authorization.createLoginToken(login.userId, ((NormalLogin) login).loginState);
+            } catch (JwtException ex) {
+                throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, ex.toString());
+            }
+        } else {
+            newToken = Authorization.createGmailLoginToken(login.userId, ((GoogleLogin) login).googleToken);
         }
+
+        return ResponseEntity.ok(OkResponse.Success("Authorized.", new LoginResponse(newToken)));
     }
 
     //                          //
