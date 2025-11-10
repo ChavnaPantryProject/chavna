@@ -23,7 +23,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 
 // Adjust the initial list length by changing the { length: 5 }
-const initialItems = Array.from({ length: 5 }).map((_, i) => ({
+const initialItems = Array.from({ length: 3 }).map((_, i) => ({
   id: String(i + 1),
   name: '',
   done: false,
