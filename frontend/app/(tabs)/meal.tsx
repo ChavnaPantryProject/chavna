@@ -17,7 +17,7 @@ import { Ionicons, MaterialIcons } from '@expo/vector-icons'
 
 // example meal card data used in our figma
 // replace this so thatt user has an option to delete it
-const meals = [
+const initialMeals = [
   {
     id: "1",
     name: "Fettuccine Alfredo Pasta",
@@ -36,6 +36,7 @@ const meals = [
 
 const MealScreen = () => {
   const router = useRouter(); // nav controller
+  const [meals, setMeals] = React.useState(initialMeals);
   const [showDeleteModal, setShowDeleteModal] = React.useState(false);
   const [selectedMeal, setSelectedMeal] = React.useState<any>(null);
   const [favorites, setFavorites] = React.useState<string[]>([]); // fav meal IDs
@@ -46,6 +47,14 @@ const MealScreen = () => {
     setShowDeleteModal(true);
   };
 
+  // confirm deletion
+  const confirmDelete = () => {
+    if (selectedMeal) {
+      setMeals((prev) => prev.filter((m) => m.id !== selectedMeal.id));
+    }
+    setShowDeleteModal(false);
+  };
+
   // to allow users to favorite a meal
   const handleFavorite = (meal: any) => {
     setFavorites((prev) => 
@@ -53,6 +62,11 @@ const MealScreen = () => {
         ? prev.filter((id) => id !== meal.id)
         : [...prev, meal.id]
     );
+  };
+
+  // navigate to meal info page (unique for each meal)
+  const goToMealInfo = (mealId: string) => {
+    router.push("/meals/meal_ingredient?id=${mealId}");
   };
 
   // rendering each meal card
@@ -92,7 +106,7 @@ const MealScreen = () => {
           {/* Eat Button */}
           <TouchableOpacity 
             style={styles.actionBtn} 
-            onPress={() => router.push("/meals/meal_ingredient")}
+            onPress={() => goToMealInfo(item.id)}
           >
             <Ionicons name="restaurant" size={20} color="white" />
           </TouchableOpacity>
@@ -108,7 +122,6 @@ const MealScreen = () => {
       </View>
     </View>
   </View>
-
 );
 
   return (
@@ -141,7 +154,10 @@ const MealScreen = () => {
       />
 
       {/* Add Meal Button */}
-      <TouchableOpacity style={styles.addBtn}>
+      <TouchableOpacity 
+        style={styles.addBtn}
+        onPress={() => router.push("/meals/newmeal")}
+      >
         <Text style={styles.addText}>+</Text>
       </TouchableOpacity>
 
@@ -162,9 +178,7 @@ const MealScreen = () => {
 
             <TouchableOpacity
               style={styles.modalBtn}
-              onPress={() => {
-                setShowDeleteModal(false);
-              }}
+              onPress={confirmDelete}
             >
               <Text style={styles.modalBtnText}>Delete Meal</Text>
             </TouchableOpacity>
