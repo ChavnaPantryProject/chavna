@@ -9,6 +9,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -40,6 +41,7 @@ import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.JwtParser;
 import io.jsonwebtoken.JwtVisitor;
 import io.jsonwebtoken.Jwts;
+import jakarta.annotation.Nullable;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 
@@ -606,7 +608,7 @@ public class UserController {
             updateQuery.executeUpdate();
         } catch (SQLException ex) {
             ex.printStackTrace();
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "SQL Error");
+            throw Database.getSQLErrorHTTPResponse();
         }
 
         return OkResponse.Success("Family created");
@@ -649,7 +651,7 @@ public class UserController {
             removeMemberQuery.executeUpdate();
         } catch (SQLException ex) {
             ex.printStackTrace();
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "SQL Error");
+            throw Database.getSQLErrorHTTPResponse();
         }
 
         return OkResponse.Success("Left family");
@@ -692,7 +694,7 @@ public class UserController {
             removeFamily.executeUpdate();
         } catch (SQLException ex) {
             ex.printStackTrace();
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "SQL Error");
+            throw Database.getSQLErrorHTTPResponse();
         }
 
         return OkResponse.Success("Deleted family");
@@ -779,7 +781,7 @@ public class UserController {
             Email.sendEmail("noreply@email.chavnapantry.com", requestBody.email, emailContent, "Family Invitation Request.");
         } catch (SQLException ex) {
             ex.printStackTrace();
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "SQL Error.");
+            throw Database.getSQLErrorHTTPResponse();
         }
 
         return OkResponse.Success("Invitation sent.");
@@ -875,7 +877,7 @@ public class UserController {
             updateQuery.executeUpdate();
         } catch (SQLException ex) {
             ex.printStackTrace();
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "SQL Error");
+            throw Database.getSQLErrorHTTPResponse();
         }
         
         return ResponseEntity.ok("Invite accepted.");
@@ -929,7 +931,7 @@ public class UserController {
             return OkResponse.Success(new GetFamilyMemembersResponse(members));
         } catch (SQLException ex) {
             ex.printStackTrace();
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "SQL Error");
+            throw Database.getSQLErrorHTTPResponse();
         }
     }
 
@@ -1042,5 +1044,225 @@ public class UserController {
         Email.verifyEmailAddress(email);
 
         return ResponseEntity.ok("Verification email sent.");
+    }
+
+    public static class FoodItemTemplate {
+        public String name;
+        public double amount;
+        public String unit;
+        public int shelfLifeDays;
+        public String category;
+    }
+
+    public static class RegisteredFoodItemTemplate {
+        public UUID id;
+        public UUID owningUser;
+        public FoodItemTemplate template;
+    }
+
+    public static class GetFoodItemTemplatesRequest {
+        @NotNull
+        public String name;
+        @Nullable
+        public UUID owner;
+    }
+
+    @AllArgsConstructor
+    public static class GetFoodItemTemplatesResponse {
+        public ArrayList<RegisteredFoodItemTemplate> templates;
+    }
+
+    @PostMapping("/get-food-item-templates")
+    public ResponseEntity<OkResponse> getFoodItemTemplates(@Valid @RequestBody GetFoodItemTemplatesRequest requestBody) {
+        try {
+            Connection con = Database.getRemoteConnection();
+
+            PreparedStatement statement;
+            if (requestBody.owner == null) {
+                statement = con.prepareStatement("""
+                    SELECT * FROM food_item_templates
+                    WHERE name LIKE ?
+                """);
+                statement.setString(1, requestBody.name);
+            } else {
+                statement = con.prepareStatement("""
+                    SELECT * FROM food_item_templates
+                    WHERE name = ? AND owner = ?
+                """);
+                String like = "%" + requestBody.name + "%";
+                statement.setString(1, like);
+                statement.setObject(2, requestBody.owner);
+            }
+
+            ResultSet result = statement.executeQuery();
+
+            ArrayList<RegisteredFoodItemTemplate> templates = new ArrayList<>();
+            while (result.next()) {
+                FoodItemTemplate template = new FoodItemTemplate();
+
+                template.amount = result.getDouble("amount");
+                template.category = result.getString("category");
+                template.name = result.getString("name");
+                template.shelfLifeDays = result.getInt("shelf_life_days");
+                template.unit = result.getString("result");
+
+                RegisteredFoodItemTemplate registered = new RegisteredFoodItemTemplate();
+                registered.template = template;
+                registered.owningUser = (UUID) result.getObject("owner");
+
+                templates.add(registered);
+            }
+
+            return ResponseEntity.ok(OkResponse.Success(templates));
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            
+            throw Database.getSQLErrorHTTPResponse();
+        }
+    }
+
+    @AllArgsConstructor
+    public static class AddFoodItemRequest {
+        public UUID templateId;
+        public double amount;
+        public Date expiration;
+        public double unitPrice;
+    }
+
+    @PostMapping("/add-food-item")
+    public ResponseEntity<OkResponse> addFoodItem(@RequestHeader("Authorization") String authorizationHeader, @RequestBody AddFoodItemRequest requestBody) {
+        Login login = Authorization.authorize(authorizationHeader);
+
+        try {
+            Connection con = Database.getRemoteConnection();
+
+            // Get template
+            PreparedStatement templateSatement = con.prepareStatement("""
+                SELECT * FROM food_item_templates
+                WHERE id = ?
+            """);
+            templateSatement.setObject(1, requestBody.templateId);
+            ResultSet result = templateSatement.executeQuery();
+
+            if (!result.next())
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Template does not exist.");
+
+            RegisteredFoodItemTemplate template = new RegisteredFoodItemTemplate();
+            template.id = (UUID) result.getObject("id");
+            template.owningUser = (UUID) result.getObject("owner");
+            template.template = new FoodItemTemplate();
+
+            template.template.amount = result.getDouble("amount");
+            template.template.category = result.getString("category");
+            template.template.name = result.getString("name");
+            template.template.shelfLifeDays = result.getInt("shelf_life_days");
+            template.template.unit = result.getString("unit");
+
+            // Make a copy if template is not user's
+            if (template.owningUser != login.userId) {
+                PreparedStatement copyStatement = con.prepareStatement("""
+                    INSERT INTO food_item_templates (name, owner, amount, unit, shelf_life_days, category)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    RETURNING id;
+                """);
+                copyStatement.setString(1, template.template.name);
+                copyStatement.setObject(2, login.userId);
+                copyStatement.setDouble(3, template.template.amount);
+                copyStatement.setString(4, template.template.unit);
+                copyStatement.setInt(5, template.template.shelfLifeDays);
+                copyStatement.setString(6, template.template.category);
+
+                result = copyStatement.executeQuery();
+                result.next();
+
+                UUID copy_id = (UUID) result.getObject(1);
+
+                template.id = copy_id;
+                template.owningUser = login.userId;
+            }
+
+            PreparedStatement statement = con.prepareStatement("""
+                INSERT INTO food_items (amount, expiration, unit_price, template)
+                VALUES (?, ?, ?, ?)
+            """);
+            statement.setDouble(1, requestBody.amount);
+            statement.setDate(2, new java.sql.Date(requestBody.expiration.getTime()));
+            statement.setDouble(3, requestBody.unitPrice);
+            statement.setObject(4, requestBody.templateId);
+
+            statement.executeUpdate();
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            throw Database.getSQLErrorHTTPResponse();
+        }
+
+        return ResponseEntity.ok(OkResponse.Success());
+    }
+
+    public static class GetFoodItemsRequest {
+        @Nullable
+        public String category;
+    }
+
+    public static class FoodItem {
+        public String name;
+        public double amount;
+        public String unit;
+        public Date expiration;
+        public double unitPrice;
+        public Date addDate;
+        public String category;
+    }
+
+    @AllArgsConstructor
+    public static class GetFoodItemsResponse {
+        public ArrayList<FoodItem> items;
+    }
+
+    @PostMapping("/get-food-items")
+    public ResponseEntity<OkResponse> getFoodItems(@RequestHeader("Authorization") String authorizationHeader, @RequestBody GetFoodItemsRequest requestBody) {
+        Login login = Authorization.authorize(authorizationHeader);
+
+        try {
+            Connection con = Database.getRemoteConnection();
+
+            String query = """
+                SELECT * FROM food_items
+                INNER JOIN food_item_templates
+                ON template = id
+                WHERE owner = ? 
+            """;
+
+            if (requestBody.category != null)
+                query += "AND category = ?";
+
+            PreparedStatement statement = con.prepareStatement(query);
+            statement.setObject(1, login.userId);
+
+            if (requestBody.category != null)
+                statement.setString(2, requestBody.category);
+
+            ResultSet result = statement.executeQuery();
+
+            ArrayList<FoodItem> items = new ArrayList<>();
+            while (result.next()) {
+                FoodItem item = new FoodItem();
+
+                item.addDate = result.getDate("add_date");
+                item.amount = result.getDouble("amount");
+                item.category = result.getString("category");
+                item.expiration = result.getDate("expiration");
+                item.name = result.getString("name");
+                item.unit = result.getString("unit");
+                item.unitPrice = result.getDouble("unit_price");
+
+                items.add(item);
+            }
+
+            return ResponseEntity.ok(OkResponse.Success(new GetFoodItemsResponse(items)));
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            throw Database.getSQLErrorHTTPResponse();
+        }
     }
 }
