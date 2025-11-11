@@ -81,13 +81,39 @@ export default function HomeScreen() {
     done: false,
   }));
   const [items, setItems] = useState(initialItems);
+  const [updateItems, setUpdateItems] = useState(false);
+
+  const setItemsAndUpdate = (value: React.SetStateAction<{
+      id: string;
+      name: string;
+      done: boolean;
+  }[]>) => {
+    setItems(value);
+    setUpdateItems(true);
+  };
 
   useEffect(() => {
-    updateShoppingList(items.map((value, i) => ({
-        name: value.name,
-        isChecked: value.done,
+    (async () => {
+      let items = await getShoppingList();
+      let list = items.map((item, i) => ({
+        id: String(i + 1),
+        name: item.name,
+        done: item.isChecked,
+      }));
+      setItems(list);
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (updateItems) {
+      setUpdateItems(false);
+
+      updateShoppingList(items.map((value, i) => ({
+          name: value.name,
+          isChecked: value.done,
       })));
-    }, [items]);
+    }
+  }, [updateItems]);
 
     // SAMPLE DATA FOR EXPIRATION WARNING
   const [expiringOpen, setExpiringOpen] = useState(false);
@@ -129,10 +155,10 @@ export default function HomeScreen() {
 
 
   const toggle = (id: string) =>
-    setItems(prev => prev.map(it => (it.id === id ? { ...it, done: !it.done } : it)));
+    setItemsAndUpdate(prev => prev.map(it => (it.id === id ? { ...it, done: !it.done } : it)));
 
   const addItem = () =>
-    setItems(prev => [...prev, { id: String(Date.now()), name: '', done: false }]);
+    setItemsAndUpdate(prev => [...prev, { id: String(Date.now()), name: '', done: false }]);
 
   // Auto scroll when adding to list
   const scrollRef = useRef<ScrollView | null>(null);
@@ -166,15 +192,6 @@ export default function HomeScreen() {
 
   useEffect(() => {
     scrollRef.current?.scrollToEnd({ animated: true });
-    (async () => {
-      let items = await getShoppingList();
-      let list = items.map((item, i) => ({
-        id: String(i + 1),
-        name: item.name,
-        done: item.isChecked,
-      }));
-      setItems(list);
-    })();
   }, [items.length]);
 
   return (
@@ -252,7 +269,7 @@ export default function HomeScreen() {
                       ]}
                       value={item.name}
                       onChangeText={t =>
-                        setItems(prev =>
+                        setItemsAndUpdate(prev =>
                           prev.map(it => (it.id === item.id ? { ...it, name: t } : it)),
                         )
                       }
@@ -316,7 +333,7 @@ export default function HomeScreen() {
         confirmLabel="Clear all"
         onCancel={() => setConfirmClearAllOpen(false)}
         onConfirm={() => {
-          setItems([]);
+          setItemsAndUpdate([]);
           setConfirmClearAllOpen(false);
         }}
       />
@@ -328,7 +345,7 @@ export default function HomeScreen() {
         confirmLabel="Clear selected"
         onCancel={() => setConfirmClearSelectedOpen(false)}
         onConfirm={() => {
-          setItems(prev => prev.filter(i => !i.done));
+          setItemsAndUpdate(prev => prev.filter(i => !i.done));
           setConfirmClearSelectedOpen(false);
         }}
       />
