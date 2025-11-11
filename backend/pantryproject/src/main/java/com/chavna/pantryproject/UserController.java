@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.sql.Connection;
+import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -1112,7 +1113,7 @@ public class UserController {
                 templates.add(registered);
             }
 
-            return ResponseEntity.ok(OkResponse.Success(templates));
+            return OkResponse.Success(templates);
         } catch (SQLException ex) {
             ex.printStackTrace();
             
@@ -1195,7 +1196,7 @@ public class UserController {
             throw Database.getSQLErrorHTTPResponse();
         }
 
-        return ResponseEntity.ok(OkResponse.Success());
+        return OkResponse.Success();
     }
 
     public static class GetFoodItemsRequest {
@@ -1258,7 +1259,7 @@ public class UserController {
                 items.add(item);
             }
 
-            return ResponseEntity.ok(OkResponse.Success(new GetFoodItemsResponse(items)));
+            return OkResponse.Success(new GetFoodItemsResponse(items));
         } catch (SQLException ex) {
             ex.printStackTrace();
             throw Database.getSQLErrorHTTPResponse();
