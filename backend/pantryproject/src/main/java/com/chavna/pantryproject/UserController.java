@@ -56,6 +56,7 @@ import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
 
 import lombok.AllArgsConstructor;
+import lombok.ToString;
 
 @RestController
 public class UserController {
@@ -1047,24 +1048,62 @@ public class UserController {
     }
 
     public static class FoodItemTemplate {
+        @NotNull
         public String name;
-        public double amount;
+        @NotNull
+        public Double amount;
+        @NotNull
         public String unit;
-        public int shelfLifeDays;
+        @NotNull
+        public Integer shelfLifeDays;
+        @NotNull
         public String category;
     }
 
+    @PostMapping("/create-food-item-template")
+    public ResponseEntity<OkResponse> createFoodItemTemplate(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody FoodItemTemplate requestBody) {
+        Login login = Authorization.authorize(authorizationHeader);
+
+        try {
+            Connection con = Database.getRemoteConnection();
+
+            PreparedStatement statement = con.prepareStatement("""
+                INSERT INTO food_item_templates (name, owner, amount, unit, shelf_life_days, category)
+                VALUES (?, ?, ?, ?, ?, ?)
+                RETURNING id;
+            """);
+
+            statement.setString(1, requestBody.name);
+            statement.setObject(2, login.userId);
+            statement.setDouble(3, requestBody.amount);
+            statement.setString(4, requestBody.unit);
+            statement.setInt(5, requestBody.shelfLifeDays);
+            statement.setString(6, requestBody.category);
+
+            ResultSet result = statement.executeQuery();
+            result.next();
+
+            UUID templateId = (UUID) result.getObject(1);
+
+            RegisteredFoodItemTemplate template = new RegisteredFoodItemTemplate();
+            template.templateId = templateId;
+            template.template = requestBody;
+
+            return OkResponse.Success(template);
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            throw Database.getSQLErrorHTTPResponse();
+        }
+    }
+
     public static class RegisteredFoodItemTemplate {
-        public UUID id;
-        public UUID owningUser;
+        public UUID templateId;
         public FoodItemTemplate template;
     }
 
     public static class GetFoodItemTemplatesRequest {
-        @NotNull
-        public String name;
         @Nullable
-        public UUID owner;
+        public String search;
     }
 
     @AllArgsConstructor
@@ -1073,25 +1112,30 @@ public class UserController {
     }
 
     @PostMapping("/get-food-item-templates")
-    public ResponseEntity<OkResponse> getFoodItemTemplates(@Valid @RequestBody GetFoodItemTemplatesRequest requestBody) {
+    public ResponseEntity<OkResponse> getFoodItemTemplates(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody(required = false) GetFoodItemTemplatesRequest requestBody) {
+        Login login = Authorization.authorize(authorizationHeader);
+        
+        if (requestBody == null)
+            requestBody = new GetFoodItemTemplatesRequest();
+
         try {
             Connection con = Database.getRemoteConnection();
 
+            String query = """
+                SELECT * FROM food_item_templates
+                WHERE owner = ?
+            """;
+
+            if (requestBody.search != null)
+                query += " AND name LIKE ?";
+
             PreparedStatement statement;
-            if (requestBody.owner == null) {
-                statement = con.prepareStatement("""
-                    SELECT * FROM food_item_templates
-                    WHERE name LIKE ?
-                """);
-                statement.setString(1, requestBody.name);
-            } else {
-                statement = con.prepareStatement("""
-                    SELECT * FROM food_item_templates
-                    WHERE name = ? AND owner = ?
-                """);
-                String like = "%" + requestBody.name + "%";
-                statement.setString(1, like);
-                statement.setObject(2, requestBody.owner);
+            statement = con.prepareStatement(query);
+            statement.setObject(1, login.userId);
+
+            if (requestBody.search != null) {
+                String like = '%' + requestBody.search + '%';
+                statement.setString(2, like);
             }
 
             ResultSet result = statement.executeQuery();
@@ -1104,11 +1148,11 @@ public class UserController {
                 template.category = result.getString("category");
                 template.name = result.getString("name");
                 template.shelfLifeDays = result.getInt("shelf_life_days");
-                template.unit = result.getString("result");
+                template.unit = result.getString("unit");
 
                 RegisteredFoodItemTemplate registered = new RegisteredFoodItemTemplate();
+                registered.templateId = (UUID) result.getObject("id");
                 registered.template = template;
-                registered.owningUser = (UUID) result.getObject("owner");
 
                 templates.add(registered);
             }
@@ -1121,74 +1165,58 @@ public class UserController {
         }
     }
 
-    @AllArgsConstructor
-    public static class AddFoodItemRequest {
+    public static class FoodItemFromTemplate {
+        @NotNull
         public UUID templateId;
-        public double amount;
-        public Date expiration;
-        public double unitPrice;
+        @NotNull
+        public Double amount;
+        @NotNull
+        public Double unitPrice;
     }
 
-    @PostMapping("/add-food-item")
-    public ResponseEntity<OkResponse> addFoodItem(@RequestHeader("Authorization") String authorizationHeader, @RequestBody AddFoodItemRequest requestBody) {
+    public static class AddFoodItemRequest {
+        @NotNull
+        public ArrayList<FoodItemFromTemplate> items;
+    }
+
+    @PostMapping("/add-food-items")
+    public ResponseEntity<OkResponse> addFoodItem(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody AddFoodItemRequest requestBody) {
+        if (requestBody.items.size() == 0)
+            return OkResponse.Success();
+
         Login login = Authorization.authorize(authorizationHeader);
 
         try {
             Connection con = Database.getRemoteConnection();
 
-            // Get template
-            PreparedStatement templateSatement = con.prepareStatement("""
-                SELECT * FROM food_item_templates
-                WHERE id = ?
-            """);
-            templateSatement.setObject(1, requestBody.templateId);
-            ResultSet result = templateSatement.executeQuery();
+            String values = "";
+            for (@SuppressWarnings("unused") var __ : requestBody.items)
+                values += "(CAST(? AS uuid), ?, now()::date, ?),";
+            
+            values = values.substring(0, values.length() - 1);
+            String query = String.format("""
+                INSERT INTO food_items
+                SELECT id, inserted.amount, expiration + INTERVAL '1 day' * shelf_life_days, unit_price, template_id FROM (
+                    VALUES
+                        %s
+                ) AS inserted (template_id, amount , expiration, unit_price)
+                INNER JOIN food_item_templates
+                ON id = template_id AND owner = ?;
+            """, values);
 
-            if (!result.next())
-                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Template does not exist.");
+            PreparedStatement statement = con.prepareStatement(query);
 
-            RegisteredFoodItemTemplate template = new RegisteredFoodItemTemplate();
-            template.id = (UUID) result.getObject("id");
-            template.owningUser = (UUID) result.getObject("owner");
-            template.template = new FoodItemTemplate();
-
-            template.template.amount = result.getDouble("amount");
-            template.template.category = result.getString("category");
-            template.template.name = result.getString("name");
-            template.template.shelfLifeDays = result.getInt("shelf_life_days");
-            template.template.unit = result.getString("unit");
-
-            // Make a copy if template is not user's
-            if (template.owningUser != login.userId) {
-                PreparedStatement copyStatement = con.prepareStatement("""
-                    INSERT INTO food_item_templates (name, owner, amount, unit, shelf_life_days, category)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                    RETURNING id;
-                """);
-                copyStatement.setString(1, template.template.name);
-                copyStatement.setObject(2, login.userId);
-                copyStatement.setDouble(3, template.template.amount);
-                copyStatement.setString(4, template.template.unit);
-                copyStatement.setInt(5, template.template.shelfLifeDays);
-                copyStatement.setString(6, template.template.category);
-
-                result = copyStatement.executeQuery();
-                result.next();
-
-                UUID copy_id = (UUID) result.getObject(1);
-
-                template.id = copy_id;
-                template.owningUser = login.userId;
+            int i = 1;
+            for (FoodItemFromTemplate item : requestBody.items) {
+                statement.setObject(i, item.templateId);
+                i++;
+                statement.setDouble(i, item.amount);
+                i++;
+                statement.setDouble(i, item.unitPrice);
+                i++;
             }
 
-            PreparedStatement statement = con.prepareStatement("""
-                INSERT INTO food_items (amount, expiration, unit_price, template)
-                VALUES (?, ?, ?, ?)
-            """);
-            statement.setDouble(1, requestBody.amount);
-            statement.setDate(2, new java.sql.Date(requestBody.expiration.getTime()));
-            statement.setDouble(3, requestBody.unitPrice);
-            statement.setObject(4, requestBody.templateId);
+            statement.setObject(i, login.userId);
 
             statement.executeUpdate();
         } catch (SQLException ex) {
@@ -1205,10 +1233,12 @@ public class UserController {
     }
 
     public static class FoodItem {
+        public UUID id;
         public String name;
         public double amount;
         public String unit;
         public Date expiration;
+        public Date lastUsed;
         public double unitPrice;
         public Date addDate;
         public String category;
@@ -1220,8 +1250,11 @@ public class UserController {
     }
 
     @PostMapping("/get-food-items")
-    public ResponseEntity<OkResponse> getFoodItems(@RequestHeader("Authorization") String authorizationHeader, @RequestBody GetFoodItemsRequest requestBody) {
+    public ResponseEntity<OkResponse> getFoodItems(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody(required = false) GetFoodItemsRequest requestBody) {
         Login login = Authorization.authorize(authorizationHeader);
+
+        if (requestBody == null)
+            requestBody = new GetFoodItemsRequest();
 
         try {
             Connection con = Database.getRemoteConnection();
@@ -1229,12 +1262,14 @@ public class UserController {
             String query = """
                 SELECT * FROM food_items
                 INNER JOIN food_item_templates
-                ON template = id
+                ON template_id = food_item_templates.id
                 WHERE owner = ? 
             """;
 
             if (requestBody.category != null)
                 query += "AND category = ?";
+
+            System.out.println(query);
 
             PreparedStatement statement = con.prepareStatement(query);
             statement.setObject(1, login.userId);
@@ -1248,6 +1283,7 @@ public class UserController {
             while (result.next()) {
                 FoodItem item = new FoodItem();
 
+                item.id = (UUID) result.getObject("id");
                 item.addDate = result.getDate("add_date");
                 item.amount = result.getDouble("amount");
                 item.category = result.getString("category");
@@ -1255,6 +1291,7 @@ public class UserController {
                 item.name = result.getString("name");
                 item.unit = result.getString("unit");
                 item.unitPrice = result.getDouble("unit_price");
+                item.lastUsed = result.getDate("last_used");
 
                 items.add(item);
             }
@@ -1264,5 +1301,41 @@ public class UserController {
             ex.printStackTrace();
             throw Database.getSQLErrorHTTPResponse();
         }
+    }
+
+    public static class UpdateFoodItemRequest {
+        @NotNull
+        public UUID foodItemId;
+        @NotNull
+        public Double newAmount;
+    }
+
+    @PostMapping("/update-food-item")
+    public ResponseEntity<OkResponse> updateFoodItem(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody UpdateFoodItemRequest requestBody) {
+        Login login = Authorization.authorize(authorizationHeader);
+
+        try {
+            Connection con = Database.getRemoteConnection();
+
+            if (requestBody.newAmount > 0) {
+                PreparedStatement statement = con.prepareStatement("""
+                    UPDATE food_items
+                    SET amount = ?, last_used = now()::date
+                    FROM food_item_templates
+                    WHERE food_items.id = ? AND food_item_templates.owner = ?;
+                """);
+                statement.setDouble(1, requestBody.newAmount);
+                statement.setObject(2, requestBody.foodItemId);
+                statement.setObject(3, login.userId);
+
+                statement.executeUpdate();
+            } else {
+
+            }
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            throw Database.getSQLErrorHTTPResponse();
+        }
+        return OkResponse.Success();
     }
 }
