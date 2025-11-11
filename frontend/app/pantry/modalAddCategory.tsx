@@ -1,4 +1,4 @@
-import React from "react";
+import React,{useState} from "react";
 import { Modal, StyleSheet, Pressable, Text , TextInput, View} from "react-native";
 
 type Props = {
@@ -6,15 +6,19 @@ type Props = {
   onClose: () => void;
   title?: string;
   children?: React.ReactNode;
+  onSubmit: (name: string) => void
 };
 
-export default function ModalCreateFoodCategory({ visible, onClose, title, children}: Props){
+export default function ModalCreateFoodCategory({ visible, onClose, title, children, onSubmit}: Props){
+
+  const [newCategoryName, setNewCateogoryName] = useState<string>("")
+  
     return(
         <Modal
         visible={visible}
         transparent
         animationType="fade"
-        onRequestClose={onClose} 
+        onRequestClose={onClose}
         >
             {/* backdrop that also dismisses */}
             <Pressable style={style.backdrop} onPress={onClose}>
@@ -29,6 +33,8 @@ export default function ModalCreateFoodCategory({ visible, onClose, title, child
                   <TextInput
                   placeholder={"New Group"}
                   style={style.addCategoryInput}
+                  value={newCategoryName}
+                  onChangeText={setNewCateogoryName}
                   autoFocus
                   />
                 </View>
@@ -36,7 +42,10 @@ export default function ModalCreateFoodCategory({ visible, onClose, title, child
                 {/* buttons for confirming or canceling the new category */}
                 <Pressable 
                 style={style.buttonsForAddCategory}
-                onPress={onClose}
+                onPress={()=>{
+                  onSubmit(newCategoryName)
+                  onClose()
+                }}
                 >
                   <Text style={style.textInButton}>Add</Text>
                 </Pressable>

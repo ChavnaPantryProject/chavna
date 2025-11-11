@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -13,13 +12,14 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import * as SecureStore from 'expo-secure-store';
-
-const API_BASE_URL = "https://api.chavnapantry.com";
+import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
+import { faCrown } from '@fortawesome/free-solid-svg-icons';
+import { API_URL, retrieveValue } from "../util";
 
 interface FamilyMember {
   userId: string;
   email: string;
+  role: string; // "Owner" or other roles
   firstName?: string;
   lastName?: string;
   nickname?: string;
@@ -30,12 +30,16 @@ const HouseholdManagementScreen = () => {
 
   const [members, setMembers] = useState<FamilyMember[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasFamily, setHasFamily] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [removeMode, setRemoveMode] = useState(false);
   const [newMemberEmail, setNewMemberEmail] = useState("");
   const [removeModalVisible, setRemoveModalVisible] = useState(false);
   const [selectedMember, setSelectedMember] = useState<FamilyMember | null>(null);
   const [jwtToken, setJwtToken] = useState<string | null>(null);
+  const [isOwner, setIsOwner] = useState(false);
+  const [leaveFamilyModalVisible, setLeaveFamilyModalVisible] = useState(false);
+  const [deleteFamilyModalVisible, setDeleteFamilyModalVisible] = useState(false);
 
   // Load JWT token on mount
   useEffect(() => {
@@ -52,7 +56,7 @@ const HouseholdManagementScreen = () => {
   const loadToken = async () => {
     try {
       // Try SecureStore first (matches login.tsx)
-      let token = await SecureStore.getItemAsync('jwt');
+      let token = await retrieveValue('jwt');
       
       // Fallback to localStorage if SecureStore fails
       if (!token) {
@@ -78,7 +82,7 @@ const HouseholdManagementScreen = () => {
 
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE_URL}/get-family-members`, {
+      const response = await fetch(`${API_URL}/get-family-members`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${jwtToken}`,
@@ -87,24 +91,138 @@ const HouseholdManagementScreen = () => {
       });
 
       const data = await response.json();
-      
-      // Debug logging
       console.log("API Response:", data);
+      console.log("Response status:", response.status);
 
       if (response.ok && data.success === "success") {
         // Extract members array from payload.members
         const membersList = data.payload?.members || [];
         console.log("Setting members:", membersList);
-        setMembers(membersList);
+        
+        // Check if members array is empty - user not in a family
+        if (membersList.length === 0) {
+          console.log("Empty members list - user not in a family");
+          setMembers([]);
+          setHasFamily(false);
+          setIsOwner(false);
+        } else {
+          setMembers(membersList);
+          setHasFamily(true);
+          
+          // Check if current user is owner
+          const currentUserId = JSON.parse(atob(jwtToken.split('.')[1])).user_id;
+          const ownerMember = membersList.find((m: FamilyMember) => m.role === "Owner");
+          setIsOwner(ownerMember?.userId === currentUserId);
+        }
       } else {
-        console.error("API Error:", data.message);
-        Alert.alert("Error", data.message || "Failed to fetch family members");
-        setMembers([]); // Set empty array on error
+        // Error response - treat as no family
+        console.log("Error response - setting hasFamily to false");
+        setHasFamily(false);
+        setMembers([]);
+        setIsOwner(false);
       }
     } catch (error) {
       console.error("Error fetching family members:", error);
-      Alert.alert("Error", "Failed to connect to server");
-      setMembers([]); // Set empty array on error
+      // On network error, assume no family
+      setHasFamily(false);
+      setMembers([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreateFamily = async () => {
+    if (!jwtToken) return;
+
+    try {
+      setLoading(true);
+      const response = await fetch(`${API_URL}/create-family`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${jwtToken}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success === "success") {
+        Alert.alert("Success", "Family created successfully!");
+        setHasFamily(true);
+        fetchFamilyMembers();
+      } else {
+        Alert.alert("Error", data.message || "Failed to create family");
+      }
+    } catch (error) {
+      console.error("Error creating family:", error);
+      Alert.alert("Error", "Failed to create family");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLeaveFamily = async () => {
+    if (!jwtToken) return;
+
+    try {
+      setLoading(true);
+      const response = await fetch(`${API_URL}/leave-family`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${jwtToken}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success === "success") {
+        Alert.alert("Success", "You have left the family");
+        setLeaveFamilyModalVisible(false);
+        setHasFamily(false);
+        setMembers([]);
+      } else {
+        Alert.alert("Error", data.message || "Failed to leave family");
+        setLeaveFamilyModalVisible(false);
+      }
+    } catch (error) {
+      console.error("Error leaving family:", error);
+      Alert.alert("Error", "Failed to leave family");
+      setLeaveFamilyModalVisible(false);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteFamily = async () => {
+    if (!jwtToken) return;
+
+    try {
+      setLoading(true);
+      const response = await fetch(`${API_URL}/delete-family`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${jwtToken}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success === "success") {
+        Alert.alert("Success", "Family deleted successfully");
+        setDeleteFamilyModalVisible(false);
+        setHasFamily(false);
+        setMembers([]);
+        setIsOwner(false);
+      } else {
+        Alert.alert("Error", data.message || "Failed to delete family");
+        setDeleteFamilyModalVisible(false);
+      }
+    } catch (error) {
+      console.error("Error deleting family:", error);
+      Alert.alert("Error", "Failed to delete family");
+      setDeleteFamilyModalVisible(false);
     } finally {
       setLoading(false);
     }
@@ -131,7 +249,7 @@ const HouseholdManagementScreen = () => {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/invite-to-family`, {
+      const response = await fetch(`${API_URL}/invite-to-family`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${jwtToken}`,
@@ -163,7 +281,7 @@ const HouseholdManagementScreen = () => {
     if (!selectedMember || !jwtToken) return;
 
     try {
-      const response = await fetch(`${API_BASE_URL}/remove-family-member`, {
+      const response = await fetch(`${API_URL}/remove-family-member`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${jwtToken}`,
@@ -208,11 +326,47 @@ const HouseholdManagementScreen = () => {
     return (
       <View style={[styles.container, styles.centerContent]}>
         <ActivityIndicator size="large" color="#499f44" />
-        <Text style={{ marginTop: 10 }}>Loading family members...</Text>
+        <Text style={{ marginTop: 10 }}>Loading...</Text>
       </View>
     );
   }
 
+  // User is not in a family - show create family screen
+  if (!hasFamily) {
+    return (
+      <View style={styles.container}>
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+            <Ionicons name="arrow-back" size={24} color="black" />
+          </TouchableOpacity>
+
+          <View style={styles.titleContainer}>
+            <Text style={styles.title}>Settings › Household Management</Text>
+            <View style={styles.titleUnderline} />
+          </View>
+        </View>
+
+        {/* No Family Card */}
+        <View style={styles.card}>
+          <Ionicons name="people-outline" size={60} color="#499f44" style={{ marginBottom: 20 }} />
+          <Text style={styles.noFamilyTitle}>No Family Yet</Text>
+          <Text style={styles.noFamilyText}>
+            Create a family to start managing your household together
+          </Text>
+
+          <TouchableOpacity
+            style={[styles.orangeButton, { marginTop: 30 }]}
+            onPress={handleCreateFamily}
+          >
+            <Text style={styles.orangeButtonText}>Create Family</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  // User has a family - show family members
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -231,52 +385,79 @@ const HouseholdManagementScreen = () => {
       <View style={styles.card}>
         <Text style={styles.subtitle}>Household Members</Text>
 
-        <ScrollView style={{ width: "100%" }}>
-          {!Array.isArray(members) || members.length === 0 ? (
-            <Text style={styles.emptyText}>No family members yet</Text>
-          ) : (
-            members.map((member, index) => (
-              <View key={member.userId || index} style={styles.memberRow}>
-                {removeMode && (
-                  <TouchableOpacity
-                    style={styles.removeIcon}
-                    onPress={() => {
-                      setSelectedMember(member);
-                      setRemoveModalVisible(true);
-                    }}
-                  >
-                    <Ionicons name="remove-circle" size={22} color="#f44336" />
-                  </TouchableOpacity>
-                )}
-                <View style={styles.memberBox}>
+        <ScrollView style={{ width: "100%", maxHeight: 300 }}>
+          {members.map((member, index) => (
+            <View key={member.userId || index} style={styles.memberRow}>
+              {removeMode && member.role !== "Owner" && (
+                <TouchableOpacity
+                  style={styles.removeIcon}
+                  onPress={() => {
+                    setSelectedMember(member);
+                    setRemoveModalVisible(true);
+                  }}
+                >
+                  <Ionicons name="remove-circle" size={22} color="#f44336" />
+                </TouchableOpacity>
+              )}
+              <View style={styles.memberBox}>
+                <View style={styles.memberInfo}>
                   <Text style={styles.memberText}>
                     {getMemberDisplayName(member)}
                   </Text>
-                  {member.email !== getMemberDisplayName(member) && (
-                    <Text style={styles.memberEmailText}>{member.email}</Text>
+                  {member.role === "Owner" && (
+                    <View style={styles.crownIcon}>
+                      <FontAwesomeIcon icon={faCrown} size={14} color="#FFD700" />
+                    </View>
                   )}
                 </View>
+                {member.email !== getMemberDisplayName(member) && (
+                  <Text style={styles.memberEmailText}>{member.email}</Text>
+                )}
+                {member.role === "Owner" && (
+                  <Text style={styles.roleText}>Family Owner</Text>
+                )}
               </View>
-            ))
-          )}
+            </View>
+          ))}
         </ScrollView>
 
-        {/* Add / Remove Buttons */}
-        <TouchableOpacity
-          style={styles.orangeButton}
-          onPress={() => setModalVisible(true)}
-        >
-          <Text style={styles.orangeButtonText}>Add Member</Text>
-        </TouchableOpacity>
+        {/* Owner buttons */}
+        {isOwner && (
+          <>
+            <TouchableOpacity
+              style={styles.orangeButton}
+              onPress={() => setModalVisible(true)}
+            >
+              <Text style={styles.orangeButtonText}>Add Member</Text>
+            </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.orangeButton}
-          onPress={() => setRemoveMode(!removeMode)}
-        >
-          <Text style={styles.orangeButtonText}>
-            {removeMode ? "Done Removing" : "Remove Member"}
-          </Text>
-        </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.orangeButton}
+              onPress={() => setRemoveMode(!removeMode)}
+            >
+              <Text style={styles.orangeButtonText}>
+                {removeMode ? "Done Removing" : "Remove Member"}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.orangeButton, styles.deleteButton]}
+              onPress={() => setDeleteFamilyModalVisible(true)}
+            >
+              <Text style={styles.orangeButtonText}>Delete Family</Text>
+            </TouchableOpacity>
+          </>
+        )}
+
+        {/* Non-owner button to leave family */}
+        {!isOwner && (
+          <TouchableOpacity
+            style={[styles.orangeButton, styles.leaveButton]}
+            onPress={() => setLeaveFamilyModalVisible(true)}
+          >
+            <Text style={styles.orangeButtonText}>Leave Family</Text>
+          </TouchableOpacity>
+        )}
 
         <TouchableOpacity
           style={[styles.orangeButton, styles.refreshButton]}
@@ -359,6 +540,68 @@ const HouseholdManagementScreen = () => {
           </View>
         </View>
       </Modal>
+
+      {/* Leave Family Modal */}
+      <Modal visible={leaveFamilyModalVisible} transparent animationType="fade">
+        <View style={styles.modalContainer}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>Leave Family</Text>
+            <View style={styles.underline}></View>
+
+            <Text style={{ textAlign: "center", marginBottom: 20 }}>
+              Are you sure you want to leave this family?
+            </Text>
+
+            <TouchableOpacity
+              style={[styles.orangeButton, styles.leaveButton]}
+              onPress={handleLeaveFamily}
+            >
+              <Text style={styles.orangeButtonText}>Leave Family</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.orangeButton}
+              onPress={() => setLeaveFamilyModalVisible(false)}
+            >
+              <Text style={styles.orangeButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Delete Family Modal */}
+      <Modal visible={deleteFamilyModalVisible} transparent animationType="fade">
+        <View style={styles.modalContainer}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>Delete Family</Text>
+            <View style={styles.underline}></View>
+
+            <Text style={{ textAlign: "center", marginBottom: 10, color: "#d32f2f", fontWeight: "600" }}>
+              ⚠️ Warning ⚠️
+            </Text>
+
+            <Text style={{ textAlign: "center", marginBottom: 20 }}>
+              This will permanently delete the family and remove all members!
+              {"\n\n"}
+              Are you sure you want to delete this family?
+            </Text>
+
+            <TouchableOpacity
+              style={[styles.orangeButton, styles.deleteButton]}
+              onPress={handleDeleteFamily}
+            >
+              <Text style={styles.orangeButtonText}>Delete Family</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.orangeButton}
+              onPress={() => setDeleteFamilyModalVisible(false)}
+            >
+              <Text style={styles.orangeButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -410,6 +653,18 @@ const styles = StyleSheet.create({
     paddingBottom: 5,
     width: "100%",
   },
+  noFamilyTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#333",
+    marginBottom: 10,
+  },
+  noFamilyText: {
+    fontSize: 14,
+    color: "#666",
+    textAlign: "center",
+    paddingHorizontal: 20,
+  },
   emptyText: {
     textAlign: "center",
     color: "#666",
@@ -428,10 +683,24 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#fff",
   },
+  memberInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  crownIcon: {
+    marginLeft: 6,
+  },
   memberText: { fontSize: 14, color: "#333", fontWeight: "500" },
   memberEmailText: {
     fontSize: 12,
     color: "#666",
+    marginTop: 2,
+  },
+  roleText: {
+    fontSize: 11,
+    color: "#FFD700",
+    fontWeight: "600",
     marginTop: 2,
   },
   orangeButton: {
@@ -445,6 +714,12 @@ const styles = StyleSheet.create({
   },
   refreshButton: {
     backgroundColor: "#499f44",
+  },
+  leaveButton: {
+    backgroundColor: "#f44336",
+  },
+  deleteButton: {
+    backgroundColor: "#d32f2f",
   },
   orangeButtonText: { color: "#fff", fontWeight: "bold" },
   modalContainer: {

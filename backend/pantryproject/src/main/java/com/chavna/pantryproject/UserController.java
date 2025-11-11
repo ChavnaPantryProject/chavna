@@ -1,14 +1,18 @@
 package com.chavna.pantryproject;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.Date;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 import org.apache.coyote.BadRequestException;
 import org.springframework.http.HttpStatus;
@@ -24,7 +28,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.chavna.pantryproject.Authorization.GoogleLogin;
 import com.chavna.pantryproject.Authorization.Login;
+import com.chavna.pantryproject.Authorization.NormalLogin;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwe;
@@ -38,16 +44,22 @@ import jakarta.annotation.Nullable;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 
+import static com.chavna.pantryproject.Database.FAMILY_MEMBER_TABLE;
+import static com.chavna.pantryproject.Database.FAMILY_TABLE;
+import static com.chavna.pantryproject.Database.PERSONAL_INFO_TABLE;
+import static com.chavna.pantryproject.Database.USERS_TABLE;
+
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
+import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.api.client.json.gson.GsonFactory;
+
 import lombok.AllArgsConstructor;
 
 @RestController
 public class UserController {
-    public static final String USERS_TABLE = "users";
-    public static final String PERSONAL_INFO_TABLE = "personal_info";
-    public static final String FAMILY_TABLE = "family";
-    public static final String FAMILY_MEMBER_TABLE = "family_member";
-
     public static final String CHAVNA_URL = Env.getenvNotNull("SERVER_URL");
+    public static final Pattern emailValidation = Pattern.compile("(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*|\"(?:[\\x01-\\x08\\x0b\\x0c\\x0e-\\x1f\\x21\\x23-\\x5b\\x5d-\\x7f]|\\\\[\\x01-\\x09\\x0b\\x0c\\x0e-\\x7f])*\")@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\\[(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?|[a-z0-9-]*[a-z0-9]:(?:[\\x01-\\x08\\x0b\\x0c\\x0e-\\x1f\\x21-\\x5a\\x53-\\x7f]|\\\\[\\x01-\\x09\\x0b\\x0c\\x0e-\\x7f])+)\\])");
 
     public static enum FamilyRole {
         None,
@@ -94,13 +106,155 @@ public class UserController {
             if (encoder.matches(request.password, new String(hash, StandardCharsets.UTF_8))) {
                 String jws = Authorization.createLoginToken(id, loginState);
                         
-                return ResponseEntity.ok(OkResponse.Success("Succesful login.", new LoginResponse(jws)));
+                return OkResponse.Success("Succesful login.", new LoginResponse(jws));
             }
         }
 
-        return ResponseEntity.ok(OkResponse.Error("Invalid login credentials"));
+        return OkResponse.Error("Invalid login credentials");
     }
 
+    static final String GOOGLE_PASSWORD_STRING = "GoogleAccount";
+    static final byte[] GOOGLE_PASSWORD_HASH = createGoogleHash();
+
+    static byte[] createGoogleHash() {
+        byte[] bytes = GOOGLE_PASSWORD_STRING.getBytes();
+
+        byte[] hash = new byte[60];
+
+        for (int i = 0; i < bytes.length; i++) {
+            hash[i] = bytes[i];
+        }
+        
+        return hash;
+    }
+
+    static final String GOOGLE_AUTH_FAIL = """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Redirect</title>
+        </head>
+        <body>
+            <script>
+                window.location.replace("%s" + '?success=false&message="' + "%s" + '"');
+            </script>
+        </body>
+        </html>
+    """;
+    @GetMapping("/google-login")
+    public ResponseEntity<String> googleLogin(@RequestParam Map<String, String> params) {
+        for (String param : params.keySet()) {
+            System.out.println(param + ": " + params.get(param));
+        }
+
+        String authHTML;
+        if (params.size() == 0) {
+            authHTML = """
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>Redirect</title>
+                </head>
+                <body>
+                    <script>
+                        if (window.location.hash.length > 1) {
+                            var newloc = window.location.href.split('#')[0] + "?" + window.location.hash.substring(1);
+                            console.log(newloc);
+                            window.location.replace(newloc);
+                        }
+                        else
+                            document.body.innerHTML = "args";
+                    </script>
+                </body>
+                </html>
+            """;
+        } else {
+            String clientId = Env.getenvNotNull("GOOGLE_CLIENT_ID");
+            System.out.println();
+            System.out.println(GsonFactory.getDefaultInstance());
+            GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(new NetHttpTransport(), GsonFactory.getDefaultInstance())
+                .setAudience(Arrays.asList(clientId))
+                .build();
+
+            System.out.println(verifier);
+
+            String accessToken = params.get("id_token");
+
+            GoogleIdToken googleIdToken;
+            try {
+                googleIdToken = verifier.verify(accessToken);
+            } catch (GeneralSecurityException | IOException ex) {
+                ex.printStackTrace();
+                throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Google login error.");
+            }
+
+            String email = googleIdToken.getPayload().getEmail();
+            System.out.println(email);
+            String loginToken;
+
+            // Check if account exists
+            try {
+                Connection con = Database.getRemoteConnection();
+
+                PreparedStatement emailStatement = con.prepareStatement("""
+                    SELECT id, password_hash FROM users
+                    WHERE email = ?
+                """);
+                emailStatement.setString(1, email);
+                ResultSet result = emailStatement.executeQuery();
+
+                if (!result.next()) {
+                    // Create user if not exists
+                    PreparedStatement createUserStatement = con.prepareStatement("""
+                        INSERT INTO users (email, password_hash)
+                        VALUES (?, ?)
+                        RETURNING id, password_hash
+                    """);
+                    createUserStatement.setString(1, email);
+                    createUserStatement.setBytes(2, GOOGLE_PASSWORD_HASH);
+
+                    result = createUserStatement.executeQuery();
+                    result.next();
+                }
+
+                UUID userId = (UUID) result.getObject(1);
+                byte[] passwordHash = result.getBytes(2);
+
+                if (!Arrays.equals(passwordHash, GOOGLE_PASSWORD_HASH)) {
+                    String html = String.format(GOOGLE_AUTH_FAIL, params.get("state"), "Non Google account with given email already exists.");
+
+                    return ResponseEntity.ok(html);
+                }
+
+                loginToken = Authorization.createGmailLoginToken(userId, accessToken);
+            } catch (SQLException ex) {
+                ex.printStackTrace();
+                throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "SQL Error.");
+            }
+
+            authHTML = String.format("""
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>Redirect</title>
+                </head>
+                <body>
+                    <script>
+                        window.location.replace("%s")
+                    </script>
+                </body>
+                </html>
+            """, params.get("state") + "?success=true&token=" + loginToken);
+        }
+        return ResponseEntity.ok(authHTML);
+    }
+    
     public static class UserExistsRequest {
         @NotNull
         public String email;
@@ -111,7 +265,7 @@ public class UserController {
         public boolean exists;
     }
 
-    @GetMapping("/user-exists")
+    @PostMapping("/user-exists")
     public ResponseEntity<OkResponse> userExists(@Valid @RequestBody UserExistsRequest request, Errors errors) throws SQLException {
         if (errors.hasErrors())
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, errors.getAllErrors().get(0).toString());
@@ -123,9 +277,9 @@ public class UserController {
         ResultSet results = statement.executeQuery();
 
         if (results.next())
-            return ResponseEntity.ok(OkResponse.Success(new UserExistsResponse(results.getInt(1) == 1)));
+            return OkResponse.Success(new UserExistsResponse(results.getInt(1) == 1));
 
-        return ResponseEntity.ok(OkResponse.Success(false));
+        return OkResponse.Success(false);
     }
 
     public static class CreateAccountRequest {
@@ -139,6 +293,9 @@ public class UserController {
     public ResponseEntity<OkResponse> createAccount(@Valid @RequestBody CreateAccountRequest request, Errors errors) {
         if (errors.hasErrors())
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, errors.getAllErrors().get(0).toString());
+
+        if (!emailValidation.matcher(request.email).matches())
+            return OkResponse.Error("Invalid email address.");
 
         try {
             Connection con = Database.getRemoteConnection();
@@ -175,7 +332,7 @@ public class UserController {
 
         Email.sendEmail("noreply@email.chavnapantry.com", request.email, emailContent, "Account Confirmation");
 
-        return ResponseEntity.ok(OkResponse.Success("Confirmation email sent."));
+        return OkResponse.Success("Confirmation email sent.");
     }
 
     @GetMapping("/confirm-account")
@@ -241,14 +398,19 @@ public class UserController {
 
     @GetMapping("/refresh-token")
     public ResponseEntity<OkResponse> refreshToken(@RequestHeader("Authorization") String authorizationHeader) {
-        try {
-            Login login = Authorization.authorize(authorizationHeader);
-
-            String newToken = Authorization.createLoginToken(login.userId, login.loginState);
-            return ResponseEntity.ok(OkResponse.Success("Authorized.", new LoginResponse(newToken)));
-        } catch (JwtException ex) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, ex.toString());
+        Login login = Authorization.authorize(authorizationHeader);
+        String newToken;
+        if (login instanceof NormalLogin) {
+            try {
+                newToken = Authorization.createLoginToken(login.userId, ((NormalLogin) login).loginState);
+            } catch (JwtException ex) {
+                throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, ex.toString());
+            }
+        } else {
+            newToken = Authorization.createGmailLoginToken(login.userId, ((GoogleLogin) login).googleToken);
         }
+
+        return OkResponse.Success("Authorized.", new LoginResponse(newToken));
     }
 
     //                          //
@@ -266,7 +428,7 @@ public class UserController {
         public HashMap<String, Object> personal_info;
     }
 
-    @GetMapping("/get-personal-info")
+    @PostMapping("/get-personal-info")
     public ResponseEntity<OkResponse> getPersonalInfo(@RequestHeader(value = "Authorization", required = false) String authorizationHeader, @RequestBody GetPersonalInfoRequest requestBody) {
         if (requestBody == null || (requestBody.email == null && requestBody.userId == null))
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Request body must contain a user email or a user id.");
@@ -309,20 +471,7 @@ public class UserController {
                     throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User with provided id does not exist.");
             }
 
-            PreparedStatement personalInfoStatement = con.prepareStatement(String.format("""
-                SELECT * FROM %s WHERE user_id = ?
-            """, PERSONAL_INFO_TABLE));
-            personalInfoStatement.setObject(1, requestedUser);
-            ResultSet query2 = personalInfoStatement.executeQuery();
-            
-            HashMap<String, Object> jsonObject;
-            if (query2.next()) {
-                jsonObject = Database.objectFromResultSet(query2);
-            } else {
-                jsonObject = Database.getDefaultTableEntry(con, PERSONAL_INFO_TABLE);
-            }
-            
-            jsonObject.remove("user_id");
+            HashMap<String, Object> jsonObject = Database.getUserPersonalInfo(con, requestedUser);
 
             // Check authorization if user's profie isn't public
             if (!(boolean) jsonObject.get("public")) {
@@ -331,7 +480,7 @@ public class UserController {
                     throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User has private personal info. Authorization required.");
             }
 
-            return ResponseEntity.ok().body(OkResponse.Success(new GetPersonalInfoResponse(jsonObject)));
+            return OkResponse.Success(jsonObject);
         } catch (SQLException ex) {
             ex.printStackTrace();
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, null, ex);
@@ -394,7 +543,7 @@ public class UserController {
 
         }
 
-        return ResponseEntity.ok().body(OkResponse.Success());
+        return OkResponse.Success();
     }
 
     //                  //
@@ -461,7 +610,7 @@ public class UserController {
             throw Database.getSQLErrorHTTPResponse();
         }
 
-        return ResponseEntity.ok().body(OkResponse.Success("Family created"));
+        return OkResponse.Success("Family created");
     }
 
     @PostMapping("leave-family")
@@ -504,7 +653,7 @@ public class UserController {
             throw Database.getSQLErrorHTTPResponse();
         }
 
-        return ResponseEntity.ok().body(OkResponse.Success("Left family"));
+        return OkResponse.Success("Left family");
     }
 
     @PostMapping("delete-family")
@@ -547,7 +696,7 @@ public class UserController {
             throw Database.getSQLErrorHTTPResponse();
         }
 
-        return ResponseEntity.ok().body(OkResponse.Success("Deleted family"));
+        return OkResponse.Success("Deleted family");
     }
 
     public static class InvitationRequest {
@@ -602,9 +751,16 @@ public class UserController {
 
             String token = Authorization.createInviteToken(recipientId, familyId, inviteState);
 
-            // TODO: Get the user's name.
-            String userIdentity = "&lt;user_id: " + user.toString() + "&gt;";
+            String userIdentity = String.format("the family of %s", Database.getUserEmail(con, user));
             String url = CHAVNA_URL + "accept-invite?token=" + token;
+
+            HashMap<String, Object> personalInfo = Database.getUserPersonalInfo(con, user);
+            String name = (String) personalInfo.get("first_name");
+            if (name != null)
+                userIdentity = String.format("%s's", name);
+
+            String message = String.format("You have been invited to %s family.", userIdentity);
+
             String emailContent = String.format(
                 """
                 <!DOCTYPE html>
@@ -615,11 +771,11 @@ public class UserController {
                     <title></title>
                 </head>
                 <body>
-                    You have been invited to join the family of %s!<br><a href="%s">Click here to accept the invitation.</a>
+                    %s<br><a href="%s">Click here to accept the invitation.</a>
                 </body>
                 </html>
                 """
-            , userIdentity, url);
+            , message, url);
 
             Email.sendEmail("noreply@email.chavnapantry.com", requestBody.email, emailContent, "Family Invitation Request.");
         } catch (SQLException ex) {
@@ -627,7 +783,7 @@ public class UserController {
             throw Database.getSQLErrorHTTPResponse();
         }
 
-        return ResponseEntity.ok().body(OkResponse.Success("Invitation sent."));
+        return OkResponse.Success("Invitation sent.");
     }
 
     @GetMapping("/accept-invite")
@@ -771,7 +927,7 @@ public class UserController {
                 members.add(new FamilyMember(id, email, role));
             }
 
-            return ResponseEntity.ok().body(OkResponse.Success(new GetFamilyMemembersResponse(members)));
+            return OkResponse.Success(new GetFamilyMemembersResponse(members));
         } catch (SQLException ex) {
             ex.printStackTrace();
             throw Database.getSQLErrorHTTPResponse();
@@ -875,7 +1031,7 @@ public class UserController {
 
             removeMemberQuery.executeUpdate();
 
-            return ResponseEntity.ok().body(OkResponse.Success("Member removed."));
+            return OkResponse.Success("Member removed.");
         } catch (SQLException ex) {
             ex.printStackTrace();
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, null, ex);

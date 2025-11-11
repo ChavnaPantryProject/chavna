@@ -1,5 +1,5 @@
 // pantry/ModalFoodCategory.tsx
-import React from "react";
+import React , {useState} from "react";
 import { Modal, View, Text, Pressable, StyleSheet } from "react-native";
 import { Feather, Entypo } from "@expo/vector-icons";
 
@@ -10,6 +10,13 @@ type Props = {
   title?: string;
   children?: React.ReactNode;
 };
+
+type FoodItem = {
+  name: string;
+  weight: number;
+  qty: number;
+  expDate: string;
+}
 
 export default function ModalFoodCategory({ visible, onClose, title, children }: Props) {
 
@@ -22,6 +29,92 @@ export default function ModalFoodCategory({ visible, onClose, title, children }:
     { name: 'bacon', weight: 0.3, qty: 2, expDate: '2025-11-05' },
   ]
 
+  //function to reset all arrrows to defualt
+  function resetAllArrows(){
+    setNameArrow(true)
+    setWeightArrow(true)
+    setQtyArrow(true)
+    setExpDateArrow(true)
+  }
+  //function to clear all states for when modal closes
+  function resetState(){
+    resetAllArrows()
+    setActiveFilter('')
+    setDisplayArr([...arrOfFood])
+  }
+  //saying this state will be an array of the FoodItem type, and then we initalize a COPY of the arrOfFood array
+  const [displayArr, setDisplayArr] = useState<FoodItem[] > (() => [...arrOfFood])
+
+  // States for sorting direction arrow 
+  //            ALL ARROWS WITH TRUE ARE THE DEFAULT, TRUE POINTS ARROW DOWN, FALSE POINTS ARROW UP
+  const [nameArrow, setNameArrow] = useState<boolean>(true)
+  const [weightArrow, setWeightArrow] = useState<boolean>(true)
+  const [qtyArrow, setQtyArrow] = useState<boolean>(true)
+  const [expDateArrow, setExpDateArrow] = useState<boolean>(true)
+
+  //color scheme for active an dnon active filters
+  const ACTIVEFILTERCOLOR = 'rgba(73,159,68,1)' //green
+  const NONACTIVEFILTERCOLOR = 'gray'
+
+  //state for the active filter
+  const [activeFilter, setActiveFilter] = useState<string>('')
+
+  //----------------------- Functions for sorting -----------------------
+    //name ascending
+  function sortAscName(){
+    resetAllArrows()
+    setActiveFilter('name')
+    return [...arrOfFood].sort((a , b) => a.name.localeCompare(b.name))
+  }
+    //name descending
+  function sortDescName(){
+    resetAllArrows()
+    setActiveFilter('name')
+    setNameArrow(false) //make arrow point up
+    return[...arrOfFood].sort((a , b) => b.name.localeCompare(a.name))
+  }
+    //weight ascending
+  function sortAscWeight(){
+    resetAllArrows()
+    setActiveFilter('weight')
+    return [...arrOfFood].sort((a , b) => a.weight - b.weight)
+  }
+    //weight descending
+  function sortDescWeight(){
+    resetAllArrows()
+    setActiveFilter('weight')
+    setWeightArrow(false) //make arrow point up
+    return [...arrOfFood].sort((a , b)=> b.weight - a.weight)
+  }
+    //qty ascending
+  function sortAscQty(){
+    resetAllArrows()
+    setActiveFilter('qty')
+    return [...arrOfFood].sort((a , b) => a.qty - b.qty)
+  }
+    //qty descending
+  function sortDescQty(){
+    resetAllArrows()
+    setActiveFilter('qty')
+    setQtyArrow(false) //make arrow point up
+    return [...arrOfFood].sort((a , b) => b.qty - a.qty) 
+  }
+    //exp date ascending
+  function sortAscExpDate(){
+    resetAllArrows()
+    setActiveFilter('expDate')
+    return [...arrOfFood].sort((a , b) => new Date(a.expDate as string).getTime() - new Date(b.expDate as string).getTime())
+  }
+    //exp date descending
+  function sortDescExpDate(){
+    resetAllArrows()
+    setActiveFilter('expDate')
+    setExpDateArrow(false) //make arrow point up
+    return [...arrOfFood].sort((a , b) => new Date(b.expDate as string).getTime() - new Date(a.expDate as string).getTime())
+  }
+  // --------------------------End of sorting functions ----------------------------------------
+
+
   return (
     <Modal
       visible={visible}
@@ -30,7 +123,10 @@ export default function ModalFoodCategory({ visible, onClose, title, children }:
       onRequestClose={onClose} 
     >
       {/* backdrop that also dismisses */}
-      <Pressable style={style.backdrop} onPress={onClose}>
+      <Pressable style={style.backdrop} onPress={() => {
+        resetState()
+        onClose()
+      }}>
 
         {/* stop backdrop press from closing when tapping inside */}
         <Pressable style={style.sheet} onPress={(e) => e.stopPropagation()}>
@@ -41,37 +137,51 @@ export default function ModalFoodCategory({ visible, onClose, title, children }:
           {/* column headers with the filter icon */}
           <View style={style.columnFilters}>
 
-            <View style={style.specificFilterColumn}>
+            <View style={[style.specificFilterColumn, {flex:1}]}>
               <Text style={style.filterText}>Name</Text>
-              <Entypo name="triangle-down" size={20} />
+
+              <Pressable onPress={() => setDisplayArr(nameArrow ? sortDescName() : sortAscName())}>
+                <Entypo name={nameArrow ? "triangle-down" : "triangle-up"} size={15} color={activeFilter == "name" ? ACTIVEFILTERCOLOR : NONACTIVEFILTERCOLOR}/>
+              </Pressable>
+
             </View>
 
-            <View style={style.specificFilterColumn}>
+            <View style={[style.specificFilterColumn, {flex:1.1}]}>
               <Text style={style.filterText}>Weight</Text>
-              <Entypo name="triangle-down" size={20} />
+
+              <Pressable onPress={() => setDisplayArr(weightArrow ? sortDescWeight() : sortAscWeight())}>
+                <Entypo name={weightArrow ? "triangle-down" : "triangle-up"} size={15} color={activeFilter == "weight" ? ACTIVEFILTERCOLOR : NONACTIVEFILTERCOLOR} />
+              </Pressable>
+
             </View>
 
-            <View style={style.specificFilterColumn}>
+            <View style={[style.specificFilterColumn, {flex:1}]}>
               <Text style={style.filterText}>Qty</Text>
-              <Entypo name="triangle-down" size={20} />
+
+              <Pressable onPress={() => setDisplayArr(qtyArrow ? sortDescQty() : sortAscQty())}>
+                <Entypo name={qtyArrow ? "triangle-down" : "triangle-up"} size={15} color={activeFilter == "qty" ? ACTIVEFILTERCOLOR : NONACTIVEFILTERCOLOR} />
+              </Pressable>
+
             </View>
 
-            <View style={style.specificFilterColumn}>
+            <View style={[style.specificFilterColumn, {flex:1.2}]}>
               <Text style={style.filterText}>Exp Date</Text>
-              <Entypo name="triangle-down" size={20} />
+              <Pressable onPress={() => setDisplayArr( expDateArrow ? sortDescExpDate() : sortAscExpDate())}>
+                <Entypo name={ expDateArrow ? "triangle-down" : "triangle-up"} size={15} color={activeFilter == "expDate" ? ACTIVEFILTERCOLOR : NONACTIVEFILTERCOLOR} />
+              </Pressable>
             </View>
 
           </View>
 
           {/* loop through each item they have in this category */}
             <View style={{width: '100%'}}>
-              {arrOfFood.map((foodItem, index) =>{
+              {displayArr.map((foodItem, index) =>{
                 return (
                   <View key={index} style={style.entryOfFood}>
-                    <Text>{foodItem.name}</Text>
-                    <Text>{foodItem.weight}</Text>
-                    <Text>{foodItem.qty}</Text>
-                    <Text>{foodItem.expDate}</Text>
+                    <Text style={[style.specficFoodEntryColumn, {flex:1}]}>{foodItem.name}</Text>
+                    <Text style={[style.specficFoodEntryColumn, {flex:1}]}>{foodItem.weight}</Text>
+                    <Text style={[style.specficFoodEntryColumn, {flex:1}]}>{foodItem.qty}</Text>
+                    <Text style={[style.specficFoodEntryColumn, {flex:2}]}>{foodItem.expDate}</Text>
                   </View>
                 )
               }) }
@@ -125,6 +235,7 @@ const style = StyleSheet.create({
     flexDirection: 'row',
     paddingBottom: 10,
     marginTop:0,
+    marginBottom:5,
     paddingRight: 10,
     paddingLeft: 10,
   },
@@ -135,7 +246,7 @@ const style = StyleSheet.create({
     alignItems: 'center',
   },
     filterText:{
-    fontSize:14,
+    fontSize:17,
     fontWeight:'500'
   },
 
@@ -145,9 +256,15 @@ const style = StyleSheet.create({
     borderWidth: 2,
     borderColor: 'rgba(73,159,68,1)',
     borderRadius: 5,
-    marginTop: 10,
+    backgroundColor: 'white',
+    marginTop: 5,
     padding: 3,
     flexDirection: 'row',
     justifyContent: 'space-between'
     },
+
+    specficFoodEntryColumn:{
+      textAlign: 'center',
+      fontSize: 17,
+    }
 });
