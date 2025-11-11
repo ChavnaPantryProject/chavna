@@ -56,7 +56,6 @@ import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
 
 import lombok.AllArgsConstructor;
-import lombok.ToString;
 
 @RestController
 public class UserController {
