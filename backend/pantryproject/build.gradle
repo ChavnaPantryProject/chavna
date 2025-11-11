@@ -1,11 +1,11 @@
 plugins {
-	id 'java'
+	id 'java' 
 	id 'org.springframework.boot' version '3.5.6'
 	id 'io.spring.dependency-management' version '1.1.7'
 }
 
 group = 'com.chavna'
-version = '0.0.1-SNAPSHOT'
+version = '0.0.9'
 description = 'REST API for pantry project backend'
 
 java {
@@ -33,15 +33,32 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 
 	implementation 'org.postgresql:postgresql:42.7.3'
-	implementation 'io.jsonwebtoken:jjwt-api:0.12.3' // Use the latest stable version
-    implementation 'io.jsonwebtoken:jjwt-impl:0.12.3' // Use the latest stable version, matching jjwt-api
+	implementation 'io.jsonwebtoken:jjwt-api:0.12.3'
+    implementation 'io.jsonwebtoken:jjwt-impl:0.12.3'
     runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.3'
 	compileOnly 'org.projectlombok:lombok'
 	annotationProcessor 'org.projectlombok:lombok'
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+    implementation platform('com.google.auth:google-auth-library-bom:1.30.1')
+	implementation 'com.google.api-client:google-api-client:1.32.1'
+    implementation 'com.google.auth:google-auth-library-oauth2-http'
+	implementation("com.google.http-client:google-http-client:2.0.2")
 }
 
 tasks.named('test') {
 	useJUnitPlatform()
+}
+
+task jarName {
+	doLast {
+		println rootProject.name + '-' + version + '.jar'
+	}
+}
+
+task versionLabel {
+	doLast {
+		println version
+	}
 }
