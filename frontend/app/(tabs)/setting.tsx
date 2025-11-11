@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -8,12 +8,14 @@ import {
   ScrollView,
   Modal,
   Alert,
+  ActivityIndicator,
+  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Feather from "@expo/vector-icons/Feather";
 import { useRouter } from "expo-router";
 import * as ImagePicker from 'expo-image-picker';
-import * as SecureStore from 'expo-secure-store';
+import { API_URL, deleteValue, retrieveValue } from "../util";
 
 const SettingScreen = () => {
   const router = useRouter();
@@ -25,6 +27,84 @@ const SettingScreen = () => {
   ]);
   const [hasUnread, setHasUnread] = useState(true);
   const [avatar, setAvatar] = useState("https://api.dicebear.com/7.x/adventurer/png?seed=User");
+  const [jwtToken, setJwtToken] = useState<string | null>(null);
+  const [userName, setUserName] = useState("User");
+  const [loadingUserInfo, setLoadingUserInfo] = useState(true);
+
+  // Load user info on mount
+  useEffect(() => {
+    loadTokenAndUserInfo();
+  }, []);
+
+  const loadTokenAndUserInfo = async () => {
+    try {
+      // Load JWT token
+      let token = await retrieveValue('jwt');
+      if (!token) {
+        try {
+          token = localStorage.getItem('jwt');
+        } catch {}
+      }
+      setJwtToken(token);
+
+      if (token) {
+        // Fetch user's personal info
+        await fetchUserInfo(token);
+      }
+    } catch (error) {
+      console.error("Error loading token:", error);
+    } finally {
+      setLoadingUserInfo(false);
+    }
+  };
+
+  const fetchUserInfo = async (token: string) => {
+    try {
+      console.log("Fetching user info with token:", token?.substring(0, 20) + "...");
+      
+      // Decode JWT to get userId
+      const jwtPayload = JSON.parse(atob(token.split('.')[1]));
+      const userId = jwtPayload.user_id;
+      console.log("Extracted userId from JWT:", userId);
+      
+      // Use POST method (after backend changes from GET to POST)
+      const response = await fetch(`${API_URL}/get-personal-info`, {
+        method: "POST",
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId: userId }),
+      });
+
+      console.log("Response status:", response.status);
+      const data = await response.json();
+      console.log("Full API response:", JSON.stringify(data, null, 2));
+      
+      if (response.ok && data.success === "success") {
+        // The personal info is nested inside payload.personal_info
+        const personalInfo = data.payload?.personal_info || data.payload;
+        console.log("Personal info payload:", personalInfo);
+        console.log("First name:", personalInfo?.first_name);
+        console.log("Nickname:", personalInfo?.nickname);
+        
+        // Set user name (prioritize nickname > first name > "User")
+        if (personalInfo?.nickname) {
+          console.log("Setting name from nickname:", personalInfo.nickname);
+          setUserName(personalInfo.nickname);
+        } else if (personalInfo?.first_name) {
+          console.log("Setting name from first_name:", personalInfo.first_name);
+          setUserName(personalInfo.first_name);
+        } else {
+          console.log("No name found, using default 'User'");
+        }
+      } else {
+        console.log("API returned error:", data.message || data);
+      }
+    } catch (error) {
+      console.error("Error fetching user info:", error);
+    }
+  };
 
   const handleNotificationPress = () => {
     setShowNotifications(!showNotifications);
@@ -104,27 +184,34 @@ const SettingScreen = () => {
   };
 
   const handleSignOut = () => {
-    Alert.alert(
-      "Sign Out",
-      "Are you sure you want to sign out?",
-      [
-        {
-          text: "Cancel",
-          style: "cancel"
-        },
-        { 
-          text: "Sign Out", 
-          onPress: performSignOut,
-          style: "destructive"
-        }
-      ]
-    );
+    if (Platform.OS == "web") {
+      const result = window.confirm("Are you sure you want to sign out?");
+
+      if (result)
+        performSignOut();
+    } else {
+      Alert.alert(
+        "Sign Out",
+        "Are you sure you want to sign out?",
+        [
+          {
+            text: "Cancel",
+            style: "cancel"
+          },
+          { 
+            text: "Sign Out", 
+            onPress: performSignOut,
+            style: "destructive"
+          }
+        ]
+      );
+    }
   };
 
   const performSignOut = async () => {
     try {
       // Clear JWT token from SecureStore
-      await SecureStore.deleteItemAsync('jwt');
+      await deleteValue('jwt');
       
       // Also try to clear from localStorage as fallback
       try {
@@ -170,7 +257,11 @@ const SettingScreen = () => {
             <Ionicons name="camera-outline" size={20} color="white" />
           </View>
         </TouchableOpacity>
-        <Text style={styles.welcome}>Hello User!</Text>
+        {loadingUserInfo ? (
+          <ActivityIndicator size="small" color="#499F44" style={{ marginVertical: 10 }} />
+        ) : (
+          <Text style={styles.welcome}>Hello {userName}!</Text>
+        )}
         <TouchableOpacity onPress={handleChangeAvatar}>
           <Text style={styles.changeAvatarText}>Change Avatar</Text>
         </TouchableOpacity>
@@ -265,7 +356,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 20,
-    marginTop: 50,
+    marginTop: 0,
   },
   headerTitle: {
     fontSize: 18,
