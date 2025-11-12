@@ -74,8 +74,13 @@ const InventoryScreen = () => {
       </View>
 
       {/* This is a modal which will be a pop up for the food category, it is invisble until a user clicks on a category */}
-      <ModalFoodCategory visible={modalCategoryVisible} onClose={closeCategory} title={foodCategoryTitle ?? undefined}/>
+      <ModalFoodCategory 
+        visible={modalCategoryVisible} 
+        onClose={closeCategory} 
+        title={foodCategoryTitle ?? undefined}
+      />
     </ScrollView>
+    
     {/* plus icon to add another category */}
       <Pressable onPress={() => {openCreateCategory()}}>
 

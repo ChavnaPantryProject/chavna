@@ -1,8 +1,8 @@
 // pantry/ModalFoodCategory.tsx
-import React , {useState} from "react";
+import React , {useState, useEffect} from "react";
 import { Modal, View, Text, Pressable, StyleSheet } from "react-native";
 import { Feather, Entypo } from "@expo/vector-icons";
-
+import PopupForm from "../PopupForm";
 
 type Props = {
   visible: boolean;
@@ -21,13 +21,45 @@ type FoodItem = {
 export default function ModalFoodCategory({ visible, onClose, title, children }: Props) {
 
   //hard coding food in this category for now
-  const arrOfFood = [
-    { name: 'chicken', weight: 2, qty: 3, expDate: '2025-10-31' },
-    { name: 'beef', weight: 1, qty: 2, expDate: '2025-11-02' },
-    { name: 'eggs', weight: 0.5, qty: 12, expDate: '2025-10-25' },
-    { name: 'milk', weight: 1, qty: 1, expDate: '2025-10-28' },
-    { name: 'bacon', weight: 0.3, qty: 2, expDate: '2025-11-05' },
-  ]
+  // state (lazy init so it runs once, unless updated)
+  const [foodArray, setFoodArray] = useState<FoodItem[]>(() => [
+    { name: "chicken", weight: 2,   qty: 3,  expDate: "2025-10-31" },
+    { name: "beef",    weight: 1,   qty: 2,  expDate: "2025-11-02" },
+    { name: "eggs",    weight: 0.5, qty: 12, expDate: "2025-10-25" },
+    { name: "milks",    weight: 1,   qty: 1,  expDate: "2025-10-28" },
+    { name: "bacons",   weight: 0.3, qty: 2,  expDate: "2025-11-05" },
+  ]);
+  //functions for adding/updating food into this array
+    //reset updated food list
+  useEffect(() => {
+    setDisplayArr([...foodArray]);
+  }, [foodArray]);
+    //add food to array
+  const addFood = (food : FoodItem) =>{
+    setFoodArray(prev => [...prev, food])
+  }
+
+    //remove food from the array
+  const removeFood = (name: string) => {
+    setFoodArray(prev => prev.filter(f => f.name !== name))
+  }
+
+    
+  type NewFoodEntry = {
+    category: string;
+    name: string;
+    weight: number;
+    qty: number;
+    expDate: string; 
+  };
+
+  const [foodEntry, setFoodEntry] = useState<NewFoodEntry>({
+    category: "",
+    name: "",
+    weight: 0,
+    qty: 0,
+    expDate: "",
+  });
 
   //function to reset all arrrows to defualt
   function resetAllArrows(){
@@ -40,10 +72,12 @@ export default function ModalFoodCategory({ visible, onClose, title, children }:
   function resetState(){
     resetAllArrows()
     setActiveFilter('')
-    setDisplayArr([...arrOfFood])
+    setDisplayArr([...foodArray])
+    setAddFoodItemModalVisible(false)
   }
-  //saying this state will be an array of the FoodItem type, and then we initalize a COPY of the arrOfFood array
-  const [displayArr, setDisplayArr] = useState<FoodItem[] > (() => [...arrOfFood])
+
+  //saying this state will be an array of the FoodItem type, and then we initalize a COPY of the foodArray array
+  const [displayArr, setDisplayArr] = useState<FoodItem[] > (() => [...foodArray])
 
   // States for sorting direction arrow 
   //            ALL ARROWS WITH TRUE ARE THE DEFAULT, TRUE POINTS ARROW DOWN, FALSE POINTS ARROW UP
@@ -59,58 +93,61 @@ export default function ModalFoodCategory({ visible, onClose, title, children }:
   //state for the active filter
   const [activeFilter, setActiveFilter] = useState<string>('')
 
+  //state for opening add food item modal
+  const [addFoodItemModalVisble, setAddFoodItemModalVisible] = useState<boolean>(false)
+
   //----------------------- Functions for sorting -----------------------
     //name ascending
   function sortAscName(){
     resetAllArrows()
     setActiveFilter('name')
-    return [...arrOfFood].sort((a , b) => a.name.localeCompare(b.name))
+    return [...foodArray].sort((a , b) => a.name.localeCompare(b.name))
   }
     //name descending
   function sortDescName(){
     resetAllArrows()
     setActiveFilter('name')
     setNameArrow(false) //make arrow point up
-    return[...arrOfFood].sort((a , b) => b.name.localeCompare(a.name))
+    return[...foodArray].sort((a , b) => b.name.localeCompare(a.name))
   }
     //weight ascending
   function sortAscWeight(){
     resetAllArrows()
     setActiveFilter('weight')
-    return [...arrOfFood].sort((a , b) => a.weight - b.weight)
+    return [...foodArray].sort((a , b) => a.weight - b.weight)
   }
     //weight descending
   function sortDescWeight(){
     resetAllArrows()
     setActiveFilter('weight')
     setWeightArrow(false) //make arrow point up
-    return [...arrOfFood].sort((a , b)=> b.weight - a.weight)
+    return [...foodArray].sort((a , b)=> b.weight - a.weight)
   }
     //qty ascending
   function sortAscQty(){
     resetAllArrows()
     setActiveFilter('qty')
-    return [...arrOfFood].sort((a , b) => a.qty - b.qty)
+    return [...foodArray].sort((a , b) => a.qty - b.qty)
   }
     //qty descending
   function sortDescQty(){
     resetAllArrows()
     setActiveFilter('qty')
     setQtyArrow(false) //make arrow point up
-    return [...arrOfFood].sort((a , b) => b.qty - a.qty) 
+    return [...foodArray].sort((a , b) => b.qty - a.qty) 
   }
     //exp date ascending
   function sortAscExpDate(){
     resetAllArrows()
     setActiveFilter('expDate')
-    return [...arrOfFood].sort((a , b) => new Date(a.expDate as string).getTime() - new Date(b.expDate as string).getTime())
+    return [...foodArray].sort((a , b) => new Date(a.expDate as string).getTime() - new Date(b.expDate as string).getTime())
   }
     //exp date descending
   function sortDescExpDate(){
     resetAllArrows()
     setActiveFilter('expDate')
     setExpDateArrow(false) //make arrow point up
-    return [...arrOfFood].sort((a , b) => new Date(b.expDate as string).getTime() - new Date(a.expDate as string).getTime())
+    return [...foodArray].sort((a , b) => new Date(b.expDate as string).getTime() - new Date(a.expDate as string).getTime())
   }
   // --------------------------End of sorting functions ----------------------------------------
 
@@ -183,6 +220,45 @@ export default function ModalFoodCategory({ visible, onClose, title, children }:
               }) }
             </View>
 
+            {/* add button to open the input popup for adding food items */}
+            <Pressable onPress={() => setAddFoodItemModalVisible(true)}>
+              <Text style={style.addButton}>+</Text>
+            </Pressable>
+
+            <PopupForm
+              visible={addFoodItemModalVisble}
+              onClose={() => setAddFoodItemModalVisible(false)}
+              onSave={(data) => {
+                const newItem: FoodItem = {
+                  name: data.textValue.trim(),
+                  weight: data.number1.trim() === "" ? 0 : Number(data.number1),
+                  qty:    data.number2.trim() === "" ? 0 : Number(data.number2),
+                  expDate: typeof data.date === "string"
+                    ? data.date
+                    : new Date(data.date).toISOString().slice(0, 10),
+                };
+
+                // ignore empty names (optional)
+                if (!newItem.name) return;
+
+                addFood(newItem)
+                setFoodEntry({              //reset the form state
+                  category: "",
+                  name: "",
+                  weight: 0,
+                  qty: 0,
+                  expDate: "",
+                });
+                setAddFoodItemModalVisible(false); // close the add modal
+              }}
+              dropdownOptions={[
+                  { label: "Protein", value: "Protein" },
+                  { label: "Vegetables", value: "Vegetables" },
+                  { label: "Seafood", value: "Seafood" },
+                  { label: "Carbs", value: "Carbs" },
+                  { label: "Fruits", value: "Fruits" }
+                ]}
+              />
         </Pressable>
       </Pressable>
     </Modal>
@@ -262,5 +338,9 @@ const style = StyleSheet.create({
     specficFoodEntryColumn:{
       textAlign: 'center',
       fontSize: 17,
-    }
+    },
+    addButton:{
+    fontSize: 40,
+    color: "rgba(138, 141, 138)"
+  },
 });
