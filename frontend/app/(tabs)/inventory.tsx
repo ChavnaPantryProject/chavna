@@ -5,15 +5,8 @@ import ModalFoodCategory from "../pantry/modalFoodCategory";
 import ModalCreateFoodCategory from "../pantry/modalAddCategory"
 import { API_URL, retrieveValue } from "../util"
 
-type FoodItemTemplate = {
-  templateId: string;
-  template: {
-    name: string;
-    amount: number;
-    unit: string;
-    shelfLifeDays: number;
-    category: string;
-  };
+type GetCategoriesResponse = {
+  categories: Array<string>
 }
 
 const InventoryScreen = () => {
@@ -51,24 +44,19 @@ const InventoryScreen = () => {
         return
       }
 
-      const response = await fetch(`${API_URL}/get-food-item-templates`, {
-        method: 'POST',
+      const response = await fetch(`${API_URL}/get-categories`, {
+        method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({}),
       })
 
       const data = await response.json()
       
       if (response.ok && data.success === 'success') {
-        const templates: FoodItemTemplate[] = data.payload || []
-        // Extract unique categories from templates
-        const uniqueCategories = Array.from(
-          new Set(templates.map(t => t.template.category).filter(Boolean))
-        ) as string[]
-        setFoodCategories(uniqueCategories)
+        const response: GetCategoriesResponse = data.payload;
+        setFoodCategories(response.categories);
       } else {
         console.error("Failed to fetch categories:", data.message || data)
       }

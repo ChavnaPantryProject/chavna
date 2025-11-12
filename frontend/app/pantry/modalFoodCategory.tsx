@@ -4,7 +4,6 @@ import { Modal, View, Text, Pressable, StyleSheet, ActivityIndicator } from "rea
 import { Feather, Entypo } from "@expo/vector-icons";
 import { API_URL, retrieveValue } from "../util";
 
-
 type Props = {
   visible: boolean;
   onClose: () => void;
@@ -104,8 +103,8 @@ export default function ModalFoodCategory({ visible, onClose, title, children }:
         // Map backend items to frontend format
         const mappedItems: FoodItem[] = backendItems.map(item => ({
           name: item.name,
-          weight: item.amount,
-          qty: 1, // Backend doesn't have qty, defaulting to 1
+          weight: 0,
+          qty: item.amount,
           expDate: item.expiration ? new Date(item.expiration).toISOString().split('T')[0] : '',
         }))
         setArrOfFood(mappedItems)
@@ -260,6 +259,11 @@ export default function ModalFoodCategory({ visible, onClose, title, children }:
               )}
             </View>
 
+          {/* plus icon to add another category */}
+          <Pressable onPress={() => {}}>
+              
+            <Text style={style.addButton}>+</Text>
+          </Pressable>
         </Pressable>
       </Pressable>
     </Modal>
@@ -339,5 +343,10 @@ const style = StyleSheet.create({
     specficFoodEntryColumn:{
       textAlign: 'center',
       fontSize: 17,
+    },
+
+    addButton:{
+      fontSize: 40,
+      color: "rgba(138, 141, 138)"
     }
 });

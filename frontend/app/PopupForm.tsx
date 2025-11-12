@@ -66,11 +66,11 @@ const PopupMenu: React.FC<PopupMenuProps> = ({
 
   const handleSave = () => {
     onSave({
-      selectedOption,
-      textValue,
-      number1,
-      number2,
-      date,
+      dropdown: selectedOption,
+      text: textValue,
+      number1: number1,
+      number2: number2,
+      date: date,
     });
     onClose();
   };

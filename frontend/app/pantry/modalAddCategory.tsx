@@ -32,18 +32,14 @@ export default function ModalCreateFoodCategory({ visible, onClose, title, child
 
       // Create a food item template with the category name
       // Using default values for required fields
-      const response = await fetch(`${API_URL}/create-food-item-template`, {
+      const response = await fetch(`${API_URL}/create-category`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          name: "New Item", // Default name, user can update later
-          amount: 1,
-          unit: "unit",
-          shelfLifeDays: 7,
-          category: newCategoryName.trim()
+          name: newCategoryName
         }),
       })
 
