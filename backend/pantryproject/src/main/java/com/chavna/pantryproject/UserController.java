@@ -40,6 +40,7 @@ import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.JwtParser;
 import io.jsonwebtoken.JwtVisitor;
 import io.jsonwebtoken.Jwts;
+import jakarta.annotation.Nullable;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 
@@ -232,7 +233,7 @@ public class UserController {
                 loginToken = Authorization.createGmailLoginToken(userId, accessToken);
             } catch (SQLException ex) {
                 ex.printStackTrace();
-                throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "SQL Error.");
+                throw Database.getSQLErrorHTTPResponse();
             }
 
             authHTML = String.format("""
@@ -307,7 +308,7 @@ public class UserController {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "User with email already exists.");
         } catch (SQLException ex) {
             ex.printStackTrace();
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, null);
+            throw Database.getSQLErrorHTTPResponse();
         }
         
         String token = Authorization.createSingupToken(request.email, request.password);
@@ -482,7 +483,7 @@ public class UserController {
             return OkResponse.Success(jsonObject);
         } catch (SQLException ex) {
             ex.printStackTrace();
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, null, ex);
+            throw Database.getSQLErrorHTTPResponse();
         }
     }
 
@@ -606,7 +607,7 @@ public class UserController {
             updateQuery.executeUpdate();
         } catch (SQLException ex) {
             ex.printStackTrace();
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "SQL Error");
+            throw Database.getSQLErrorHTTPResponse();
         }
 
         return OkResponse.Success("Family created");
@@ -649,7 +650,7 @@ public class UserController {
             removeMemberQuery.executeUpdate();
         } catch (SQLException ex) {
             ex.printStackTrace();
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "SQL Error");
+            throw Database.getSQLErrorHTTPResponse();
         }
 
         return OkResponse.Success("Left family");
@@ -692,7 +693,7 @@ public class UserController {
             removeFamily.executeUpdate();
         } catch (SQLException ex) {
             ex.printStackTrace();
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "SQL Error");
+            throw Database.getSQLErrorHTTPResponse();
         }
 
         return OkResponse.Success("Deleted family");
@@ -779,7 +780,7 @@ public class UserController {
             Email.sendEmail("noreply@email.chavnapantry.com", requestBody.email, emailContent, "Family Invitation Request.");
         } catch (SQLException ex) {
             ex.printStackTrace();
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "SQL Error.");
+            throw Database.getSQLErrorHTTPResponse();
         }
 
         return OkResponse.Success("Invitation sent.");
@@ -875,7 +876,7 @@ public class UserController {
             updateQuery.executeUpdate();
         } catch (SQLException ex) {
             ex.printStackTrace();
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "SQL Error");
+            throw Database.getSQLErrorHTTPResponse();
         }
         
         return ResponseEntity.ok("Invite accepted.");
@@ -929,7 +930,7 @@ public class UserController {
             return OkResponse.Success(new GetFamilyMemembersResponse(members));
         } catch (SQLException ex) {
             ex.printStackTrace();
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "SQL Error");
+            throw Database.getSQLErrorHTTPResponse();
         }
     }
 
@@ -1033,7 +1034,7 @@ public class UserController {
             return OkResponse.Success("Member removed.");
         } catch (SQLException ex) {
             ex.printStackTrace();
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, null, ex);
+            throw Database.getSQLErrorHTTPResponse();
         }
     }
 
@@ -1042,5 +1043,106 @@ public class UserController {
         Email.verifyEmailAddress(email);
 
         return ResponseEntity.ok("Verification email sent.");
+    }
+
+    //                 //
+    //  SHOPPING LIST  //
+    //                 //
+
+    public static class ShoppingListItem {
+        public String name;
+        @Nullable
+        public Boolean isChecked;
+    }
+
+    public static class ShoppingList {
+        public ArrayList<ShoppingListItem> items;
+
+        public ShoppingList() {
+            this.items = new ArrayList<>();
+        }
+    }
+
+    @PostMapping("/update-shopping-list")
+    public ResponseEntity<OkResponse> updateShoppingList(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody ShoppingList requestBody) {
+        Login login = Authorization.authorize(authorizationHeader);
+
+        try {
+            Connection con = Database.getRemoteConnection();
+
+            PreparedStatement delete = con.prepareStatement("""
+                DELETE FROM shopping_list
+                WHERE user_id = ?
+            """);
+            delete.setObject(1, login.userId);
+            delete.executeUpdate();
+
+            if (requestBody.items.size() == 0)
+                return OkResponse.Success();
+
+            String query = "INSERT INTO shopping_list (item_name, buy_item, user_id, order_index) VALUES";
+            for (@SuppressWarnings("unused") var __ : requestBody.items) {
+                query += " (?, ?, ?, ?),";
+            }
+            query = query.substring(0, query.length() - 1);
+            PreparedStatement insert = con.prepareStatement(query);
+
+            int i = 1;
+            int order = 0;
+            for (ShoppingListItem item : requestBody.items) {
+                insert.setString(i, item.name);
+                i++;
+
+                boolean isChecked = item.isChecked != null && item.isChecked.booleanValue();
+                insert.setBoolean(i, isChecked);
+                i++;
+
+                insert.setObject(i, login.userId);
+                i++;
+
+                insert.setInt(i, order);
+                i++;
+
+                order++;
+            }
+
+            insert.executeUpdate();
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            throw Database.getSQLErrorHTTPResponse();
+        }
+
+        return OkResponse.Success();
+    }
+
+    @PostMapping("/get-shopping-list")
+    public ResponseEntity<OkResponse> getShoppingList(@RequestHeader("Authorization") String authorizationHeader) {
+        Login login = Authorization.authorize(authorizationHeader);
+
+        try {
+            Connection con = Database.getRemoteConnection();
+
+            PreparedStatement statement = con.prepareStatement("""
+                SELECT item_name, buy_item FROM shopping_list
+                WHERE user_id = ?
+                ORDER BY order_index;
+            """);
+            statement.setObject(1, login.userId);
+
+            ResultSet result = statement.executeQuery();
+
+            ShoppingList list = new ShoppingList();
+            while (result.next()) {
+                ShoppingListItem item = new ShoppingListItem();
+                item.name = result.getString(1);
+                item.isChecked = Boolean.valueOf(result.getBoolean(2));
+                list.items.add(item);
+            }
+
+            return OkResponse.Success(list);
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            throw Database.getSQLErrorHTTPResponse();
+        }
     }
 }
