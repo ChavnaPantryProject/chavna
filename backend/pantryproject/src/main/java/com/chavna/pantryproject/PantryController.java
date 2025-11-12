@@ -1,5 +1,6 @@
 package com.chavna.pantryproject;
 
+import static com.chavna.pantryproject.Database.CATEGORIES_TABLE;
 import static com.chavna.pantryproject.Database.FOOD_ITEMS_TABLE;
 import static com.chavna.pantryproject.Database.FOOD_ITEM_TEMPLATES_TABLE;
 
@@ -11,6 +12,7 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.UUID;
 
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -58,6 +60,10 @@ public class PantryController {
 
             return Response.Success(template);
         } catch (SQLException ex) {
+            if (ex.getSQLState().equals("23503"))
+                return Response.Fail("Category does not exist.");
+
+            System.out.println("SQL Error Code: " + ex.getSQLState());
             ex.printStackTrace();
             return Database.getSQLErrorHTTPResponse();
         }
@@ -162,8 +168,8 @@ public class PantryController {
             
             values = values.substring(0, values.length() - 1);
             String query = String.format("""
-                INSERT INTO %s
-                SELECT id, inserted.amount, expiration + INTERVAL '1 day' * shelf_life_days, unit_price, template_id FROM (
+                INSERT INTO %s (amount, expiration, unit_price, template_id)
+                SELECT inserted.amount, expiration + INTERVAL '1 day' * shelf_life_days, unit_price, template_id FROM (
                     VALUES
                         %s
                 ) AS inserted (template_id, amount , expiration, unit_price)
@@ -307,5 +313,98 @@ public class PantryController {
             return Database.getSQLErrorHTTPResponse();
         }
         return Response.Success();
+    }
+
+    public static class CategoryRequest {
+        @NotNull
+        public String name;
+    }
+
+    @PostMapping("/create-category")
+    public Response createCategory(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody CategoryRequest requestBody) {
+        Login login = Authorization.authorize(authorizationHeader);
+
+        try {
+            Connection con = Database.getRemoteConnection();
+
+            PreparedStatement statement = con.prepareStatement(String.format("""
+                INSERT INTO %s (name, owner)
+                VALUES (?, ?);
+            """, CATEGORIES_TABLE));
+            statement.setString(1, requestBody.name);
+            statement.setObject(2, login.userId);
+
+            statement.executeUpdate();
+        } catch (SQLException ex) {
+
+            if (ex.getSQLState().equals("23505")) {
+                return Response.Fail("Category already exists.");
+            }
+
+            ex.printStackTrace();
+            return Database.getSQLErrorHTTPResponse();
+        }
+
+        return Response.Success("Category created.");
+    }
+
+    @PostMapping("/remove-category")
+    public Response removeCategory(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody CategoryRequest requestBody) {
+        Login login = Authorization.authorize(authorizationHeader);
+
+        try {
+            Connection con = Database.getRemoteConnection();
+
+            PreparedStatement statement = con.prepareStatement(String.format("""
+                DELETE FROM %s
+                WHERE name = ? AND owner = ?;
+            """, CATEGORIES_TABLE));
+            statement.setString(1, requestBody.name);
+            statement.setObject(2, login.userId);
+
+            int removed = statement.executeUpdate();
+
+            if (removed == 0)
+                return Response.Fail("Category not found.");
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            return Database.getSQLErrorHTTPResponse();
+        }
+
+        return Response.Success("Category removed.");
+    }
+
+    public static class GetCategoriesResponse {
+        public ArrayList<String> categories;
+
+        public GetCategoriesResponse() {
+            categories = new ArrayList<>();
+        }
+    }
+
+    @GetMapping("/get-categories")
+    public Response getCategories(@RequestHeader("Authorization") String authorizationHeader) {
+        Login login = Authorization.authorize(authorizationHeader);
+
+        try {
+            Connection con = Database.getRemoteConnection();
+
+            PreparedStatement statement = con.prepareStatement(String.format("""
+                SELECT name FROM %s
+                WHERE owner = ?
+            """, CATEGORIES_TABLE));
+            statement.setObject(1, login.userId);
+            ResultSet result = statement.executeQuery();
+
+            GetCategoriesResponse response = new GetCategoriesResponse();
+            while (result.next()) {
+                response.categories.add(result.getString(1));
+            }
+
+            return Response.Success(response);
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            return Database.getSQLErrorHTTPResponse();
+        }
     }
 }

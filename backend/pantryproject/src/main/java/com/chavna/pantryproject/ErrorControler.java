@@ -13,8 +13,8 @@ public class ErrorControler {
         return response.getResponse();
     }
 
-    @ExceptionHandler(RuntimeException.class)
-    public Response runtimeException(HttpServletRequest req, RuntimeException ex) {
+    @ExceptionHandler(Exception.class)
+    public Response runtimeException(HttpServletRequest req, Exception ex) {
         return Response.Error(HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage());
     }
 }
