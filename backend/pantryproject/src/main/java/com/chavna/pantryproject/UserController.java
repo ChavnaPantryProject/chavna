@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.sql.Connection;
+import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -1045,68 +1046,178 @@ public class UserController {
         return ResponseEntity.ok("Verification email sent.");
     }
 
-    //                 //
-    //  SHOPPING LIST  //
-    //                 //
-
-    public static class ShoppingListItem {
+    public static class FoodItemTemplate {
+        @NotNull
         public String name;
-        @Nullable
-        public Boolean isChecked;
+        @NotNull
+        public Double amount;
+        @NotNull
+        public String unit;
+        @NotNull
+        public Integer shelfLifeDays;
+        @NotNull
+        public String category;
     }
 
-    public static class ShoppingList {
-        public ArrayList<ShoppingListItem> items;
-
-        public ShoppingList() {
-            this.items = new ArrayList<>();
-        }
-    }
-
-    @PostMapping("/update-shopping-list")
-    public ResponseEntity<OkResponse> updateShoppingList(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody ShoppingList requestBody) {
+    @PostMapping("/create-food-item-template")
+    public ResponseEntity<OkResponse> createFoodItemTemplate(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody FoodItemTemplate requestBody) {
         Login login = Authorization.authorize(authorizationHeader);
 
         try {
             Connection con = Database.getRemoteConnection();
 
-            PreparedStatement delete = con.prepareStatement("""
-                DELETE FROM shopping_list
-                WHERE user_id = ?
+            PreparedStatement statement = con.prepareStatement("""
+                INSERT INTO food_item_templates (name, owner, amount, unit, shelf_life_days, category)
+                VALUES (?, ?, ?, ?, ?, ?)
+                RETURNING id;
             """);
-            delete.setObject(1, login.userId);
-            delete.executeUpdate();
 
-            if (requestBody.items.size() == 0)
-                return OkResponse.Success();
+            statement.setString(1, requestBody.name);
+            statement.setObject(2, login.userId);
+            statement.setDouble(3, requestBody.amount);
+            statement.setString(4, requestBody.unit);
+            statement.setInt(5, requestBody.shelfLifeDays);
+            statement.setString(6, requestBody.category);
 
-            String query = "INSERT INTO shopping_list (item_name, buy_item, user_id, order_index) VALUES";
-            for (@SuppressWarnings("unused") var __ : requestBody.items) {
-                query += " (?, ?, ?, ?),";
+            ResultSet result = statement.executeQuery();
+            result.next();
+
+            UUID templateId = (UUID) result.getObject(1);
+
+            RegisteredFoodItemTemplate template = new RegisteredFoodItemTemplate();
+            template.templateId = templateId;
+            template.template = requestBody;
+
+            return OkResponse.Success(template);
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            throw Database.getSQLErrorHTTPResponse();
+        }
+    }
+
+    public static class RegisteredFoodItemTemplate {
+        public UUID templateId;
+        public FoodItemTemplate template;
+    }
+
+    public static class GetFoodItemTemplatesRequest {
+        @Nullable
+        public String search;
+    }
+
+    @AllArgsConstructor
+    public static class GetFoodItemTemplatesResponse {
+        public ArrayList<RegisteredFoodItemTemplate> templates;
+    }
+
+    @PostMapping("/get-food-item-templates")
+    public ResponseEntity<OkResponse> getFoodItemTemplates(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody(required = false) GetFoodItemTemplatesRequest requestBody) {
+        Login login = Authorization.authorize(authorizationHeader);
+        
+        if (requestBody == null)
+            requestBody = new GetFoodItemTemplatesRequest();
+
+        try {
+            Connection con = Database.getRemoteConnection();
+
+            String query = """
+                SELECT * FROM food_item_templates
+                WHERE owner = ?
+            """;
+
+            if (requestBody.search != null)
+                query += " AND name LIKE ?";
+
+            PreparedStatement statement;
+            statement = con.prepareStatement(query);
+            statement.setObject(1, login.userId);
+
+            if (requestBody.search != null) {
+                String like = '%' + requestBody.search + '%';
+                statement.setString(2, like);
             }
-            query = query.substring(0, query.length() - 1);
-            PreparedStatement insert = con.prepareStatement(query);
+
+            ResultSet result = statement.executeQuery();
+
+            ArrayList<RegisteredFoodItemTemplate> templates = new ArrayList<>();
+            while (result.next()) {
+                FoodItemTemplate template = new FoodItemTemplate();
+
+                template.amount = result.getDouble("amount");
+                template.category = result.getString("category");
+                template.name = result.getString("name");
+                template.shelfLifeDays = result.getInt("shelf_life_days");
+                template.unit = result.getString("unit");
+
+                RegisteredFoodItemTemplate registered = new RegisteredFoodItemTemplate();
+                registered.templateId = (UUID) result.getObject("id");
+                registered.template = template;
+
+                templates.add(registered);
+            }
+
+            return OkResponse.Success(templates);
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            
+            throw Database.getSQLErrorHTTPResponse();
+        }
+    }
+
+    public static class FoodItemFromTemplate {
+        @NotNull
+        public UUID templateId;
+        @NotNull
+        public Double amount;
+        @NotNull
+        public Double unitPrice;
+    }
+
+    public static class AddFoodItemRequest {
+        @NotNull
+        public ArrayList<FoodItemFromTemplate> items;
+    }
+
+    @PostMapping("/add-food-items")
+    public ResponseEntity<OkResponse> addFoodItem(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody AddFoodItemRequest requestBody) {
+        if (requestBody.items.size() == 0)
+            return OkResponse.Success();
+
+        Login login = Authorization.authorize(authorizationHeader);
+
+        try {
+            Connection con = Database.getRemoteConnection();
+
+            String values = "";
+            for (@SuppressWarnings("unused") var __ : requestBody.items)
+                values += "(CAST(? AS uuid), ?, now()::date, ?),";
+            
+            values = values.substring(0, values.length() - 1);
+            String query = String.format("""
+                INSERT INTO food_items
+                SELECT id, inserted.amount, expiration + INTERVAL '1 day' * shelf_life_days, unit_price, template_id FROM (
+                    VALUES
+                        %s
+                ) AS inserted (template_id, amount , expiration, unit_price)
+                INNER JOIN food_item_templates
+                ON id = template_id AND owner = ?;
+            """, values);
+
+            PreparedStatement statement = con.prepareStatement(query);
 
             int i = 1;
-            int order = 0;
-            for (ShoppingListItem item : requestBody.items) {
-                insert.setString(i, item.name);
+            for (FoodItemFromTemplate item : requestBody.items) {
+                statement.setObject(i, item.templateId);
                 i++;
-
-                boolean isChecked = item.isChecked != null && item.isChecked.booleanValue();
-                insert.setBoolean(i, isChecked);
+                statement.setDouble(i, item.amount);
                 i++;
-
-                insert.setObject(i, login.userId);
+                statement.setDouble(i, item.unitPrice);
                 i++;
-
-                insert.setInt(i, order);
-                i++;
-
-                order++;
             }
 
-            insert.executeUpdate();
+            statement.setObject(i, login.userId);
+
+            statement.executeUpdate();
         } catch (SQLException ex) {
             ex.printStackTrace();
             throw Database.getSQLErrorHTTPResponse();
@@ -1115,34 +1226,115 @@ public class UserController {
         return OkResponse.Success();
     }
 
-    @PostMapping("/get-shopping-list")
-    public ResponseEntity<OkResponse> getShoppingList(@RequestHeader("Authorization") String authorizationHeader) {
+    public static class GetFoodItemsRequest {
+        @Nullable
+        public String category;
+    }
+
+    public static class FoodItem {
+        public UUID id;
+        public String name;
+        public double amount;
+        public String unit;
+        public Date expiration;
+        public Date lastUsed;
+        public double unitPrice;
+        public Date addDate;
+        public String category;
+    }
+
+    @AllArgsConstructor
+    public static class GetFoodItemsResponse {
+        public ArrayList<FoodItem> items;
+    }
+
+    @PostMapping("/get-food-items")
+    public ResponseEntity<OkResponse> getFoodItems(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody(required = false) GetFoodItemsRequest requestBody) {
+        Login login = Authorization.authorize(authorizationHeader);
+
+        if (requestBody == null)
+            requestBody = new GetFoodItemsRequest();
+
+        try {
+            Connection con = Database.getRemoteConnection();
+
+            String query = """
+                SELECT * FROM food_items
+                INNER JOIN food_item_templates
+                ON template_id = food_item_templates.id
+                WHERE owner = ? 
+            """;
+
+            if (requestBody.category != null)
+                query += "AND category = ?";
+
+            System.out.println(query);
+
+            PreparedStatement statement = con.prepareStatement(query);
+            statement.setObject(1, login.userId);
+
+            if (requestBody.category != null)
+                statement.setString(2, requestBody.category);
+
+            ResultSet result = statement.executeQuery();
+
+            ArrayList<FoodItem> items = new ArrayList<>();
+            while (result.next()) {
+                FoodItem item = new FoodItem();
+
+                item.id = (UUID) result.getObject("id");
+                item.addDate = result.getDate("add_date");
+                item.amount = result.getDouble("amount");
+                item.category = result.getString("category");
+                item.expiration = result.getDate("expiration");
+                item.name = result.getString("name");
+                item.unit = result.getString("unit");
+                item.unitPrice = result.getDouble("unit_price");
+                item.lastUsed = result.getDate("last_used");
+
+                items.add(item);
+            }
+
+            return OkResponse.Success(new GetFoodItemsResponse(items));
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            throw Database.getSQLErrorHTTPResponse();
+        }
+    }
+
+    public static class UpdateFoodItemRequest {
+        @NotNull
+        public UUID foodItemId;
+        @NotNull
+        public Double newAmount;
+    }
+
+    @PostMapping("/update-food-item")
+    public ResponseEntity<OkResponse> updateFoodItem(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody UpdateFoodItemRequest requestBody) {
         Login login = Authorization.authorize(authorizationHeader);
 
         try {
             Connection con = Database.getRemoteConnection();
 
-            PreparedStatement statement = con.prepareStatement("""
-                SELECT item_name, buy_item FROM shopping_list
-                WHERE user_id = ?
-                ORDER BY order_index;
-            """);
-            statement.setObject(1, login.userId);
+            if (requestBody.newAmount > 0) {
+                PreparedStatement statement = con.prepareStatement("""
+                    UPDATE food_items
+                    SET amount = ?, last_used = now()::date
+                    FROM food_item_templates
+                    WHERE food_items.id = ? AND food_item_templates.owner = ?;
+                """);
+                statement.setDouble(1, requestBody.newAmount);
+                statement.setObject(2, requestBody.foodItemId);
+                statement.setObject(3, login.userId);
 
-            ResultSet result = statement.executeQuery();
+                statement.executeUpdate();
+            } else {
 
-            ShoppingList list = new ShoppingList();
-            while (result.next()) {
-                ShoppingListItem item = new ShoppingListItem();
-                item.name = result.getString(1);
-                item.isChecked = Boolean.valueOf(result.getBoolean(2));
-                list.items.add(item);
             }
-
-            return OkResponse.Success(list);
         } catch (SQLException ex) {
             ex.printStackTrace();
             throw Database.getSQLErrorHTTPResponse();
         }
+        return OkResponse.Success();
     }
 }
