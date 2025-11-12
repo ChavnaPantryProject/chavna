@@ -9,12 +9,12 @@ import {
     Text, 
     Image, 
     TouchableOpacity, 
-    FlatList, 
     StyleSheet,
     SafeAreaView,
     TextInput,
     Modal,
-    Touchable,
+    Alert,
+    ScrollView,
 } from "react-native";
 import DropDownPicker from "react-native-dropdown-picker";
 import * as ImagePicker from "expo-image-picker";
@@ -25,7 +25,7 @@ export default function NewMeal() {
     const [mealName, setMealName] = useState("");
     const [mealImage, setMealImage] = useState<string | null>(null);
     const [ingredients, setIngredients] = useState<
-        { name: String; amount: String; unit: string }[]
+        { name: string; amount: string; unit: string }[]
     >([]);
     
     const [modalVisible, setModalVisible] = useState(false);
@@ -62,6 +62,43 @@ export default function NewMeal() {
         }
     };
 
+    const deleteIngredient = (index: number) => {
+        const updatedIngredients = ingredients.filter((_, i) => i !== index);
+        setIngredients(updatedIngredients);
+    };
+
+    const saveMeal = () => {
+        if (!mealName.trim()) {
+            Alert.alert("Missing Information", "Please enter a meal name.");
+            return;
+        }
+
+        if (ingredients.length === 0) {
+            Alert.alert("Missing Information", "Please add at least one ingredient.");
+            return;
+        }
+
+        // backend/database info
+        const mealData = {
+            name: mealName,
+            image: mealImage,
+            ingredients: ingredients,
+        };
+
+        console.log("Saving meal:", mealData);
+
+        Alert.alert(
+            "Meal Saved!",
+            '${mealName} has been saved successfully.',
+            [
+                {
+                    text: "OK",
+                    onPress: () => navigation.goBack(),
+                }
+            ]
+        );
+    };
+
     return (
         <SafeAreaView style={styles.container}>
 
@@ -70,72 +107,88 @@ export default function NewMeal() {
                 onPress={() => navigation.goBack()}
                 style={styles.backButton}
             >
-                <Ionicons name="chevron-back" size={26} color="black" />
+                <Ionicons name="chevron-back" size={24} color="black" />
             </TouchableOpacity>
 
             {/* meal name input */}
-            <View style={styles.nameBox}>
-                <TextInput
-                    style={styles.mealNameInput}
-                    placeholder="New Meal"
-                    placeholderTextColor="#000"
-                    value={mealName}
-                    onChangeText={setMealName}
-                />
-            </View>
+            <View style={styles.topSection}>
+                <View style={styles.mealHeader}>
+                    <TextInput
+                        style={styles.mealNameInput}
+                        placeholder="New Meal"
+                        placeholderTextColor="#2C3A2D"
+                        value={mealName}
+                        onChangeText={setMealName}
+                    />
+                </View>
 
             {/* image picker */}
-            <TouchableOpacity style={styles.imageContainer} onPress={pickImage}>
-                {mealImage ? (
-                    <Image source={{ uri: mealImage }} style={styles.image} />
-                ) : (
-                    <View style={styles.placeholder}>
-                        <Ionicons name="camera" size={40} color="#555" />
-                    </View>
-                )}
-            </TouchableOpacity>
+                <TouchableOpacity onPress={pickImage}>
+                    {mealImage ? (
+                        <Image source={{ uri: mealImage }} style={styles.mealImage} />
+                    ) : (
+                        <View style={styles.placeholder}>
+                            <Ionicons name="camera" size={40} color="#555" />
+                        </View>
+                    )}
+                </TouchableOpacity>
+            </View>
 
-            {/* ingredients header */}
-            <View style={styles.ingredientsContainer}>
+            {/* scrollable ingredients */}
+            <ScrollView
+                style={styles.scrollContainer}
+                showsVerticalScrollIndicator={false}
+            >
+
+                {/* ingredients header */}
                 <View style={styles.tableHeader}>
                     <Text style={styles.tableHeaderText}>Ingredients</Text>
                     <Text style={styles.tableHeaderText}>Measurement</Text>
                 </View>
 
                 {/* ingredients list */}
-                <FlatList
-                    data={ingredients}
-                    keyExtractor={(item, index) => index.toString()}
-                    renderItem={({ item }) => (
-                        <View style={styles.tableRow}>
+                {ingredients.map((item, index) => (
+                    <View key={index} style={styles.rowContainer}>
+                        <View style={styles.row}>
                             <Text style={styles.ingredientText}>{item.name}</Text>
-                            <Text style={styles.ingredientText}>
-                                {item.amount}
-                                {item.unit}
-                            </Text>
+                            <View style={styles.amountContainer}>
+                                <Text style={styles.amountText}>
+                                    {item.amount}{item.unit}
+                                </Text>
+
+                                <TouchableOpacity
+                                    onPress={() => deleteIngredient(index)}
+                                    style={styles.deleteButton}
+                                >
+                                    <Ionicons name="trash-outline" size={18} color="#E38B4D" />
+                                </TouchableOpacity>
+                            </View>
                         </View>
-                    )}
-                />
-            </View>
 
-            {/* add ingredient button */}
-            <TouchableOpacity
-                style={styles.addButton}
-                onPress={() => setModalVisible(true)}
-            >
-                <Ionicons name="add" size={28} color="#4C6444" />
-            </TouchableOpacity>
+                        {/* separator line */}
+                        {index < ingredients.length - 1 && <View style={styles.divider} />}
+                    </View>
+                ))}
 
-            {/* save button */}
-            <TouchableOpacity style={styles.saveButton}>
-                <Text style={styles.saveButtonText}>Save</Text>
-            </TouchableOpacity>
+                {/* add ingredient button */}
+                <TouchableOpacity
+                    style={styles.addButton}
+                    onPress={() => setModalVisible(true)}
+                >
+                    <Ionicons name="add" size={28} color="#4C6444" />
+                </TouchableOpacity>
+
+                {/* save button */}
+                <TouchableOpacity style={styles.saveButton} onPress={saveMeal}>
+                    <Text style={styles.saveButtonText}>Save</Text>
+                </TouchableOpacity>
+            </ScrollView>
 
             {/* add ingredient modal */}
             <Modal 
                 visible={modalVisible} 
                 transparent 
-                animationType="slide"
+                animationType="fade"
             >
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalContent}>
@@ -158,12 +211,12 @@ export default function NewMeal() {
                                 value={newAmount}
                                 onChangeText={setNewAmount}
                             />
-                            <View style={{ flex: 1}}>
+                            <View style={{ flex: 1, zIndex: 1000}}>
                                 <DropDownPicker
                                     open={openUnit}
                                     value={newUnit}
                                     items={[
-                                        { label: "grames (g)", value: "g" },
+                                        { label: "grams (g)", value: "g" },
                                         { label: "milliliters (ml)", value: "ml" },
                                         { label: "ounces (oz)", value: "oz" },
                                         { label: "pounds (lbs)", value: "lbs" },
@@ -189,11 +242,20 @@ export default function NewMeal() {
 
                         <View style={styles.modalButtons}>
                             <TouchableOpacity
-                                onPress={() => setModalVisible(false)}>
+                                style={styles.cancelButton}
+                                onPress={() => {
+                                    setModalVisible(false);
+                                    setNewIngredient("");
+                                    setNewAmount("");
+                                    setNewUnit("g");
+                                }}
+                            >
                                     <Text style={styles.cancelText}>Cancel</Text>
                             </TouchableOpacity>
                             <TouchableOpacity 
-                                onPress={addIngredient}>
+                                style={styles.addModalButton}
+                                onPress={addIngredient}
+                            >
                                     <Text style={styles.addText}>Add</Text>
                             </TouchableOpacity>
                         </View>
@@ -207,10 +269,56 @@ export default function NewMeal() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: "#fff",
+        backgroundColor: "#FFFFFF",
+    },
+
+    topSection: {
         alignItems: "center",
+    },
+
+    scrollContainer: {
+        flex: 1,
         paddingHorizontal: 25,
-        paddingTop: 20,
+        marginTop: 5,
+    },
+
+    mealHeader: {
+        backgroundColor: "#E3F0E3",
+        borderRadius: 10,
+        paddingVertical: 8,
+        paddingHorizontal: 20,
+        marginVertical: 10,
+        borderWidth: 1,
+        borderColor: "#499F44",
+    },
+
+    mealNameInput: {
+        fontSize: 20,
+        fontWeight: "700",
+        color: "#2C3A2D",
+        textAlign: "center",
+        minWidth: 150,
+    },
+
+    mealImage: {
+        width: 230,
+        height: 180,
+        borderRadius: 15,
+        borderColor: "#499F44",
+        borderWidth: 1,
+        marginVertical: 10,
+    },
+
+    rowContainer: {
+        alignSelf: "stretch",
+    },
+
+    row: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        paddingVertical: 8,
+        paddingHorizontal: 10,
     },
 
     backButton: {
@@ -220,48 +328,16 @@ const styles = StyleSheet.create({
         zIndex: 10,
     },
 
-    nameBox: {
-        alignItems: "center",
-        marginBottom: 20,
-    },
-
-    mealNameInput: {
-        backgroundColor: "#D9E8D2",
-        borderRadius: 12,
-        borderColor: "#9DBE96",
-        borderWidth: 1.5,
-        textAlign: "center",
-        width: "80%",
-        paddingVertical: 10,
-        fontSize: 18,
-        fontWeight: "600",
-    },
-
-    imageContainer: {
-        width: 200,
-        height: 160,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: "A2C49F",
-    },
-
-    image: {
-        width: 200,
-        height: 160,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: "A2C49F",
-    },
-
     placeholder: {
-        width: 200,
-        height: 160,
-        borderRadius: 12,
+        width: 230,
+        height: 180,
+        borderRadius: 15,
         borderWidth: 1,
-        borderColor: "A2C49F",
+        borderColor: "#499F44",
         alignItems: "center",
         justifyContent: "center",
         backgroundColor: "rgba(240, 240, 240, 0.5)",
+        marginVertical: 10,
     },
 
     ingredientsContainer: {
@@ -275,13 +351,14 @@ const styles = StyleSheet.create({
     tableHeader: {
         flexDirection: "row",
         justifyContent: "space-between",
-        paddingHorizontal: 10,
+        marginTop: 15,
         marginBottom: 8,
     },
 
     tableHeaderText: {
+        fontSize: 22,
         fontWeight: "700",
-        fontSize: 16,
+        color: "#000",
     },
 
     tableRow: {
@@ -295,22 +372,49 @@ const styles = StyleSheet.create({
 
     ingredientText: {
         fontSize: 15,
-        color: "#333",
-        flexShrink: 1,
+        color: "#000",
+        flex: 1,
+    },
+
+    amountContainer: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 10,
+    },
+
+    amountText: {
+        fontSize: 15,
+        color: "#000",
     },
 
     addButton: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        marginTop: 15,
+        paddingVertical: 10,
+        gap: 8,
+    },
+
+    deleteButton: {
+        padding: 4,
+    },
+
+    divider: {
+        width: "100%",
+        height: 1,
+        backgroundColor: "#499F44",
         alignSelf: "center",
-        marginTop: 10,
     },
 
     saveButton: {
         alignSelf: "center",
         backgroundColor: "#E38B4D",
         borderRadius: 10,
-        paddingVertical: 10,
+        paddingVertical: 12,
         paddingHorizontal: 60,
         marginTop: 20,
+        marginBottom: 30,
     },
 
     saveButtonText: {
@@ -330,41 +434,60 @@ const styles = StyleSheet.create({
         backgroundColor: "#fff",
         padding: 20,
         borderRadius: 12,
-        width: "80%",
+        width: "85%",
     },
 
     modalTitle: {
         fontWeight: "700",
         fontSize: 18,
-        marginBottom: 10,
+        marginBottom: 15,
+        textAlign: "center",
     },
 
     input: {
         borderWidth: 1,
         borderColor: "#ccc",
         borderRadius: 8,
-        padding: 8,
+        padding: 10,
         marginBottom: 10,
+        fontSize: 15,
     },
 
     amountRow: {
         flexDirection: "row",
-        alignItems: "center",
+        alignItems: "flex-start",
+        marginBottom: 10,
     },
 
     modalButtons: {
         flexDirection: "row",
         justifyContent: "space-between",
-        marginTop: 10,
+        marginTop: 20,
+    },
+
+    addModalButton: {
+        flex: 1,
+        alignItems: "center",
+        paddingVertical: 10,
+        marginLeft: 10,
+    },
+
+    cancelButton: {
+        flex: 1,
+        alignItems: "center",
+        paddingVertical: 10,
+        marginRight: 10,
     },
 
     cancelText: {
         color: "#888",
         fontWeight: "600",
+        fontSize: 16,
     },
 
     addText: {
-        color: "#4C6444",
+        color: "#499F44",
         fontWeight: "700",
+        fontSize: 16,
     },
 });

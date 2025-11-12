@@ -18,6 +18,7 @@ import {
     ScrollView,
     Modal,
     Pressable,
+    Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -32,9 +33,40 @@ export default function MealIngredientScreen() {
         { name: "Butter", amount: "240g" },
         { name: "Heavy Cream", amount: "360g" },
         { name: "Garlic Salt", amount: ".5g" },
-        { name: "Roman Cheese", amount: "75g" },
+        { name: "Romano Cheese", amount: "75g" },
         { name: "Parmesan Cheese", amount: "45g" },
     ];
+
+    const handleDeleteMeal = () => {
+        setMenuVisible(false);
+
+        Alert.alert(
+            "Delete Meal",
+            "Are you sure you want to delete this meal? This action cannot be undone.",
+            [
+                {
+                    text: "Cancel",
+                    style: "cancel"
+                },
+                {
+                    text: "Delete",
+                    style: "destructive",
+                    onPress: () => {
+                        // delete meal logic
+                        console.log("Meal deleted");
+
+                        // navigatee back to meals tab
+                        router.replace("/(tabs)/meal");
+
+                        // confirmation
+                        setTimeout(() => {
+                            Alert.alert("Meal Deleted", "This meal has beedn deleted successfully.");
+                        }, 500);
+                    }
+                }
+            ]
+        );
+    };
 
     return (
         <SafeAreaView style={styles.container}>
@@ -75,13 +107,9 @@ export default function MealIngredientScreen() {
 
                         <TouchableOpacity
                             style={styles.dropdownItem}
-                            onPress={() => {
-                                setMenuVisible(false);
-                                console.log("Delete Meal pressed");
-                                // delete meal logic here
-                            }}
+                            onPress={handleDeleteMeal}
                         >
-                            <Text style={styles.dropdownText}>Delete Meal</Text>
+                            <Text style={[styles.dropdownText, styles.deleteText]}>Delete Meal</Text>
                         </TouchableOpacity>
                     </View>
                 </Pressable>
@@ -291,6 +319,10 @@ const styles = StyleSheet.create({
     dropdownText: {
         fontSize: 15,
         color: "#333",
+    },
+
+    deleteText: {
+        color: "#E38B4D",
     },
 
     separator: {
