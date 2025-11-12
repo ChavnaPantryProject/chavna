@@ -1,6 +1,8 @@
 package com.chavna.pantryproject;
 
 public class Env {
+    public static final String CHAVNA_URL = Env.getenvNotNull("SERVER_URL");
+    
     public static String getenvNotNull(String name) {
         String env = System.getenv(name);
 
