@@ -11,7 +11,6 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.UUID;
 
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -29,7 +28,7 @@ import lombok.AllArgsConstructor;
 public class PantryController {
     
     @PostMapping("/create-food-item-template")
-    public ResponseEntity<OkResponse> createFoodItemTemplate(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody FoodItemTemplate requestBody) {
+    public Response createFoodItemTemplate(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody FoodItemTemplate requestBody) {
         Login login = Authorization.authorize(authorizationHeader);
 
         try {
@@ -57,10 +56,10 @@ public class PantryController {
             template.templateId = templateId;
             template.template = requestBody;
 
-            return OkResponse.Success(template);
+            return Response.Success(template);
         } catch (SQLException ex) {
             ex.printStackTrace();
-            throw Database.getSQLErrorHTTPResponse();
+            return Database.getSQLErrorHTTPResponse();
         }
     }
 
@@ -80,7 +79,7 @@ public class PantryController {
     }
 
     @PostMapping("/get-food-item-templates")
-    public ResponseEntity<OkResponse> getFoodItemTemplates(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody(required = false) GetFoodItemTemplatesRequest requestBody) {
+    public Response getFoodItemTemplates(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody(required = false) GetFoodItemTemplatesRequest requestBody) {
         Login login = Authorization.authorize(authorizationHeader);
         
         if (requestBody == null)
@@ -125,11 +124,11 @@ public class PantryController {
                 templates.add(registered);
             }
 
-            return OkResponse.Success(templates);
+            return Response.Success(templates);
         } catch (SQLException ex) {
             ex.printStackTrace();
             
-            throw Database.getSQLErrorHTTPResponse();
+            return Database.getSQLErrorHTTPResponse();
         }
     }
 
@@ -148,9 +147,9 @@ public class PantryController {
     }
 
     @PostMapping("/add-food-items")
-    public ResponseEntity<OkResponse> addFoodItem(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody AddFoodItemRequest requestBody) {
+    public Response addFoodItem(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody AddFoodItemRequest requestBody) {
         if (requestBody.items.size() == 0)
-            return OkResponse.Success();
+            return Response.Success();
 
         Login login = Authorization.authorize(authorizationHeader);
 
@@ -186,13 +185,16 @@ public class PantryController {
 
             statement.setObject(i, login.userId);
 
-            statement.executeUpdate();
+            int updated = statement.executeUpdate();
+
+            if (updated == 0)
+                return Response.Fail("No items added.");
+
+            return Response.Success("Items added: " + updated);
         } catch (SQLException ex) {
             ex.printStackTrace();
-            throw Database.getSQLErrorHTTPResponse();
+            return Database.getSQLErrorHTTPResponse();
         }
-
-        return OkResponse.Success();
     }
 
     public static class GetFoodItemsRequest {
@@ -218,7 +220,7 @@ public class PantryController {
     }
 
     @PostMapping("/get-food-items")
-    public ResponseEntity<OkResponse> getFoodItems(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody(required = false) GetFoodItemsRequest requestBody) {
+    public Response getFoodItems(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody(required = false) GetFoodItemsRequest requestBody) {
         Login login = Authorization.authorize(authorizationHeader);
 
         if (requestBody == null)
@@ -264,10 +266,10 @@ public class PantryController {
                 items.add(item);
             }
 
-            return OkResponse.Success(new GetFoodItemsResponse(items));
+            return Response.Success(new GetFoodItemsResponse(items));
         } catch (SQLException ex) {
             ex.printStackTrace();
-            throw Database.getSQLErrorHTTPResponse();
+            return Database.getSQLErrorHTTPResponse();
         }
     }
 
@@ -279,7 +281,7 @@ public class PantryController {
     }
 
     @PostMapping("/update-food-item")
-    public ResponseEntity<OkResponse> updateFoodItem(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody UpdateFoodItemRequest requestBody) {
+    public Response updateFoodItem(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody UpdateFoodItemRequest requestBody) {
         Login login = Authorization.authorize(authorizationHeader);
 
         try {
@@ -302,8 +304,8 @@ public class PantryController {
             }
         } catch (SQLException ex) {
             ex.printStackTrace();
-            throw Database.getSQLErrorHTTPResponse();
+            return Database.getSQLErrorHTTPResponse();
         }
-        return OkResponse.Success();
+        return Response.Success();
     }
 }

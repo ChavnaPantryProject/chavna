@@ -15,7 +15,6 @@ import java.util.UUID;
 import javax.crypto.SecretKey;
 
 import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwe;
@@ -114,7 +113,7 @@ public class Authorization {
         String[] split = authorizationHeader.split(" ");
 
         if (split.length != 2 || !split[0].equals("Bearer"))
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid authorization header.");
+            throw new ResponseException(Response.Error(HttpStatus.BAD_REQUEST, "Invalid authorization header."));
 
         String token = split[1];
 
@@ -176,15 +175,15 @@ public class Authorization {
                 ResultSet result = query.executeQuery();
                 
                 if (!result.next())
-                    throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User does not exist.");
+                    throw new ResponseException(Response.Error(HttpStatus.NOT_FOUND, "User does not exist."));
                 
                 UUID loginState = (UUID) result.getObject(1);
 
                 if (!loginState.equals(((NormalLogin) login).loginState))
-                    throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid login token.");
+                    throw new ResponseException(Response.Error(HttpStatus.UNAUTHORIZED, "Invalid login token."));
             } catch (SQLException ex) {
                 ex.printStackTrace();
-                throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "SQL Error.");
+                throw new ResponseException(Response.Error(HttpStatus.INTERNAL_SERVER_ERROR, "SQL Error."));
             }
         } else {
             GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(new NetHttpTransport(), GsonFactory.getDefaultInstance())
@@ -196,11 +195,11 @@ public class Authorization {
                 googleIdToken = verifier.verify(((GoogleLogin) login).googleToken);
             } catch (GeneralSecurityException | IOException ex) {
                 ex.printStackTrace();
-                throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Google login error.");
+                throw new ResponseException(Response.Error(HttpStatus.INTERNAL_SERVER_ERROR, "Google login error."));
             }
 
             if (googleIdToken == null)
-                throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid google login token.");
+                throw new ResponseException(Response.Error(HttpStatus.UNAUTHORIZED, "Invalid google login token."));
         }
 
         return login;

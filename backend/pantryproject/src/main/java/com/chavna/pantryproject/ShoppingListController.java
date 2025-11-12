@@ -8,7 +8,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -36,7 +35,7 @@ public class ShoppingListController {
     }
 
     @PostMapping("/update-shopping-list")
-    public ResponseEntity<OkResponse> updateShoppingList(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody ShoppingList requestBody) {
+    public Response updateShoppingList(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody ShoppingList requestBody) {
         Login login = Authorization.authorize(authorizationHeader);
 
         try {
@@ -50,7 +49,7 @@ public class ShoppingListController {
             delete.executeUpdate();
 
             if (requestBody.items.size() == 0)
-                return OkResponse.Success();
+                return Response.Success();
 
             String query = String.format("INSERT INTO %s (item_name, buy_item, user_id, order_index) VALUES", SHOPPING_LIST_TABLE);
             for (@SuppressWarnings("unused") var __ : requestBody.items) {
@@ -81,14 +80,14 @@ public class ShoppingListController {
             insert.executeUpdate();
         } catch (SQLException ex) {
             ex.printStackTrace();
-            throw Database.getSQLErrorHTTPResponse();
+            return Database.getSQLErrorHTTPResponse();
         }
 
-        return OkResponse.Success();
+        return Response.Success();
     }
 
     @PostMapping("/get-shopping-list")
-    public ResponseEntity<OkResponse> getShoppingList(@RequestHeader("Authorization") String authorizationHeader) {
+    public Response getShoppingList(@RequestHeader("Authorization") String authorizationHeader) {
         Login login = Authorization.authorize(authorizationHeader);
 
         try {
@@ -111,10 +110,10 @@ public class ShoppingListController {
                 list.items.add(item);
             }
 
-            return OkResponse.Success(list);
+            return Response.Success(list);
         } catch (SQLException ex) {
             ex.printStackTrace();
-            throw Database.getSQLErrorHTTPResponse();
+            return Database.getSQLErrorHTTPResponse();
         }
     }
 }

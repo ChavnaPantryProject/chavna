@@ -12,12 +12,10 @@ import java.util.HashMap;
 import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 
 import lombok.AllArgsConstructor;
 
@@ -35,11 +33,11 @@ public class PersonalInfoController {
     }
 
     @PostMapping("/get-personal-info")
-    public ResponseEntity<OkResponse> getPersonalInfo(@RequestHeader(value = "Authorization", required = false) String authorizationHeader, @RequestBody GetPersonalInfoRequest requestBody) {
+    public Response getPersonalInfo(@RequestHeader(value = "Authorization", required = false) String authorizationHeader, @RequestBody GetPersonalInfoRequest requestBody) {
         if (requestBody == null || (requestBody.email == null && requestBody.userId == null))
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Request body must contain a user email or a user id.");
+            return Response.Error(HttpStatus.BAD_REQUEST, "Request body must contain a user email or a user id.");
         else if (requestBody.email != null && requestBody.userId != null)
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Request body may only contain email or user id, not both.");
+            return Response.Error(HttpStatus.BAD_REQUEST, "Request body may only contain email or user id, not both.");
 
         Connection con = Database.getRemoteConnection();
 
@@ -62,7 +60,7 @@ public class PersonalInfoController {
                 if (query.next())
                     requestedUser = (UUID) query.getObject(1);
                 else
-                    throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User with provided e-mail does not exist.");
+                    return Response.Error(HttpStatus.NOT_FOUND, "User with provided e-mail does not exist.");
             } else {
                 requestedUser = requestBody.userId;
 
@@ -74,7 +72,7 @@ public class PersonalInfoController {
                 ResultSet result = userExistsStatement.executeQuery();
 
                 if (!result.next())
-                    throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User with provided id does not exist.");
+                    return Response.Error(HttpStatus.NOT_FOUND, "User with provided id does not exist.");
             }
 
             HashMap<String, Object> jsonObject = Database.getUserPersonalInfo(con, requestedUser);
@@ -83,13 +81,13 @@ public class PersonalInfoController {
             if (!(boolean) jsonObject.get("public")) {
 
                 if (!requestedUser.equals(authorizedUser))
-                    throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User has private personal info. Authorization required.");
+                    return Response.Error(HttpStatus.UNAUTHORIZED, "User has private personal info. Authorization required.");
             }
 
-            return OkResponse.Success(jsonObject);
+            return Response.Success(jsonObject);
         } catch (SQLException ex) {
             ex.printStackTrace();
-            throw Database.getSQLErrorHTTPResponse();
+            return Database.getSQLErrorHTTPResponse();
         }
     }
 
@@ -98,11 +96,11 @@ public class PersonalInfoController {
     }
 
     @PostMapping("/set-personal-info")
-    public ResponseEntity<OkResponse> setPersonalInfo(@RequestHeader("Authorization") String authorizationHeader, @RequestBody HashMap<String, Object> requestBody) {
+    public Response setPersonalInfo(@RequestHeader("Authorization") String authorizationHeader, @RequestBody HashMap<String, Object> requestBody) {
         Connection con = Database.getRemoteConnection();
         UUID user = Authorization.authorize(authorizationHeader).userId;
         if (requestBody.containsKey("user_id"))
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid column: \"user_id\"");
+            return Response.Error(HttpStatus.BAD_REQUEST, "Invalid column: \"user_id\"");
         
         requestBody.put("user_id", user);
 
@@ -121,7 +119,7 @@ public class PersonalInfoController {
                     
                     columns.add(columnName);
                 } else
-                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, String.format("Invalid column: \"%s\"", columnName));
+                    return Response.Error(HttpStatus.BAD_REQUEST, String.format("Invalid column: \"%s\"", columnName));
             }
             valuesString = shortenString(valuesString, 2) + ")";
             columnsString = shortenString(columnsString, 2) + ")";
@@ -149,6 +147,6 @@ public class PersonalInfoController {
 
         }
 
-        return OkResponse.Success();
+        return Response.Success();
     }
 }

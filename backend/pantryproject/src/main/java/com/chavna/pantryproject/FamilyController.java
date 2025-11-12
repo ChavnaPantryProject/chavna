@@ -23,7 +23,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwe;
@@ -50,7 +49,7 @@ public class FamilyController {
     //                  //
 
     @PostMapping("create-family")
-    public ResponseEntity<OkResponse> createFamily(@RequestHeader("Authorization") String authorizationHeader) {
+    public Response createFamily(@RequestHeader("Authorization") String authorizationHeader) {
         UUID user = Authorization.authorize(authorizationHeader).userId;
         
         try {
@@ -68,7 +67,7 @@ public class FamilyController {
                 UUID memberId = (UUID) result.getObject(1);
 
                 if (memberId != null)
-                    throw new ResponseStatusException(HttpStatus.CONFLICT, "User already part of a family.");
+                    return Response.Error(HttpStatus.CONFLICT, "User already part of a family.");
             }
 
             // Create the family
@@ -106,14 +105,14 @@ public class FamilyController {
             updateQuery.executeUpdate();
         } catch (SQLException ex) {
             ex.printStackTrace();
-            throw Database.getSQLErrorHTTPResponse();
+            return Database.getSQLErrorHTTPResponse();
         }
 
-        return OkResponse.Success("Family created");
+        return Response.Success("Family created");
     }
 
     @PostMapping("leave-family")
-    public ResponseEntity<OkResponse> leaveFamily(@RequestHeader("Authorization") String authorizationHeader) {
+    public Response leaveFamily(@RequestHeader("Authorization") String authorizationHeader) {
         UUID user = Authorization.authorize(authorizationHeader).userId;
         
         try {
@@ -131,13 +130,13 @@ public class FamilyController {
             ResultSet result = checkFamilyQuery.executeQuery();
 
             if (!result.next())
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "User not part of a family.");
+                return Response.Error(HttpStatus.CONFLICT, "User not part of a family.");
 
             FamilyRole role = FamilyRole.values()[result.getInt(2)];
             UUID memberId = (UUID) result.getObject(3);
 
             if (role == FamilyRole.Owner)
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "Cannot leave family as owner.");
+                return Response.Error(HttpStatus.CONFLICT, "Cannot leave family as owner.");
 
             // Remove member
             PreparedStatement removeMemberQuery = con.prepareStatement(String.format(
@@ -149,14 +148,14 @@ public class FamilyController {
             removeMemberQuery.executeUpdate();
         } catch (SQLException ex) {
             ex.printStackTrace();
-            throw Database.getSQLErrorHTTPResponse();
+            return Database.getSQLErrorHTTPResponse();
         }
 
-        return OkResponse.Success("Left family");
+        return Response.Success("Left family");
     }
 
     @PostMapping("delete-family")
-    public ResponseEntity<OkResponse> deleteFamily(@RequestHeader("Authorization") String authorizationHeader) {
+    public Response deleteFamily(@RequestHeader("Authorization") String authorizationHeader) {
         UUID user = Authorization.authorize(authorizationHeader).userId;
         
         try {
@@ -174,13 +173,13 @@ public class FamilyController {
             ResultSet result = checkFamilyQuery.executeQuery();
 
             if (!result.next())
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "User not part of a family.");
+                return Response.Error(HttpStatus.CONFLICT, "User not part of a family.");
 
             FamilyRole role = FamilyRole.values()[result.getInt(2)];
             UUID familyId = (UUID) result.getObject(3);
 
             if (role != FamilyRole.Owner)
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "Only owner can delete family.");
+                return Response.Error(HttpStatus.CONFLICT, "Only owner can delete family.");
 
             // Remove family
             PreparedStatement removeFamily = con.prepareStatement(String.format(
@@ -192,10 +191,10 @@ public class FamilyController {
             removeFamily.executeUpdate();
         } catch (SQLException ex) {
             ex.printStackTrace();
-            throw Database.getSQLErrorHTTPResponse();
+            return Database.getSQLErrorHTTPResponse();
         }
 
-        return OkResponse.Success("Deleted family");
+        return Response.Success("Deleted family");
     }
 
     public static class InvitationRequest {
@@ -204,9 +203,9 @@ public class FamilyController {
     }
 
     @PostMapping("/invite-to-family")
-    public ResponseEntity<OkResponse> inviteToFamily(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody InvitationRequest requestBody, Errors errors) {
+    public Response inviteToFamily(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody InvitationRequest requestBody, Errors errors) {
         if (errors.hasErrors())
-           throw new ResponseStatusException(HttpStatus.BAD_REQUEST, errors.getAllErrors().get(0).toString());
+           return Response.Error(HttpStatus.BAD_REQUEST, errors.getAllErrors().get(0).toString());
         UUID user = Authorization.authorize(authorizationHeader).userId;
         
         try {
@@ -220,13 +219,13 @@ public class FamilyController {
             ResultSet result = emailQuery.executeQuery();
 
             if (!result.next())
-                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User with email does not exist.");
+                return Response.Error(HttpStatus.NOT_FOUND, "User with email does not exist.");
             
             UUID recipientId = (UUID) result.getObject(1);
             UUID inviteState = (UUID) result.getObject(2);
 
             if (recipientId.equals(user))
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot invite yourself.");
+                return Response.Error(HttpStatus.BAD_REQUEST, "Cannot invite yourself.");
 
             // Get membership info
             PreparedStatement checkFamilyQuery = con.prepareStatement(String.format(
@@ -240,13 +239,13 @@ public class FamilyController {
             result = checkFamilyQuery.executeQuery();
 
             if (!result.next())
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "User not part of a family.");
+                return Response.Error(HttpStatus.CONFLICT, "User not part of a family.");
 
             FamilyRole role = FamilyRole.values()[result.getInt(2)];
             UUID familyId = (UUID) result.getObject(3);
 
             if (role != FamilyRole.Owner)
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "Only owner can invite members.");
+                return Response.Error(HttpStatus.CONFLICT, "Only owner can invite members.");
 
             String token = Authorization.createInviteToken(recipientId, familyId, inviteState);
 
@@ -279,10 +278,10 @@ public class FamilyController {
             Email.sendEmail("noreply@email.chavnapantry.com", requestBody.email, emailContent, "Family Invitation Request.");
         } catch (SQLException ex) {
             ex.printStackTrace();
-            throw Database.getSQLErrorHTTPResponse();
+            return Database.getSQLErrorHTTPResponse();
         }
 
-        return OkResponse.Success("Invitation sent.");
+        return Response.Success("Invitation sent.");
     }
 
     @GetMapping("/accept-invite")
@@ -337,7 +336,7 @@ public class FamilyController {
             ResultSet result = checkFamilyQuery.executeQuery();
 
             if (!result.next())
-                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Recipient id not found.");
+                throw new ResponseException(Response.Error(HttpStatus.NOT_FOUND, "Recipient id not found."));
 
             UUID memberId = (UUID) result.getObject(1);
             UUID inviteState = (UUID) result.getObject(2);
@@ -375,7 +374,7 @@ public class FamilyController {
             updateQuery.executeUpdate();
         } catch (SQLException ex) {
             ex.printStackTrace();
-            throw Database.getSQLErrorHTTPResponse();
+            throw Database.getSQLErrorHTTPResponseException();
         }
         
         return ResponseEntity.ok("Invite accepted.");
@@ -394,7 +393,7 @@ public class FamilyController {
     }
 
     @GetMapping("/get-family-members")
-    public ResponseEntity<OkResponse> getFamilyMembers(@RequestHeader("Authorization") String authorizationHeader) {
+    public Response getFamilyMembers(@RequestHeader("Authorization") String authorizationHeader) {
         UUID user = Authorization.authorize(authorizationHeader).userId;
 
         try {
@@ -426,10 +425,10 @@ public class FamilyController {
                 members.add(new FamilyMember(id, email, role));
             }
 
-            return OkResponse.Success(new GetFamilyMemembersResponse(members));
+            return Response.Success(new GetFamilyMemembersResponse(members));
         } catch (SQLException ex) {
             ex.printStackTrace();
-            throw Database.getSQLErrorHTTPResponse();
+            return Database.getSQLErrorHTTPResponse();
         }
     }
 
@@ -439,11 +438,11 @@ public class FamilyController {
     }
 
     @PostMapping("/remove-family-member")
-    public ResponseEntity<OkResponse> removeFamilyMember(@RequestHeader(value = "Authorization") String authorizationHeader, @RequestBody RemoveFamilyMemberRequest requestBody) {
+    public Response removeFamilyMember(@RequestHeader(value = "Authorization") String authorizationHeader, @RequestBody RemoveFamilyMemberRequest requestBody) {
         if (requestBody == null || (requestBody.email == null && requestBody.userId == null))
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Request body must contain a user email or a user id.");
+            return Response.Error(HttpStatus.BAD_REQUEST, "Request body must contain a user email or a user id.");
         else if (requestBody.email != null && requestBody.userId != null)
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Request body may only contain email or user id, not both.");
+            return Response.Error(HttpStatus.BAD_REQUEST, "Request body may only contain email or user id, not both.");
 
         UUID user = Authorization.authorize(authorizationHeader).userId;
         
@@ -462,13 +461,13 @@ public class FamilyController {
             ResultSet result = checkFamilyQuery.executeQuery();
 
             if (!result.next())
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "User not part of a family.");
+                return Response.Error(HttpStatus.CONFLICT, "User not part of a family.");
 
             FamilyRole role = FamilyRole.values()[result.getInt(2)];
             UUID familyId = (UUID) result.getObject(3);
 
             if (role != FamilyRole.Owner)
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "Only owner can delete family.");
+                return Response.Error(HttpStatus.CONFLICT, "Only owner can delete family.");
             
             // Verify requested user
             UUID requestedUser;
@@ -483,7 +482,7 @@ public class FamilyController {
                 if (query.next())
                     requestedUser = (UUID) query.getObject(1);
                 else
-                    throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User with provided e-mail does not exist.");
+                    return Response.Error(HttpStatus.NOT_FOUND, "User with provided e-mail does not exist.");
             } else {
                 requestedUser = requestBody.userId;
 
@@ -495,11 +494,11 @@ public class FamilyController {
                 result = userExistsStatement.executeQuery();
 
                 if (!result.next())
-                    throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User with provided id does not exist.");
+                    return Response.Error(HttpStatus.NOT_FOUND, "User with provided id does not exist.");
             }
 
             if (user.equals(requestedUser))
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot remove yourself.");
+                return Response.Error(HttpStatus.BAD_REQUEST, "Cannot remove yourself.");
 
             // Verify requested user is part of family
 
@@ -516,7 +515,7 @@ public class FamilyController {
             result = checkFamilyQuery2.executeQuery();
 
             if (!result.next())
-                throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Requested user does not belong to your family.");
+                return Response.Error(HttpStatus.UNAUTHORIZED, "Requested user does not belong to your family.");
 
             UUID memberId = (UUID) result.getObject(1);
 
@@ -530,10 +529,10 @@ public class FamilyController {
 
             removeMemberQuery.executeUpdate();
 
-            return OkResponse.Success("Member removed.");
+            return Response.Success("Member removed.");
         } catch (SQLException ex) {
             ex.printStackTrace();
-            throw Database.getSQLErrorHTTPResponse();
+            return Database.getSQLErrorHTTPResponse();
         }
     }
 }

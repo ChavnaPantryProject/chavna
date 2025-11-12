@@ -23,7 +23,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 
 import com.chavna.pantryproject.Authorization.GoogleLogin;
 import com.chavna.pantryproject.Authorization.Login;
@@ -71,9 +70,9 @@ public class UserAccountController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<OkResponse> login(@Valid @RequestBody LoginRequest request, Errors errors) throws SQLException {
+    public Response login(@Valid @RequestBody LoginRequest request, Errors errors) throws SQLException {
         if (errors.hasErrors())
-           throw new ResponseStatusException(HttpStatus.BAD_REQUEST, errors.getAllErrors().get(0).toString());
+           return Response.Error(HttpStatus.BAD_REQUEST, errors.getAllErrors().get(0).toString());
         
         Connection con = Database.getRemoteConnection();
 
@@ -90,11 +89,11 @@ public class UserAccountController {
             if (encoder.matches(request.password, new String(hash, StandardCharsets.UTF_8))) {
                 String jws = Authorization.createLoginToken(id, loginState);
                         
-                return OkResponse.Success("Succesful login.", new LoginResponse(jws));
+                return Response.Success("Succesful login.", new LoginResponse(jws));
             }
         }
 
-        return OkResponse.Error("Invalid login credentials");
+        return Response.Fail("Invalid login credentials");
     }
 
     static final String GOOGLE_PASSWORD_STRING = "GoogleAccount";
@@ -174,7 +173,7 @@ public class UserAccountController {
                 googleIdToken = verifier.verify(accessToken);
             } catch (GeneralSecurityException | IOException ex) {
                 ex.printStackTrace();
-                throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Google login error.");
+                throw new ResponseException(Response.Error(HttpStatus.INTERNAL_SERVER_ERROR, "Google login error."));
             }
 
             String email = googleIdToken.getPayload().getEmail();
@@ -218,7 +217,7 @@ public class UserAccountController {
                 loginToken = Authorization.createGmailLoginToken(userId, accessToken);
             } catch (SQLException ex) {
                 ex.printStackTrace();
-                throw Database.getSQLErrorHTTPResponse();
+                throw Database.getSQLErrorHTTPResponseException();
             }
 
             authHTML = String.format("""
@@ -251,9 +250,9 @@ public class UserAccountController {
     }
 
     @PostMapping("/user-exists")
-    public ResponseEntity<OkResponse> userExists(@Valid @RequestBody UserExistsRequest request, Errors errors) throws SQLException {
+    public Response userExists(@Valid @RequestBody UserExistsRequest request, Errors errors) throws SQLException {
         if (errors.hasErrors())
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, errors.getAllErrors().get(0).toString());
+            return Response.Error(HttpStatus.BAD_REQUEST, errors.getAllErrors().get(0).toString());
 
         Connection con = Database.getRemoteConnection();
 
@@ -262,9 +261,9 @@ public class UserAccountController {
         ResultSet results = statement.executeQuery();
 
         if (results.next())
-            return OkResponse.Success(new UserExistsResponse(results.getInt(1) == 1));
+            return Response.Success(new UserExistsResponse(results.getInt(1) == 1));
 
-        return OkResponse.Success(false);
+        return Response.Success(false);
     }
 
     public static class CreateAccountRequest {
@@ -275,12 +274,12 @@ public class UserAccountController {
     }
 
     @PostMapping("/create-account")
-    public ResponseEntity<OkResponse> createAccount(@Valid @RequestBody CreateAccountRequest request, Errors errors) {
+    public Response createAccount(@Valid @RequestBody CreateAccountRequest request, Errors errors) {
         if (errors.hasErrors())
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, errors.getAllErrors().get(0).toString());
+            return Response.Error(HttpStatus.BAD_REQUEST, errors.getAllErrors().get(0).toString());
 
         if (!emailValidation.matcher(request.email).matches())
-            return OkResponse.Error("Invalid email address.");
+            return Response.Fail("Invalid email address.");
 
         try {
             Connection con = Database.getRemoteConnection();
@@ -290,10 +289,10 @@ public class UserAccountController {
             ResultSet results = statement.executeQuery();
 
             if (results.next())
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "User with email already exists.");
+                return Response.Error(HttpStatus.CONFLICT, "User with email already exists.");
         } catch (SQLException ex) {
             ex.printStackTrace();
-            throw Database.getSQLErrorHTTPResponse();
+            return Database.getSQLErrorHTTPResponse();
         }
         
         String token = Authorization.createSingupToken(request.email, request.password);
@@ -317,7 +316,7 @@ public class UserAccountController {
 
         Email.sendEmail("noreply@email.chavnapantry.com", request.email, emailContent, "Account Confirmation");
 
-        return OkResponse.Success("Confirmation email sent.");
+        return Response.Success("Confirmation email sent.");
     }
 
     @GetMapping("/confirm-account")
@@ -373,29 +372,29 @@ public class UserAccountController {
         catch (SQLException ex) {
             ex.printStackTrace();
             if (ex.getSQLState().equals("23505"))
-                throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "User with email already exists.");
+                throw new ResponseException(Response.Error(HttpStatus.INTERNAL_SERVER_ERROR, "User with email already exists."));
 
-            throw ex;
+            throw Database.getSQLErrorHTTPResponseException();
         }
 
         return ResponseEntity.ok("Account succesfully created.");
     }
 
     @GetMapping("/refresh-token")
-    public ResponseEntity<OkResponse> refreshToken(@RequestHeader("Authorization") String authorizationHeader) {
+    public Response refreshToken(@RequestHeader("Authorization") String authorizationHeader) {
         Login login = Authorization.authorize(authorizationHeader);
         String newToken;
         if (login instanceof NormalLogin) {
             try {
                 newToken = Authorization.createLoginToken(login.userId, ((NormalLogin) login).loginState);
             } catch (JwtException ex) {
-                throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, ex.toString());
+                return Response.Error(HttpStatus.UNAUTHORIZED, ex.toString());
             }
         } else {
             newToken = Authorization.createGmailLoginToken(login.userId, ((GoogleLogin) login).googleToken);
         }
 
-        return OkResponse.Success("Authorized.", new LoginResponse(newToken));
+        return Response.Success("Authorized.", new LoginResponse(newToken));
     }
 
     @GetMapping("/verify")
