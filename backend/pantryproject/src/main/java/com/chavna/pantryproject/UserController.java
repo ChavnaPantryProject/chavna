@@ -1,13 +1,19 @@
 package com.chavna.pantryproject;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
 import java.sql.Connection;
+import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 import org.apache.coyote.BadRequestException;
 import org.springframework.http.HttpStatus;
@@ -23,7 +29,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.chavna.pantryproject.Authorization.GoogleLogin;
 import com.chavna.pantryproject.Authorization.Login;
+import com.chavna.pantryproject.Authorization.NormalLogin;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwe;
@@ -33,6 +41,7 @@ import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.JwtParser;
 import io.jsonwebtoken.JwtVisitor;
 import io.jsonwebtoken.Jwts;
+import jakarta.annotation.Nullable;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 
@@ -41,11 +50,17 @@ import static com.chavna.pantryproject.Database.FAMILY_TABLE;
 import static com.chavna.pantryproject.Database.PERSONAL_INFO_TABLE;
 import static com.chavna.pantryproject.Database.USERS_TABLE;
 
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
+import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.api.client.json.gson.GsonFactory;
+
 import lombok.AllArgsConstructor;
 
 @RestController
 public class UserController {
     public static final String CHAVNA_URL = Env.getenvNotNull("SERVER_URL");
+    public static final Pattern emailValidation = Pattern.compile("(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*|\"(?:[\\x01-\\x08\\x0b\\x0c\\x0e-\\x1f\\x21\\x23-\\x5b\\x5d-\\x7f]|\\\\[\\x01-\\x09\\x0b\\x0c\\x0e-\\x7f])*\")@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\\[(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?|[a-z0-9-]*[a-z0-9]:(?:[\\x01-\\x08\\x0b\\x0c\\x0e-\\x1f\\x21-\\x5a\\x53-\\x7f]|\\\\[\\x01-\\x09\\x0b\\x0c\\x0e-\\x7f])+)\\])");
 
     public static enum FamilyRole {
         None,
@@ -92,13 +107,155 @@ public class UserController {
             if (encoder.matches(request.password, new String(hash, StandardCharsets.UTF_8))) {
                 String jws = Authorization.createLoginToken(id, loginState);
                         
-                return ResponseEntity.ok(OkResponse.Success("Succesful login.", new LoginResponse(jws)));
+                return OkResponse.Success("Succesful login.", new LoginResponse(jws));
             }
         }
 
-        return ResponseEntity.ok(OkResponse.Error("Invalid login credentials"));
+        return OkResponse.Error("Invalid login credentials");
     }
 
+    static final String GOOGLE_PASSWORD_STRING = "GoogleAccount";
+    static final byte[] GOOGLE_PASSWORD_HASH = createGoogleHash();
+
+    static byte[] createGoogleHash() {
+        byte[] bytes = GOOGLE_PASSWORD_STRING.getBytes();
+
+        byte[] hash = new byte[60];
+
+        for (int i = 0; i < bytes.length; i++) {
+            hash[i] = bytes[i];
+        }
+        
+        return hash;
+    }
+
+    static final String GOOGLE_AUTH_FAIL = """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Redirect</title>
+        </head>
+        <body>
+            <script>
+                window.location.replace("%s" + '?success=false&message="' + "%s" + '"');
+            </script>
+        </body>
+        </html>
+    """;
+    @GetMapping("/google-login")
+    public ResponseEntity<String> googleLogin(@RequestParam Map<String, String> params) {
+        for (String param : params.keySet()) {
+            System.out.println(param + ": " + params.get(param));
+        }
+
+        String authHTML;
+        if (params.size() == 0) {
+            authHTML = """
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>Redirect</title>
+                </head>
+                <body>
+                    <script>
+                        if (window.location.hash.length > 1) {
+                            var newloc = window.location.href.split('#')[0] + "?" + window.location.hash.substring(1);
+                            console.log(newloc);
+                            window.location.replace(newloc);
+                        }
+                        else
+                            document.body.innerHTML = "args";
+                    </script>
+                </body>
+                </html>
+            """;
+        } else {
+            String clientId = Env.getenvNotNull("GOOGLE_CLIENT_ID");
+            System.out.println();
+            System.out.println(GsonFactory.getDefaultInstance());
+            GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(new NetHttpTransport(), GsonFactory.getDefaultInstance())
+                .setAudience(Arrays.asList(clientId))
+                .build();
+
+            System.out.println(verifier);
+
+            String accessToken = params.get("id_token");
+
+            GoogleIdToken googleIdToken;
+            try {
+                googleIdToken = verifier.verify(accessToken);
+            } catch (GeneralSecurityException | IOException ex) {
+                ex.printStackTrace();
+                throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Google login error.");
+            }
+
+            String email = googleIdToken.getPayload().getEmail();
+            System.out.println(email);
+            String loginToken;
+
+            // Check if account exists
+            try {
+                Connection con = Database.getRemoteConnection();
+
+                PreparedStatement emailStatement = con.prepareStatement("""
+                    SELECT id, password_hash FROM users
+                    WHERE email = ?
+                """);
+                emailStatement.setString(1, email);
+                ResultSet result = emailStatement.executeQuery();
+
+                if (!result.next()) {
+                    // Create user if not exists
+                    PreparedStatement createUserStatement = con.prepareStatement("""
+                        INSERT INTO users (email, password_hash)
+                        VALUES (?, ?)
+                        RETURNING id, password_hash
+                    """);
+                    createUserStatement.setString(1, email);
+                    createUserStatement.setBytes(2, GOOGLE_PASSWORD_HASH);
+
+                    result = createUserStatement.executeQuery();
+                    result.next();
+                }
+
+                UUID userId = (UUID) result.getObject(1);
+                byte[] passwordHash = result.getBytes(2);
+
+                if (!Arrays.equals(passwordHash, GOOGLE_PASSWORD_HASH)) {
+                    String html = String.format(GOOGLE_AUTH_FAIL, params.get("state"), "Non Google account with given email already exists.");
+
+                    return ResponseEntity.ok(html);
+                }
+
+                loginToken = Authorization.createGmailLoginToken(userId, accessToken);
+            } catch (SQLException ex) {
+                ex.printStackTrace();
+                throw Database.getSQLErrorHTTPResponse();
+            }
+
+            authHTML = String.format("""
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>Redirect</title>
+                </head>
+                <body>
+                    <script>
+                        window.location.replace("%s")
+                    </script>
+                </body>
+                </html>
+            """, params.get("state") + "?success=true&token=" + loginToken);
+        }
+        return ResponseEntity.ok(authHTML);
+    }
+    
     public static class UserExistsRequest {
         @NotNull
         public String email;
@@ -121,9 +278,9 @@ public class UserController {
         ResultSet results = statement.executeQuery();
 
         if (results.next())
-            return ResponseEntity.ok(OkResponse.Success(new UserExistsResponse(results.getInt(1) == 1)));
+            return OkResponse.Success(new UserExistsResponse(results.getInt(1) == 1));
 
-        return ResponseEntity.ok(OkResponse.Success(false));
+        return OkResponse.Success(false);
     }
 
     public static class CreateAccountRequest {
@@ -138,6 +295,9 @@ public class UserController {
         if (errors.hasErrors())
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, errors.getAllErrors().get(0).toString());
 
+        if (!emailValidation.matcher(request.email).matches())
+            return OkResponse.Error("Invalid email address.");
+
         try {
             Connection con = Database.getRemoteConnection();
 
@@ -149,7 +309,7 @@ public class UserController {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "User with email already exists.");
         } catch (SQLException ex) {
             ex.printStackTrace();
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, null);
+            throw Database.getSQLErrorHTTPResponse();
         }
         
         String token = Authorization.createSingupToken(request.email, request.password);
@@ -173,7 +333,7 @@ public class UserController {
 
         Email.sendEmail("noreply@email.chavnapantry.com", request.email, emailContent, "Account Confirmation");
 
-        return ResponseEntity.ok(OkResponse.Success("Confirmation email sent."));
+        return OkResponse.Success("Confirmation email sent.");
     }
 
     @GetMapping("/confirm-account")
@@ -239,14 +399,19 @@ public class UserController {
 
     @GetMapping("/refresh-token")
     public ResponseEntity<OkResponse> refreshToken(@RequestHeader("Authorization") String authorizationHeader) {
-        try {
-            Login login = Authorization.authorize(authorizationHeader);
-
-            String newToken = Authorization.createLoginToken(login.userId, login.loginState);
-            return ResponseEntity.ok(OkResponse.Success("Authorized.", new LoginResponse(newToken)));
-        } catch (JwtException ex) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, ex.toString());
+        Login login = Authorization.authorize(authorizationHeader);
+        String newToken;
+        if (login instanceof NormalLogin) {
+            try {
+                newToken = Authorization.createLoginToken(login.userId, ((NormalLogin) login).loginState);
+            } catch (JwtException ex) {
+                throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, ex.toString());
+            }
+        } else {
+            newToken = Authorization.createGmailLoginToken(login.userId, ((GoogleLogin) login).googleToken);
         }
+
+        return OkResponse.Success("Authorized.", new LoginResponse(newToken));
     }
 
     //                          //
@@ -316,10 +481,10 @@ public class UserController {
                     throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User has private personal info. Authorization required.");
             }
 
-            return ResponseEntity.ok().body(OkResponse.Success(jsonObject));
+            return OkResponse.Success(jsonObject);
         } catch (SQLException ex) {
             ex.printStackTrace();
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, null, ex);
+            throw Database.getSQLErrorHTTPResponse();
         }
     }
 
@@ -379,7 +544,7 @@ public class UserController {
 
         }
 
-        return ResponseEntity.ok().body(OkResponse.Success());
+        return OkResponse.Success();
     }
 
     //                  //
@@ -443,10 +608,10 @@ public class UserController {
             updateQuery.executeUpdate();
         } catch (SQLException ex) {
             ex.printStackTrace();
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "SQL Error");
+            throw Database.getSQLErrorHTTPResponse();
         }
 
-        return ResponseEntity.ok().body(OkResponse.Success("Family created"));
+        return OkResponse.Success("Family created");
     }
 
     @PostMapping("leave-family")
@@ -486,10 +651,10 @@ public class UserController {
             removeMemberQuery.executeUpdate();
         } catch (SQLException ex) {
             ex.printStackTrace();
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "SQL Error");
+            throw Database.getSQLErrorHTTPResponse();
         }
 
-        return ResponseEntity.ok().body(OkResponse.Success("Left family"));
+        return OkResponse.Success("Left family");
     }
 
     @PostMapping("delete-family")
@@ -529,10 +694,10 @@ public class UserController {
             removeFamily.executeUpdate();
         } catch (SQLException ex) {
             ex.printStackTrace();
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "SQL Error");
+            throw Database.getSQLErrorHTTPResponse();
         }
 
-        return ResponseEntity.ok().body(OkResponse.Success("Deleted family"));
+        return OkResponse.Success("Deleted family");
     }
 
     public static class InvitationRequest {
@@ -616,10 +781,10 @@ public class UserController {
             Email.sendEmail("noreply@email.chavnapantry.com", requestBody.email, emailContent, "Family Invitation Request.");
         } catch (SQLException ex) {
             ex.printStackTrace();
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "SQL Error.");
+            throw Database.getSQLErrorHTTPResponse();
         }
 
-        return ResponseEntity.ok().body(OkResponse.Success("Invitation sent."));
+        return OkResponse.Success("Invitation sent.");
     }
 
     @GetMapping("/accept-invite")
@@ -712,7 +877,7 @@ public class UserController {
             updateQuery.executeUpdate();
         } catch (SQLException ex) {
             ex.printStackTrace();
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "SQL Error");
+            throw Database.getSQLErrorHTTPResponse();
         }
         
         return ResponseEntity.ok("Invite accepted.");
@@ -763,10 +928,10 @@ public class UserController {
                 members.add(new FamilyMember(id, email, role));
             }
 
-            return ResponseEntity.ok().body(OkResponse.Success(new GetFamilyMemembersResponse(members)));
+            return OkResponse.Success(new GetFamilyMemembersResponse(members));
         } catch (SQLException ex) {
             ex.printStackTrace();
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "SQL Error");
+            throw Database.getSQLErrorHTTPResponse();
         }
     }
 
@@ -867,10 +1032,10 @@ public class UserController {
 
             removeMemberQuery.executeUpdate();
 
-            return ResponseEntity.ok().body(OkResponse.Success("Member removed."));
+            return OkResponse.Success("Member removed.");
         } catch (SQLException ex) {
             ex.printStackTrace();
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, null, ex);
+            throw Database.getSQLErrorHTTPResponse();
         }
     }
 
@@ -879,5 +1044,398 @@ public class UserController {
         Email.verifyEmailAddress(email);
 
         return ResponseEntity.ok("Verification email sent.");
+    }
+
+    //                 //
+    //  SHOPPING LIST  //
+    //                 //
+
+    public static class ShoppingListItem {
+        public String name;
+        @Nullable
+        public Boolean isChecked;
+    }
+
+    public static class ShoppingList {
+        public ArrayList<ShoppingListItem> items;
+
+        public ShoppingList() {
+            this.items = new ArrayList<>();
+        }
+    }
+
+    @PostMapping("/update-shopping-list")
+    public ResponseEntity<OkResponse> updateShoppingList(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody ShoppingList requestBody) {
+        Login login = Authorization.authorize(authorizationHeader);
+
+        try {
+            Connection con = Database.getRemoteConnection();
+
+            PreparedStatement delete = con.prepareStatement("""
+                DELETE FROM shopping_list
+                WHERE user_id = ?
+            """);
+            delete.setObject(1, login.userId);
+            delete.executeUpdate();
+
+            if (requestBody.items.size() == 0)
+                return OkResponse.Success();
+
+            String query = "INSERT INTO shopping_list (item_name, buy_item, user_id, order_index) VALUES";
+            for (@SuppressWarnings("unused") var __ : requestBody.items) {
+                query += " (?, ?, ?, ?),";
+            }
+            query = query.substring(0, query.length() - 1);
+            PreparedStatement insert = con.prepareStatement(query);
+
+            int i = 1;
+            int order = 0;
+            for (ShoppingListItem item : requestBody.items) {
+                insert.setString(i, item.name);
+                i++;
+
+                boolean isChecked = item.isChecked != null && item.isChecked.booleanValue();
+                insert.setBoolean(i, isChecked);
+                i++;
+
+                insert.setObject(i, login.userId);
+                i++;
+
+                insert.setInt(i, order);
+                i++;
+
+                order++;
+            }
+
+            insert.executeUpdate();
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            throw Database.getSQLErrorHTTPResponse();
+        }
+
+        return OkResponse.Success();
+    }
+
+    @PostMapping("/get-shopping-list")
+    public ResponseEntity<OkResponse> getShoppingList(@RequestHeader("Authorization") String authorizationHeader) {
+        Login login = Authorization.authorize(authorizationHeader);
+
+        try {
+            Connection con = Database.getRemoteConnection();
+
+            PreparedStatement statement = con.prepareStatement("""
+                SELECT item_name, buy_item FROM shopping_list
+                WHERE user_id = ?
+                ORDER BY order_index;
+            """);
+            statement.setObject(1, login.userId);
+
+            ResultSet result = statement.executeQuery();
+
+            ShoppingList list = new ShoppingList();
+            while (result.next()) {
+                ShoppingListItem item = new ShoppingListItem();
+                item.name = result.getString(1);
+                item.isChecked = Boolean.valueOf(result.getBoolean(2));
+                list.items.add(item);
+            }
+
+            return OkResponse.Success(list);
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            throw Database.getSQLErrorHTTPResponse();
+        }
+    }
+
+    public static class FoodItemTemplate {
+        @NotNull
+        public String name;
+        @NotNull
+        public Double amount;
+        @NotNull
+        public String unit;
+        @NotNull
+        public Integer shelfLifeDays;
+        @NotNull
+        public String category;
+    }
+
+    @PostMapping("/create-food-item-template")
+    public ResponseEntity<OkResponse> createFoodItemTemplate(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody FoodItemTemplate requestBody) {
+        Login login = Authorization.authorize(authorizationHeader);
+
+        try {
+            Connection con = Database.getRemoteConnection();
+
+            PreparedStatement statement = con.prepareStatement("""
+                INSERT INTO food_item_templates (name, owner, amount, unit, shelf_life_days, category)
+                VALUES (?, ?, ?, ?, ?, ?)
+                RETURNING id;
+            """);
+
+            statement.setString(1, requestBody.name);
+            statement.setObject(2, login.userId);
+            statement.setDouble(3, requestBody.amount);
+            statement.setString(4, requestBody.unit);
+            statement.setInt(5, requestBody.shelfLifeDays);
+            statement.setString(6, requestBody.category);
+
+            ResultSet result = statement.executeQuery();
+            result.next();
+
+            UUID templateId = (UUID) result.getObject(1);
+
+            RegisteredFoodItemTemplate template = new RegisteredFoodItemTemplate();
+            template.templateId = templateId;
+            template.template = requestBody;
+
+            return OkResponse.Success(template);
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            throw Database.getSQLErrorHTTPResponse();
+        }
+    }
+
+    public static class RegisteredFoodItemTemplate {
+        public UUID templateId;
+        public FoodItemTemplate template;
+    }
+
+    public static class GetFoodItemTemplatesRequest {
+        @Nullable
+        public String search;
+    }
+
+    @AllArgsConstructor
+    public static class GetFoodItemTemplatesResponse {
+        public ArrayList<RegisteredFoodItemTemplate> templates;
+    }
+
+    @PostMapping("/get-food-item-templates")
+    public ResponseEntity<OkResponse> getFoodItemTemplates(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody(required = false) GetFoodItemTemplatesRequest requestBody) {
+        Login login = Authorization.authorize(authorizationHeader);
+        
+        if (requestBody == null)
+            requestBody = new GetFoodItemTemplatesRequest();
+
+        try {
+            Connection con = Database.getRemoteConnection();
+
+            String query = """
+                SELECT * FROM food_item_templates
+                WHERE owner = ?
+            """;
+
+            if (requestBody.search != null)
+                query += " AND name LIKE ?";
+
+            PreparedStatement statement;
+            statement = con.prepareStatement(query);
+            statement.setObject(1, login.userId);
+
+            if (requestBody.search != null) {
+                String like = '%' + requestBody.search + '%';
+                statement.setString(2, like);
+            }
+
+            ResultSet result = statement.executeQuery();
+
+            ArrayList<RegisteredFoodItemTemplate> templates = new ArrayList<>();
+            while (result.next()) {
+                FoodItemTemplate template = new FoodItemTemplate();
+
+                template.amount = result.getDouble("amount");
+                template.category = result.getString("category");
+                template.name = result.getString("name");
+                template.shelfLifeDays = result.getInt("shelf_life_days");
+                template.unit = result.getString("unit");
+
+                RegisteredFoodItemTemplate registered = new RegisteredFoodItemTemplate();
+                registered.templateId = (UUID) result.getObject("id");
+                registered.template = template;
+
+                templates.add(registered);
+            }
+
+            return OkResponse.Success(templates);
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            
+            throw Database.getSQLErrorHTTPResponse();
+        }
+    }
+
+    public static class FoodItemFromTemplate {
+        @NotNull
+        public UUID templateId;
+        @NotNull
+        public Double amount;
+        @NotNull
+        public Double unitPrice;
+    }
+
+    public static class AddFoodItemRequest {
+        @NotNull
+        public ArrayList<FoodItemFromTemplate> items;
+    }
+
+    @PostMapping("/add-food-items")
+    public ResponseEntity<OkResponse> addFoodItem(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody AddFoodItemRequest requestBody) {
+        if (requestBody.items.size() == 0)
+            return OkResponse.Success();
+
+        Login login = Authorization.authorize(authorizationHeader);
+
+        try {
+            Connection con = Database.getRemoteConnection();
+
+            String values = "";
+            for (@SuppressWarnings("unused") var __ : requestBody.items)
+                values += "(CAST(? AS uuid), ?, now()::date, ?),";
+            
+            values = values.substring(0, values.length() - 1);
+            String query = String.format("""
+                INSERT INTO food_items
+                SELECT id, inserted.amount, expiration + INTERVAL '1 day' * shelf_life_days, unit_price, template_id FROM (
+                    VALUES
+                        %s
+                ) AS inserted (template_id, amount , expiration, unit_price)
+                INNER JOIN food_item_templates
+                ON id = template_id AND owner = ?;
+            """, values);
+
+            PreparedStatement statement = con.prepareStatement(query);
+
+            int i = 1;
+            for (FoodItemFromTemplate item : requestBody.items) {
+                statement.setObject(i, item.templateId);
+                i++;
+                statement.setDouble(i, item.amount);
+                i++;
+                statement.setDouble(i, item.unitPrice);
+                i++;
+            }
+
+            statement.setObject(i, login.userId);
+
+            statement.executeUpdate();
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            throw Database.getSQLErrorHTTPResponse();
+        }
+
+        return OkResponse.Success();
+    }
+
+    public static class GetFoodItemsRequest {
+        @Nullable
+        public String category;
+    }
+
+    public static class FoodItem {
+        public UUID id;
+        public String name;
+        public double amount;
+        public String unit;
+        public Date expiration;
+        public Date lastUsed;
+        public double unitPrice;
+        public Date addDate;
+        public String category;
+    }
+
+    @AllArgsConstructor
+    public static class GetFoodItemsResponse {
+        public ArrayList<FoodItem> items;
+    }
+
+    @PostMapping("/get-food-items")
+    public ResponseEntity<OkResponse> getFoodItems(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody(required = false) GetFoodItemsRequest requestBody) {
+        Login login = Authorization.authorize(authorizationHeader);
+
+        if (requestBody == null)
+            requestBody = new GetFoodItemsRequest();
+
+        try {
+            Connection con = Database.getRemoteConnection();
+
+            String query = """
+                SELECT * FROM food_items
+                INNER JOIN food_item_templates
+                ON template_id = food_item_templates.id
+                WHERE owner = ? 
+            """;
+
+            if (requestBody.category != null)
+                query += "AND category = ?";
+
+            System.out.println(query);
+
+            PreparedStatement statement = con.prepareStatement(query);
+            statement.setObject(1, login.userId);
+
+            if (requestBody.category != null)
+                statement.setString(2, requestBody.category);
+
+            ResultSet result = statement.executeQuery();
+
+            ArrayList<FoodItem> items = new ArrayList<>();
+            while (result.next()) {
+                FoodItem item = new FoodItem();
+
+                item.id = (UUID) result.getObject("id");
+                item.addDate = result.getDate("add_date");
+                item.amount = result.getDouble("amount");
+                item.category = result.getString("category");
+                item.expiration = result.getDate("expiration");
+                item.name = result.getString("name");
+                item.unit = result.getString("unit");
+                item.unitPrice = result.getDouble("unit_price");
+                item.lastUsed = result.getDate("last_used");
+
+                items.add(item);
+            }
+
+            return OkResponse.Success(new GetFoodItemsResponse(items));
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            throw Database.getSQLErrorHTTPResponse();
+        }
+    }
+
+    public static class UpdateFoodItemRequest {
+        @NotNull
+        public UUID foodItemId;
+        @NotNull
+        public Double newAmount;
+    }
+
+    @PostMapping("/update-food-item")
+    public ResponseEntity<OkResponse> updateFoodItem(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody UpdateFoodItemRequest requestBody) {
+        Login login = Authorization.authorize(authorizationHeader);
+
+        try {
+            Connection con = Database.getRemoteConnection();
+
+            if (requestBody.newAmount > 0) {
+                PreparedStatement statement = con.prepareStatement("""
+                    UPDATE food_items
+                    SET amount = ?, last_used = now()::date
+                    FROM food_item_templates
+                    WHERE food_items.id = ? AND food_item_templates.owner = ?;
+                """);
+                statement.setDouble(1, requestBody.newAmount);
+                statement.setObject(2, requestBody.foodItemId);
+                statement.setObject(3, login.userId);
+
+                statement.executeUpdate();
+            } else {
+
+            }
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            throw Database.getSQLErrorHTTPResponse();
+        }
+        return OkResponse.Success();
     }
 }

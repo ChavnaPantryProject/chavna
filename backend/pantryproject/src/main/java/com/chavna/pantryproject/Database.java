@@ -123,4 +123,8 @@ public class Database {
         
         return result.getString(1);
     }
+
+    public static ResponseStatusException getSQLErrorHTTPResponse() {
+        return new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "SQL Error.");
+    }
 }
