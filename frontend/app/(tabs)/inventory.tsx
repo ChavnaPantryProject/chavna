@@ -1,15 +1,19 @@
-import React, { useState } from 'react'
-import { Text, View, StyleSheet, TextInput, Pressable, FlatList } from 'react-native'
+import React, { useState, useEffect } from 'react'
+import { Text, View, StyleSheet, TextInput, Pressable, FlatList, ActivityIndicator } from 'react-native'
 import { Feather, Ionicons } from "@expo/vector-icons";
 import ModalFoodCategory from "../pantry/modalFoodCategory";
 import ModalCreateFoodCategory from "../pantry/modalAddCategory"
+import { API_URL, retrieveValue } from "../util"
+
+type GetCategoriesResponse = {
+  categories: Array<string>
+}
 
 const InventoryScreen = () => {
 
   const [searchEntry, setSearchEntry] = useState('')
-
-  // hard coded for now
-  const [foodCategories, setFoodCategories] = useState<string[]> (['Protein', 'Seafood', 'Vegetables', 'Herbs & Spices', 'test'])
+  const [foodCategories, setFoodCategories] = useState<string[]>([])
+  const [loading, setLoading] = useState(true)
 
   //states for modal visibility
     //modal for users food categories
@@ -29,7 +33,48 @@ const InventoryScreen = () => {
   //setting type to be a string or null <string | null >
   const [foodCategoryTitle, setFoodCategoryTitle] = useState<string | null >(null) 
   
+  // Fetch categories from backend
+  const fetchCategories = async () => {
+    try {
+      setLoading(true)
+      const token = await retrieveValue("jwt")
+      if (!token) {
+        console.error("No authentication token found")
+        setLoading(false)
+        return
+      }
 
+      const response = await fetch(`${API_URL}/get-categories`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      })
+
+      const data = await response.json()
+      
+      if (response.ok && data.success === 'success') {
+        const response: GetCategoriesResponse = data.payload;
+        setFoodCategories(response.categories);
+      } else {
+        console.error("Failed to fetch categories:", data.message || data)
+      }
+    } catch (error) {
+      console.error("Error fetching categories:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchCategories()
+  }, [])
+
+  const handleCategoryCreated = () => {
+    // Refresh categories after creating a new one
+    fetchCategories()
+  }
 
   return (
     <View style={style.container}>
@@ -57,17 +102,21 @@ const InventoryScreen = () => {
 
     {/* list of food categories */}
       <View style={style.catergoryContainer}>
-        {/* looping through foodCategories array to create a card for each category */}
-        {foodCategories.map((category) => (
-          <Pressable key={category} style={style.card} onPress={()=>{
-            openCategory() // open modal
-            setFoodCategoryTitle(category) //telling the modal what category to populate
-          }}>
-            <View style={style.cardTextContainer}>
-              <Text>{category}</Text>
-            </View>
-          </Pressable>
-        ))}
+        {loading ? (
+          <ActivityIndicator size="large" color="#499F44" style={{ marginTop: 50 }} />
+        ) : (
+          /* looping through foodCategories array to create a card for each category */
+          foodCategories.map((category) => (
+            <Pressable key={category} style={style.card} onPress={()=>{
+              openCategory() // open modal
+              setFoodCategoryTitle(category) //telling the modal what category to populate
+            }}>
+              <View style={style.cardTextContainer}>
+                <Text>{category}</Text>
+              </View>
+            </Pressable>
+          ))
+        )}
       </View>
 
       {/* This is a modal which will be a pop up for the food category, it is invisble until a user clicks on a category */}
@@ -80,7 +129,9 @@ const InventoryScreen = () => {
           visible={modalCreateCategory}
           onClose={closeCreateCategory}
           title="New Group"
-          onSubmit={(name) => setFoodCategories(prev => [...prev, name])}
+          onSubmit={(name) => {
+            handleCategoryCreated()
+          }}
           />
           
         <Text style={style.addButton}>+</Text>

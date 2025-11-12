@@ -1,17 +1,179 @@
 import * as React from "react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import PopupForm from "./PopupForm";
+import { API_URL, retrieveValue } from "./util";
+
+type GetCategoriesResponse = {
+  categories: Array<string>
+}
+
+type Template = {
+  id: string,
+  name: string,
+  amount: number,
+  unit: string,
+  shelfLifeDays: number,
+  category: string
+};
 
 export default function ConfirmationScreen() {
   const router = useRouter();
-  const [items, setItems] = useState([
-    { name: "Chicken Breast", weight: "300g", qty: "3", exp: "9/15/2025" },
+  const [items, setItems] = useState<Array<{name: string, weight: string, qty: number, exp: Date, category: string}>>([
+    { name: "Chicken Breast", weight: "300g", qty: 3, exp: new Date(), category: "Protein" },
   ]);
 
   const [isPopupVisible, setIsPopupVisible] = useState(false);
+  const [dropdownOptions, setDropdownOptions] = useState<Array<{label: string, value: string}>>([]);
+
+  const [templates, setTemplates] = useState<Array<Template>>([])
+  const updateTemplates = async () => {
+    type TemplatesResponse = {
+      success: "success",
+      status: 200,
+      payload: Array<
+        {
+          templateId: string,
+          template: {
+            name: string,
+            amount: number,
+            unit: string,
+            shelfLifeDays: number,
+            category: string
+          };
+        }
+      >
+    };
+
+    const token = await retrieveValue("jwt")
+    if (!token) {
+      console.error("No authentication token found")
+      return
+    }
+
+    const response = await fetch(`${API_URL}/get-food-item-templates`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    const body: TemplatesResponse = await response.json();
+
+    if (response.ok && body.success === "success") {
+      const payload = body.payload;
+      
+      setTemplates(payload.map(value => {
+        let template = value.template as Template;
+        template['id'] = value.templateId;
+
+        return template as Template;
+      }));
+    }
+  };
+
+  useEffect(() => {
+    updateTemplates();
+  }, [])
+
+  const updateDropdownOptions = async () => {
+    const token = await retrieveValue("jwt")
+    if (!token) {
+      console.error("No authentication token found")
+      return
+    }
+
+    const response = await fetch(`${API_URL}/get-categories`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    const body = await response.json();
+
+    if (response.ok && body.success === "success") {
+      const payload: GetCategoriesResponse = body.payload;
+      setDropdownOptions(
+        payload.categories.map(v => ({
+          label: v,
+          value: v
+        }))
+      );
+    }
+  };
+
+  const saveItems = async () => {
+    const token = await retrieveValue("jwt")
+    if (!token) {
+      console.error("No authentication token found")
+      return
+    }
+
+    let addItems: Array<{ templateId: string, amount: number, unitPrice: number}> = [];
+
+    outer: for (const item of items) {
+      for (const template of templates) {
+        if (item.name === template.name) {
+          addItems.push({templateId: template.id, amount: item.qty, unitPrice: 0});
+          continue outer;
+        }
+      }
+
+      const ms = item.exp.getTime() - new Date().getTime(); 
+
+      // Add template
+      const newTemplate = {
+        name: item.name,
+        amount: item.qty,
+        unit: "None",
+        shelfLifeDays: Math.trunc(ms / 1000),
+        category: item.category
+      }
+
+      const response = await fetch(`${API_URL}/create-food-item-template`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newTemplate)
+      });
+
+      const body = await response.json();
+
+      if (!response.ok || body.success === "fail") {
+        console.error(body);
+        break;
+      }
+
+      addItems.push({templateId: body.payload.templateId, amount: item.qty, unitPrice: 0});
+    }
+
+    const response = await fetch(`${API_URL}/add-food-items`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        items: addItems
+      })
+    });
+
+    const body = await response.json();
+
+    if (!response.ok || body.success === "fail")
+      throw body;
+  }
+
+  useEffect(() => {
+    updateDropdownOptions();
+  }, []);
 
   const handleAddItem = (data: {
     dropdown: string | string;
@@ -23,8 +185,9 @@ export default function ConfirmationScreen() {
     const newItem = {
       name: data.text || (data.dropdown ? String(data.dropdown) : "New Item"),
       weight: data.number1 ? `${data.number1}g` : "-",
-      qty: data.number2 ? String(data.number2) : "-",
-      exp: data.date ? data.date.toLocaleDateString() : "-",
+      qty: data.number2 ? data.number2 : 0,
+      exp: data.date ? data.date! : new Date(),
+      category: data.dropdown
     };
     setItems((prev) => [...prev, newItem]);
 
@@ -65,7 +228,7 @@ export default function ConfirmationScreen() {
             <Text style={styles.tableCell}>{item.name}</Text>
             <Text style={styles.tableCell}>{item.weight}</Text>
             <Text style={styles.tableCell}>{item.qty}</Text>
-            <Text style={styles.tableCell}>{item.exp}</Text>
+            <Text style={styles.tableCell}>{item.exp ? item.exp.toLocaleDateString() : ""}</Text>
           </View>
         ))}
 
@@ -80,7 +243,10 @@ export default function ConfirmationScreen() {
 
         {/* Save Button */}
         <TouchableOpacity style={styles.saveButton}
-        onPress={() => router.push("/(tabs)/home")}
+        onPress={() => {
+          saveItems();
+          router.push("/(tabs)/home");
+        }}
         >
           <Text style={styles.saveText}>Save</Text>
         </TouchableOpacity>
@@ -91,20 +257,14 @@ export default function ConfirmationScreen() {
       <PopupForm
         visible={isPopupVisible}
         onClose={() => setIsPopupVisible(false)}
-        onSave={(data) => console.log("Saved:", data)}
+        onSave={(data) => handleAddItem(data)}
         /*
         onSubmit={(data) => {
           handleAddItem(data);      // add the returned data to the table
           setIsPopupVisible(false); // close the popup
         }}
           */
-        dropdownOptions={[
-          { label: "Protein", value: "Protein" },
-          { label: "Vegetables", value: "Vegetables" },
-          { label: "Seafood", value: "Seafood" },
-          { label: "Carbs", value: "Carbs" },
-          { label: "Fruits", value: "Fruits" }
-        ]}
+        dropdownOptions={dropdownOptions}
         //title="Add Item"
       />
     </View>
