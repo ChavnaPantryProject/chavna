@@ -10,13 +10,17 @@ import java.util.HashMap;
 import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
 
 public class Database {
-    public static final String USERS_TABLE = "users";
-    public static final String PERSONAL_INFO_TABLE = "personal_info";
     public static final String FAMILY_TABLE = "family";
     public static final String FAMILY_MEMBER_TABLE = "family_member";
+    public static final String FOOD_ITEM_TEMPLATES_TABLE = "food_item_templates";
+    public static final String FOOD_ITEMS_TABLE = "food_items";
+    public static final String PERSONAL_INFO_TABLE = "personal_info";
+    public static final String SCAN_ITEMS_TABLE = "scan_items";
+    public static final String SHOPPING_LIST_TABLE = "shopping_list";
+    public static final String USERS_TABLE = "users";
+    public static final String CATEGORIES_TABLE = "user_categories";
 
     public static Connection getRemoteConnection() {
         try {
@@ -119,12 +123,16 @@ public class Database {
         ResultSet result = query.executeQuery();
 
         if (!result.next())
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User does not exist.");
+            throw new ResponseException(Response.Error(HttpStatus.NOT_FOUND, "User does not exist."));
         
         return result.getString(1);
     }
 
-    public static ResponseStatusException getSQLErrorHTTPResponse() {
-        return new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "SQL Error.");
+    public static Response getSQLErrorHTTPResponse() {
+        return Response.Error(HttpStatus.INTERNAL_SERVER_ERROR, "SQL Error.");
+    }
+
+    public static ResponseException getSQLErrorHTTPResponseException() {
+        return new ResponseException(Response.Error(HttpStatus.INTERNAL_SERVER_ERROR, "SQL Error."));
     }
 }
