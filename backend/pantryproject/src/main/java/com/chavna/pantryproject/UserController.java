@@ -234,7 +234,7 @@ public class UserController {
                 loginToken = Authorization.createGmailLoginToken(userId, accessToken);
             } catch (SQLException ex) {
                 ex.printStackTrace();
-                throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "SQL Error.");
+                throw Database.getSQLErrorHTTPResponse();
             }
 
             authHTML = String.format("""
@@ -309,7 +309,7 @@ public class UserController {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "User with email already exists.");
         } catch (SQLException ex) {
             ex.printStackTrace();
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, null);
+            throw Database.getSQLErrorHTTPResponse();
         }
         
         String token = Authorization.createSingupToken(request.email, request.password);
@@ -484,7 +484,7 @@ public class UserController {
             return OkResponse.Success(jsonObject);
         } catch (SQLException ex) {
             ex.printStackTrace();
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, null, ex);
+            throw Database.getSQLErrorHTTPResponse();
         }
     }
 
@@ -1035,7 +1035,7 @@ public class UserController {
             return OkResponse.Success("Member removed.");
         } catch (SQLException ex) {
             ex.printStackTrace();
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, null, ex);
+            throw Database.getSQLErrorHTTPResponse();
         }
     }
 

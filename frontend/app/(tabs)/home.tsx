@@ -16,21 +16,104 @@ import {
   Modal,
   Animated,
   Dimensions,
+  AppState,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import { API_URL, retrieveValue } from '../util';
 
-// Adjust the initial list length by changing the { length: 5 }
-const initialItems = Array.from({ length: 5 }).map((_, i) => ({
-  id: String(i + 1),
-  name: '',
-  done: false,
-}));
+type ShoppingListItem = {
+  name: string,
+  isChecked: boolean
+}
+
+async function getShoppingList(): Promise<Array<ShoppingListItem>> {
+  let loginToken: string = (await retrieveValue("jwt"))!;
+  let response = await fetch(`${API_URL}/get-shopping-list`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${loginToken}`,
+      "Content-Type": "application/json",
+    }
+  });
+
+  let body = await response.json();
+
+  if (!response.ok)
+    throw body;
+
+
+  if (body.success !== 'success')
+    throw body;
+
+  return body.payload.items;
+}
+
+async function updateShoppingList(shoppingList: Array<ShoppingListItem>) {
+  let loginToken: string = (await retrieveValue("jwt"))!;
+  let response = await fetch(`${API_URL}/update-shopping-list`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${loginToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      items: shoppingList
+    })
+  })
+
+  let body = await response.json();
+
+  if (!response.ok)
+    throw body;
+
+
+  if (body.success !== 'success')
+    throw body;
+}
 
 export default function HomeScreen() {
+  const initialItems = [].map((_, i) => ({
+    id: String(i + 1),
+    name: '',
+    done: false,
+  }));
   const [items, setItems] = useState(initialItems);
+  const [updateItems, setUpdateItems] = useState(false);
+
+  const setItemsAndUpdate = (value: React.SetStateAction<{
+      id: string;
+      name: string;
+      done: boolean;
+  }[]>) => {
+    setItems(value);
+    setUpdateItems(true);
+  };
+
+  useEffect(() => {
+    (async () => {
+      let items = await getShoppingList();
+      let list = items.map((item, i) => ({
+        id: String(i + 1),
+        name: item.name,
+        done: item.isChecked,
+      }));
+      setItems(list);
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (updateItems) {
+      setUpdateItems(false);
+
+      updateShoppingList(items.map((value, i) => ({
+          name: value.name,
+          isChecked: value.done,
+      })));
+    }
+  }, [updateItems]);
 
     // SAMPLE DATA FOR EXPIRATION WARNING
   const [expiringOpen, setExpiringOpen] = useState(false);
@@ -72,10 +155,10 @@ export default function HomeScreen() {
 
 
   const toggle = (id: string) =>
-    setItems(prev => prev.map(it => (it.id === id ? { ...it, done: !it.done } : it)));
+    setItemsAndUpdate(prev => prev.map(it => (it.id === id ? { ...it, done: !it.done } : it)));
 
   const addItem = () =>
-    setItems(prev => [...prev, { id: String(Date.now()), name: '', done: false }]);
+    setItemsAndUpdate(prev => [...prev, { id: String(Date.now()), name: '', done: false }]);
 
   // Auto scroll when adding to list
   const scrollRef = useRef<ScrollView | null>(null);
@@ -186,7 +269,7 @@ export default function HomeScreen() {
                       ]}
                       value={item.name}
                       onChangeText={t =>
-                        setItems(prev =>
+                        setItemsAndUpdate(prev =>
                           prev.map(it => (it.id === item.id ? { ...it, name: t } : it)),
                         )
                       }
@@ -250,7 +333,7 @@ export default function HomeScreen() {
         confirmLabel="Clear all"
         onCancel={() => setConfirmClearAllOpen(false)}
         onConfirm={() => {
-          setItems([]);
+          setItemsAndUpdate([]);
           setConfirmClearAllOpen(false);
         }}
       />
@@ -262,7 +345,7 @@ export default function HomeScreen() {
         confirmLabel="Clear selected"
         onCancel={() => setConfirmClearSelectedOpen(false)}
         onConfirm={() => {
-          setItems(prev => prev.filter(i => !i.done));
+          setItemsAndUpdate(prev => prev.filter(i => !i.done));
           setConfirmClearSelectedOpen(false);
         }}
       />
