@@ -47,6 +47,8 @@ import jakarta.validation.constraints.NotNull;
 
 import static com.chavna.pantryproject.Database.FAMILY_MEMBER_TABLE;
 import static com.chavna.pantryproject.Database.FAMILY_TABLE;
+import static com.chavna.pantryproject.Database.FOOD_ITEMS_TABLE;
+import static com.chavna.pantryproject.Database.FOOD_ITEM_TEMPLATES_TABLE;
 import static com.chavna.pantryproject.Database.PERSONAL_INFO_TABLE;
 import static com.chavna.pantryproject.Database.USERS_TABLE;
 
@@ -1066,11 +1068,11 @@ public class UserController {
         try {
             Connection con = Database.getRemoteConnection();
 
-            PreparedStatement statement = con.prepareStatement("""
-                INSERT INTO food_item_templates (name, owner, amount, unit, shelf_life_days, category)
+            PreparedStatement statement = con.prepareStatement(String.format("""
+                INSERT INTO %s (name, owner, amount, unit, shelf_life_days, category)
                 VALUES (?, ?, ?, ?, ?, ?)
                 RETURNING id;
-            """);
+            """, FOOD_ITEM_TEMPLATES_TABLE));
 
             statement.setString(1, requestBody.name);
             statement.setObject(2, login.userId);
@@ -1120,10 +1122,10 @@ public class UserController {
         try {
             Connection con = Database.getRemoteConnection();
 
-            String query = """
-                SELECT * FROM food_item_templates
+            String query = String.format("""
+                SELECT * FROM %s
                 WHERE owner = ?
-            """;
+            """, FOOD_ITEM_TEMPLATES_TABLE);
 
             if (requestBody.search != null)
                 query += " AND name LIKE ?";
@@ -1194,14 +1196,14 @@ public class UserController {
             
             values = values.substring(0, values.length() - 1);
             String query = String.format("""
-                INSERT INTO food_items
+                INSERT INTO %s
                 SELECT id, inserted.amount, expiration + INTERVAL '1 day' * shelf_life_days, unit_price, template_id FROM (
                     VALUES
                         %s
                 ) AS inserted (template_id, amount , expiration, unit_price)
-                INNER JOIN food_item_templates
+                INNER JOIN %s
                 ON id = template_id AND owner = ?;
-            """, values);
+            """, FOOD_ITEMS_TABLE, values, FOOD_ITEM_TEMPLATES_TABLE);
 
             PreparedStatement statement = con.prepareStatement(query);
 
@@ -1258,12 +1260,12 @@ public class UserController {
         try {
             Connection con = Database.getRemoteConnection();
 
-            String query = """
-                SELECT * FROM food_items
-                INNER JOIN food_item_templates
-                ON template_id = food_item_templates.id
+            String query = String.format("""
+                SELECT * FROM %s
+                INNER JOIN %s
+                ON template_id = %<s.id
                 WHERE owner = ? 
-            """;
+            """, FOOD_ITEMS_TABLE, FOOD_ITEM_TEMPLATES_TABLE);
 
             if (requestBody.category != null)
                 query += "AND category = ?";
@@ -1317,12 +1319,12 @@ public class UserController {
             Connection con = Database.getRemoteConnection();
 
             if (requestBody.newAmount > 0) {
-                PreparedStatement statement = con.prepareStatement("""
-                    UPDATE food_items
+                PreparedStatement statement = con.prepareStatement(String.format("""
+                    UPDATE %1$s
                     SET amount = ?, last_used = now()::date
-                    FROM food_item_templates
-                    WHERE food_items.id = ? AND food_item_templates.owner = ?;
-                """);
+                    FROM %2$s
+                    WHERE %1$s.id = ? AND %2$s.owner = ?;
+                """, FOOD_ITEMS_TABLE, FOOD_ITEM_TEMPLATES_TABLE));
                 statement.setDouble(1, requestBody.newAmount);
                 statement.setObject(2, requestBody.foodItemId);
                 statement.setObject(3, login.userId);
