@@ -74,22 +74,17 @@ public class PantryController {
         public FoodItemTemplate template;
     }
 
-    public static class GetFoodItemTemplatesRequest {
-        @Nullable
-        public String search;
-    }
-
     @AllArgsConstructor
     public static class GetFoodItemTemplatesResponse {
         public ArrayList<RegisteredFoodItemTemplate> templates;
     }
 
     @PostMapping("/get-food-item-templates")
-    public Response getFoodItemTemplates(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody(required = false) GetFoodItemTemplatesRequest requestBody) {
+    public Response getFoodItemTemplates(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody(required = false) GetFoodItemsRequest requestBody) {
         Login login = Authorization.authorize(authorizationHeader);
         
         if (requestBody == null)
-            requestBody = new GetFoodItemTemplatesRequest();
+            requestBody = new GetFoodItemsRequest();
 
         try {
             Connection con = Database.getRemoteConnection();
@@ -99,16 +94,25 @@ public class PantryController {
                 WHERE owner = ?
             """, FOOD_ITEM_TEMPLATES_TABLE);
 
+            if (requestBody.category != null)
+                query += "AND category = ? ";
+
             if (requestBody.search != null)
-                query += " AND name LIKE ?";
+                query += "AND name LIKE ?";
 
             PreparedStatement statement;
             statement = con.prepareStatement(query);
             statement.setObject(1, login.userId);
 
+            int i = 2;
+            if (requestBody.category != null) {
+                statement.setString(i, requestBody.category);
+                i++;
+            }
+
             if (requestBody.search != null) {
                 String like = '%' + requestBody.search + '%';
-                statement.setString(2, like);
+                statement.setString(i, like);
             }
 
             ResultSet result = statement.executeQuery();
@@ -206,6 +210,8 @@ public class PantryController {
     public static class GetFoodItemsRequest {
         @Nullable
         public String category;
+        @Nullable
+        public String search;
     }
 
     public static class FoodItem {
@@ -243,15 +249,27 @@ public class PantryController {
             """, FOOD_ITEMS_TABLE, FOOD_ITEM_TEMPLATES_TABLE);
 
             if (requestBody.category != null)
-                query += "AND category = ?";
+                query += "AND category = ? ";
+
+            if (requestBody.search != null)
+                query += "AND name LIKE ?";
 
             System.out.println(query);
 
             PreparedStatement statement = con.prepareStatement(query);
+
             statement.setObject(1, login.userId);
 
-            if (requestBody.category != null)
-                statement.setString(2, requestBody.category);
+            int i = 2;
+            if (requestBody.category != null) {
+                statement.setString(i, requestBody.category);
+                i++;
+            }
+
+            if (requestBody.search != null) {
+                String like = '%' + requestBody.search + '%';
+                statement.setString(i, like);
+            }
 
             ResultSet result = statement.executeQuery();
 
