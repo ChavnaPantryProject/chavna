@@ -3,6 +3,9 @@ import React , {useState, useEffect} from "react";
 import { Modal, View, Text, Pressable, StyleSheet } from "react-native";
 import { Feather, Entypo } from "@expo/vector-icons";
 import PopupForm from "../PopupForm";
+import { Modal, View, Text, Pressable, StyleSheet, ActivityIndicator } from "react-native";
+import { Feather, Entypo } from "@expo/vector-icons";
+import { API_URL, retrieveValue } from "../util";
 
 type Props = {
   visible: boolean;
@@ -10,6 +13,18 @@ type Props = {
   title?: string;
   children?: React.ReactNode;
 };
+
+type BackendFoodItem = {
+  id: string;
+  name: string;
+  amount: number;
+  unit: string;
+  expiration: string;
+  lastUsed: string | null;
+  unitPrice: number;
+  addDate: string;
+  category: string;
+}
 
 type FoodItem = {
   name: string;
@@ -60,6 +75,24 @@ export default function ModalFoodCategory({ visible, onClose, title, children }:
     qty: 0,
     expDate: "",
   });
+  const [arrOfFood, setArrOfFood] = useState<FoodItem[]>([])
+  const [loading, setLoading] = useState(false)
+  //saying this state will be an array of the FoodItem type, and then we initalize a COPY of the arrOfFood array
+  const [displayArr, setDisplayArr] = useState<FoodItem[]>([])
+
+  // States for sorting direction arrow 
+  //            ALL ARROWS WITH TRUE ARE THE DEFAULT, TRUE POINTS ARROW DOWN, FALSE POINTS ARROW UP
+  const [nameArrow, setNameArrow] = useState<boolean>(true)
+  const [weightArrow, setWeightArrow] = useState<boolean>(true)
+  const [qtyArrow, setQtyArrow] = useState<boolean>(true)
+  const [expDateArrow, setExpDateArrow] = useState<boolean>(true)
+
+  //color scheme for active an dnon active filters
+  const ACTIVEFILTERCOLOR = 'rgba(73,159,68,1)' //green
+  const NONACTIVEFILTERCOLOR = 'gray'
+
+  //state for the active filter
+  const [activeFilter, setActiveFilter] = useState<string>('')
 
   //function to reset all arrrows to defualt
   function resetAllArrows(){
@@ -95,6 +128,66 @@ export default function ModalFoodCategory({ visible, onClose, title, children }:
 
   //state for opening add food item modal
   const [addFoodItemModalVisble, setAddFoodItemModalVisible] = useState<boolean>(false)
+    setDisplayArr([...arrOfFood])
+  }
+
+  // Fetch food items from backend when modal opens and title changes
+  useEffect(() => {
+    if (visible && title) {
+      fetchFoodItems()
+    } else if (!visible) {
+      // Reset state when modal closes
+      resetState()
+    }
+  }, [visible, title])
+
+  const fetchFoodItems = async () => {
+    if (!title) return
+    
+    try {
+      setLoading(true)
+      const token = await retrieveValue("jwt")
+      if (!token) {
+        console.error("No authentication token found")
+        setLoading(false)
+        return
+      }
+
+      const response = await fetch(`${API_URL}/get-food-items`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ category: title }),
+      })
+
+      const data = await response.json()
+      
+      if (response.ok && data.success === 'success') {
+        const backendItems: BackendFoodItem[] = data.payload?.items || []
+        // Map backend items to frontend format
+        const mappedItems: FoodItem[] = backendItems.map(item => ({
+          name: item.name,
+          weight: 0,
+          qty: item.amount,
+          expDate: item.expiration ? new Date(item.expiration).toISOString().split('T')[0] : '',
+        }))
+        setArrOfFood(mappedItems)
+        setDisplayArr([...mappedItems])
+      } else {
+        console.error("Failed to fetch food items:", data.message || data)
+        setArrOfFood([])
+        setDisplayArr([])
+      }
+    } catch (error) {
+      console.error("Error fetching food items:", error)
+      setArrOfFood([])
+      setDisplayArr([])
+    } finally {
+      setLoading(false)
+    }
+  }
 
   //----------------------- Functions for sorting -----------------------
     //name ascending
@@ -102,6 +195,7 @@ export default function ModalFoodCategory({ visible, onClose, title, children }:
     resetAllArrows()
     setActiveFilter('name')
     return [...foodArray].sort((a , b) => a.name.localeCompare(b.name))
+    return [...arrOfFood].sort((a , b) => a.name.localeCompare(b.name))
   }
     //name descending
   function sortDescName(){
@@ -109,6 +203,7 @@ export default function ModalFoodCategory({ visible, onClose, title, children }:
     setActiveFilter('name')
     setNameArrow(false) //make arrow point up
     return[...foodArray].sort((a , b) => b.name.localeCompare(a.name))
+    return[...arrOfFood].sort((a , b) => b.name.localeCompare(a.name))
   }
     //weight ascending
   function sortAscWeight(){

@@ -4,6 +4,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import ModalFoodCategory from "../pantry/modalFoodCategory";
 import ModalCreateFoodCategory from "../pantry/modalAddCategory"
+import { API_URL, retrieveValue } from "../util"
+
+type GetCategoriesResponse = {
+  categories: Array<string>
+}
 
 const InventoryScreen = () => {
 
@@ -31,6 +36,10 @@ const InventoryScreen = () => {
   const [foodCategoryTitle, setFoodCategoryTitle] = useState<string | null >(null) 
   
 
+  const handleCategoryCreated = () => {
+    // Refresh categories after creating a new one
+    fetchCategories()
+  }
 
   return (
     <SafeAreaView style={style.container} edges={['left' ,'right' , 'bottom']}>
@@ -60,17 +69,21 @@ const InventoryScreen = () => {
     <ScrollView>
       {/* list of food categories */}
       <View style={style.catergoryContainer}>
-        {/* looping through foodCategories array to create a card for each category */}
-        {foodCategories.map((category) => (
-          <Pressable key={category} style={style.card} onPress={()=>{
-            openCategory() // open modal
-            setFoodCategoryTitle(category) //telling the modal what category to populate
-          }}>
-            <View style={style.cardTextContainer}>
-              <Text>{category}</Text>
-            </View>
-          </Pressable>
-        ))}
+        {loading ? (
+          <ActivityIndicator size="large" color="#499F44" style={{ marginTop: 50 }} />
+        ) : (
+          /* looping through foodCategories array to create a card for each category */
+          foodCategories.map((category) => (
+            <Pressable key={category} style={style.card} onPress={()=>{
+              openCategory() // open modal
+              setFoodCategoryTitle(category) //telling the modal what category to populate
+            }}>
+              <View style={style.cardTextContainer}>
+                <Text>{category}</Text>
+              </View>
+            </Pressable>
+          ))
+        )}
       </View>
 
       {/* This is a modal which will be a pop up for the food category, it is invisble until a user clicks on a category */}

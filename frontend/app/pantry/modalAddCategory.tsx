@@ -1,5 +1,7 @@
 import React,{useState} from "react";
 import { Modal, StyleSheet, Pressable, Text , TextInput, View} from "react-native";
+import { Modal, StyleSheet, Pressable, Text , TextInput, View, Alert, ActivityIndicator} from "react-native";
+import { API_URL, retrieveValue } from "../util";
 
 type Props = {
   visible: boolean;
@@ -12,6 +14,52 @@ type Props = {
 export default function ModalCreateFoodCategory({ visible, onClose, title, children, onSubmit}: Props){
 
   const [newCategoryName, setNewCateogoryName] = useState<string>("")
+  const [loading, setLoading] = useState(false)
+
+  const handleSubmit = async () => {
+    if (!newCategoryName.trim()) {
+      Alert.alert("Error", "Please enter a category name")
+      return
+    }
+
+    try {
+      setLoading(true)
+      const token = await retrieveValue("jwt")
+      if (!token) {
+        Alert.alert("Error", "No authentication token found")
+        setLoading(false)
+        return
+      }
+
+      // Create a food item template with the category name
+      // Using default values for required fields
+      const response = await fetch(`${API_URL}/create-category`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: newCategoryName
+        }),
+      })
+
+      const data = await response.json()
+      
+      if (response.ok && data.success === 'success') {
+        onSubmit(newCategoryName.trim())
+        setNewCateogoryName("")
+        onClose()
+      } else {
+        Alert.alert("Error", data.message || "Failed to create category")
+      }
+    } catch (error) {
+      console.error("Error creating category:", error)
+      Alert.alert("Error", "Failed to create category. Please try again.")
+    } finally {
+      setLoading(false)
+    }
+  }
   
     return(
         <Modal
@@ -21,7 +69,10 @@ export default function ModalCreateFoodCategory({ visible, onClose, title, child
         onRequestClose={onClose}
         >
             {/* backdrop that also dismisses */}
-            <Pressable style={style.backdrop} onPress={onClose}>
+            <Pressable style={style.backdrop} onPress={() => {
+              setNewCateogoryName("")
+              onClose()
+            }}>
 
                 {/* stop backdrop press from closing when tapping inside */}
                 <Pressable style={style.sheet} onPress={(e) => e.stopPropagation()}>
@@ -47,8 +98,15 @@ export default function ModalCreateFoodCategory({ visible, onClose, title, child
                   onClose()
                   setNewCateogoryName("")
                 }}
+                style={[style.buttonsForAddCategory, loading && style.buttonDisabled]}
+                onPress={handleSubmit}
+                disabled={loading}
                 >
-                  <Text style={style.textInButton}>Add</Text>
+                  {loading ? (
+                    <ActivityIndicator color="white" />
+                  ) : (
+                    <Text style={style.textInButton}>Add</Text>
+                  )}
                 </Pressable>
 
                 <Pressable 
@@ -57,6 +115,12 @@ export default function ModalCreateFoodCategory({ visible, onClose, title, child
                   onClose()
                   setNewCateogoryName("")
                 }}
+                style={[style.buttonsForAddCategory, loading && style.buttonDisabled]}
+                onPress={() => {
+                  setNewCateogoryName("")
+                  onClose()
+                }}
+                disabled={loading}
                 >
                   <Text style={style.textInButton}>Cancel</Text>
                 </Pressable>
@@ -126,5 +190,8 @@ const style = StyleSheet.create({
     padding: 8,
     fontWeight: 'bold',
     fontSize: 16
+  },
+  buttonDisabled: {
+    opacity: 0.5
   }
 });
