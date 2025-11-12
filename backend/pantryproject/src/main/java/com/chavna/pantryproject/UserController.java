@@ -199,20 +199,20 @@ public class UserController {
             try {
                 Connection con = Database.getRemoteConnection();
 
-                PreparedStatement emailStatement = con.prepareStatement("""
-                    SELECT id, password_hash FROM users
+                PreparedStatement emailStatement = con.prepareStatement(String.format("""
+                    SELECT id, password_hash FROM %s
                     WHERE email = ?
-                """);
+                """, USERS_TABLE));
                 emailStatement.setString(1, email);
                 ResultSet result = emailStatement.executeQuery();
 
                 if (!result.next()) {
                     // Create user if not exists
-                    PreparedStatement createUserStatement = con.prepareStatement("""
-                        INSERT INTO users (email, password_hash)
+                    PreparedStatement createUserStatement = con.prepareStatement(String.format("""
+                        INSERT INTO %s (email, password_hash)
                         VALUES (?, ?)
                         RETURNING id, password_hash
-                    """);
+                    """, USERS_TABLE));
                     createUserStatement.setString(1, email);
                     createUserStatement.setBytes(2, GOOGLE_PASSWORD_HASH);
 
