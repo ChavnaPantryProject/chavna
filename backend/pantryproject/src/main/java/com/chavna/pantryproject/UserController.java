@@ -50,6 +50,7 @@ import static com.chavna.pantryproject.Database.FAMILY_TABLE;
 import static com.chavna.pantryproject.Database.FOOD_ITEMS_TABLE;
 import static com.chavna.pantryproject.Database.FOOD_ITEM_TEMPLATES_TABLE;
 import static com.chavna.pantryproject.Database.PERSONAL_INFO_TABLE;
+import static com.chavna.pantryproject.Database.SHOPPING_LIST_TABLE;
 import static com.chavna.pantryproject.Database.USERS_TABLE;
 
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
@@ -1073,17 +1074,17 @@ public class UserController {
         try {
             Connection con = Database.getRemoteConnection();
 
-            PreparedStatement delete = con.prepareStatement("""
-                DELETE FROM shopping_list
+            PreparedStatement delete = con.prepareStatement(String.format("""
+                DELETE FROM %s
                 WHERE user_id = ?
-            """);
+            """, SHOPPING_LIST_TABLE));
             delete.setObject(1, login.userId);
             delete.executeUpdate();
 
             if (requestBody.items.size() == 0)
                 return OkResponse.Success();
 
-            String query = "INSERT INTO shopping_list (item_name, buy_item, user_id, order_index) VALUES";
+            String query = String.format("INSERT INTO %s (item_name, buy_item, user_id, order_index) VALUES", SHOPPING_LIST_TABLE);
             for (@SuppressWarnings("unused") var __ : requestBody.items) {
                 query += " (?, ?, ?, ?),";
             }
@@ -1125,11 +1126,11 @@ public class UserController {
         try {
             Connection con = Database.getRemoteConnection();
 
-            PreparedStatement statement = con.prepareStatement("""
-                SELECT item_name, buy_item FROM shopping_list
+            PreparedStatement statement = con.prepareStatement(String.format("""
+                SELECT item_name, buy_item FROM %s
                 WHERE user_id = ?
                 ORDER BY order_index;
-            """);
+            """, SHOPPING_LIST_TABLE));
             statement.setObject(1, login.userId);
 
             ResultSet result = statement.executeQuery();
