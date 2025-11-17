@@ -24,7 +24,7 @@ possible usage:
 />
 */
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Modal,
   View,
@@ -74,6 +74,13 @@ const PopupMenu: React.FC<PopupMenuProps> = ({
     });
     onClose();
   };
+
+  useEffect(() => {
+    console.log(dropdownOptions)
+    const option = dropdownOptions[0]?.value || "";
+    console.log(option);
+    setSelectedOption(option);
+  }, [dropdownOptions])
 
   return (
     <Modal visible={visible} transparent animationType="fade">
