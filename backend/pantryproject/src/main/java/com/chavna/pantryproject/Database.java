@@ -16,6 +16,8 @@ public class Database {
     public static final String FAMILY_MEMBER_TABLE = "family_member";
     public static final String FOOD_ITEM_TEMPLATES_TABLE = "food_item_templates";
     public static final String FOOD_ITEMS_TABLE = "food_items";
+    public static final String MEAL_INGREDIENTS_TABLE = "meal_ingredients";
+    public static final String MEALS_TABLE = "meals";
     public static final String PERSONAL_INFO_TABLE = "personal_info";
     public static final String SCAN_ITEMS_TABLE = "scan_items";
     public static final String SHOPPING_LIST_TABLE = "shopping_list";
