@@ -28,13 +28,6 @@ public class MealController {
         public Double amount;
     }
 
-    public static class Meal {
-        @Nullable
-        public String name;
-        @NotNull
-        public ArrayList<Ingredient> ingredients;
-    }
-
     private static int insertMealIngredients(Connection con, UUID mealId, ArrayList<Ingredient> ingredients) throws SQLException {
             if (ingredients.size() == 0)
                 return 0;
@@ -70,6 +63,8 @@ public class MealController {
     public static class CreateMealRequest {
         @NotNull
         public String name;
+        @NotNull
+        public ArrayList<Ingredient> ingredients;
     }
 
     @AllArgsConstructor
@@ -99,6 +94,7 @@ public class MealController {
 
             UUID mealId = (UUID) result.getObject(1);
             
+            insertMealIngredients(con, mealId, requestBody.ingredients);
 
             return Response.Success(new CreateMealResponse(mealId));
         } catch (SQLException ex) {
@@ -183,6 +179,13 @@ public class MealController {
         }
     }
 
+    public static class Meal {
+        @Nullable
+        public String name;
+        @Nullable
+        public ArrayList<Ingredient> ingredients;
+    }
+
     public static class UpdateMealRequest {
         @NotNull
         public UUID mealId;
@@ -224,7 +227,8 @@ public class MealController {
                     return Response.Fail("Meal ID Not Found.");
             }
 
-            insertMealIngredients(con, requestBody.mealId, requestBody.meal.ingredients);
+            if (requestBody.meal.ingredients != null)
+                insertMealIngredients(con, requestBody.mealId, requestBody.meal.ingredients);
 
             return Response.Success();
         } catch (SQLException ex) {
