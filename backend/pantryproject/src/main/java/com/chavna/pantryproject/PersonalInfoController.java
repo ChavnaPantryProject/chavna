@@ -86,8 +86,8 @@ public class PersonalInfoController {
 
             return Response.Success(jsonObject);
         } catch (SQLException ex) {
-            ex.printStackTrace();
-            return Database.getSQLErrorHTTPResponse();
+            
+            return Database.getSQLErrorHTTPResponse(ex);
         }
     }
 

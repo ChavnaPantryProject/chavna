@@ -130,11 +130,17 @@ public class Database {
         return result.getString(1);
     }
 
-    public static Response getSQLErrorHTTPResponse() {
+    public static Response getSQLErrorHTTPResponse(SQLException ex) {
+        System.err.println("SQL State: " + ex.getSQLState());
+        ex.printStackTrace();
+
         return Response.Error(HttpStatus.INTERNAL_SERVER_ERROR, "SQL Error.");
     }
 
-    public static ResponseException getSQLErrorHTTPResponseException() {
+    public static ResponseException getSQLErrorHTTPResponseException(SQLException ex) {
+        System.err.println("SQL State: " + ex.getSQLState());
+        ex.printStackTrace();
+
         return new ResponseException(Response.Error(HttpStatus.INTERNAL_SERVER_ERROR, "SQL Error."));
     }
 }

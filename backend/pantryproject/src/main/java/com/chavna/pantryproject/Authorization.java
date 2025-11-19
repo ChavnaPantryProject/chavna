@@ -182,7 +182,7 @@ public class Authorization {
                 if (!loginState.equals(((NormalLogin) login).loginState))
                     throw new ResponseException(Response.Error(HttpStatus.UNAUTHORIZED, "Invalid login token."));
             } catch (SQLException ex) {
-                ex.printStackTrace();
+                
                 throw new ResponseException(Response.Error(HttpStatus.INTERNAL_SERVER_ERROR, "SQL Error."));
             }
         } else {

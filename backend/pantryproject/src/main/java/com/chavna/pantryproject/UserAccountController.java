@@ -216,8 +216,8 @@ public class UserAccountController {
 
                 loginToken = Authorization.createGmailLoginToken(userId, accessToken);
             } catch (SQLException ex) {
-                ex.printStackTrace();
-                throw Database.getSQLErrorHTTPResponseException();
+                
+                throw Database.getSQLErrorHTTPResponseException(ex);
             }
 
             authHTML = String.format("""
@@ -291,8 +291,8 @@ public class UserAccountController {
             if (results.next())
                 return Response.Error(HttpStatus.CONFLICT, "User with email already exists.");
         } catch (SQLException ex) {
-            ex.printStackTrace();
-            return Database.getSQLErrorHTTPResponse();
+            
+            return Database.getSQLErrorHTTPResponse(ex);
         }
         
         String token = Authorization.createSingupToken(request.email, request.password);
@@ -370,11 +370,11 @@ public class UserAccountController {
             statement.executeUpdate();
         }
         catch (SQLException ex) {
-            ex.printStackTrace();
+            
             if (ex.getSQLState().equals("23505"))
                 throw new ResponseException(Response.Error(HttpStatus.INTERNAL_SERVER_ERROR, "User with email already exists."));
 
-            throw Database.getSQLErrorHTTPResponseException();
+            throw Database.getSQLErrorHTTPResponseException(ex);
         }
 
         return ResponseEntity.ok("Account succesfully created.");

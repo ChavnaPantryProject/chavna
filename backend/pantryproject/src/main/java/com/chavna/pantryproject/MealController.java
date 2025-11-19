@@ -102,9 +102,9 @@ public class MealController {
 
             return Response.Success(new CreateMealResponse(mealId));
         } catch (SQLException ex) {
-            ex.printStackTrace();
+            
 
-            return Database.getSQLErrorHTTPResponse();
+            return Database.getSQLErrorHTTPResponse(ex);
         }
     }
 
@@ -176,9 +176,9 @@ public class MealController {
 
             return Response.Success(new GetMealResponse(meal));
         } catch (SQLException ex) {
-            ex.printStackTrace();
+            
 
-            return Database.getSQLErrorHTTPResponse();
+            return Database.getSQLErrorHTTPResponse(ex);
         }
     }
 
@@ -227,9 +227,9 @@ public class MealController {
 
             return Response.Success();
         } catch (SQLException ex) {
-            ex.printStackTrace();
+            
 
-            return Database.getSQLErrorHTTPResponse();
+            return Database.getSQLErrorHTTPResponse(ex);
         }
     }
 }

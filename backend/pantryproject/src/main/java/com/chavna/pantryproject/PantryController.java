@@ -64,8 +64,8 @@ public class PantryController {
                 return Response.Fail("Category does not exist.");
 
             System.out.println("SQL Error Code: " + ex.getSQLState());
-            ex.printStackTrace();
-            return Database.getSQLErrorHTTPResponse();
+            
+            return Database.getSQLErrorHTTPResponse(ex);
         }
     }
 
@@ -132,9 +132,9 @@ public class PantryController {
 
             return Response.Success(templates);
         } catch (SQLException ex) {
-            ex.printStackTrace();
             
-            return Database.getSQLErrorHTTPResponse();
+            
+            return Database.getSQLErrorHTTPResponse(ex);
         }
     }
 
@@ -198,8 +198,8 @@ public class PantryController {
 
             return Response.Success("Items added: " + updated);
         } catch (SQLException ex) {
-            ex.printStackTrace();
-            return Database.getSQLErrorHTTPResponse();
+            
+            return Database.getSQLErrorHTTPResponse(ex);
         }
     }
 
@@ -274,8 +274,8 @@ public class PantryController {
 
             return Response.Success(new GetFoodItemsResponse(items));
         } catch (SQLException ex) {
-            ex.printStackTrace();
-            return Database.getSQLErrorHTTPResponse();
+            
+            return Database.getSQLErrorHTTPResponse(ex);
         }
     }
 
@@ -309,8 +309,8 @@ public class PantryController {
 
             }
         } catch (SQLException ex) {
-            ex.printStackTrace();
-            return Database.getSQLErrorHTTPResponse();
+            
+            return Database.getSQLErrorHTTPResponse(ex);
         }
         return Response.Success();
     }
@@ -341,8 +341,8 @@ public class PantryController {
                 return Response.Fail("Category already exists.");
             }
 
-            ex.printStackTrace();
-            return Database.getSQLErrorHTTPResponse();
+            
+            return Database.getSQLErrorHTTPResponse(ex);
         }
 
         return Response.Success("Category created.");
@@ -367,8 +367,8 @@ public class PantryController {
             if (removed == 0)
                 return Response.Fail("Category not found.");
         } catch (SQLException ex) {
-            ex.printStackTrace();
-            return Database.getSQLErrorHTTPResponse();
+            
+            return Database.getSQLErrorHTTPResponse(ex);
         }
 
         return Response.Success("Category removed.");
@@ -403,8 +403,8 @@ public class PantryController {
 
             return Response.Success(response);
         } catch (SQLException ex) {
-            ex.printStackTrace();
-            return Database.getSQLErrorHTTPResponse();
+            
+            return Database.getSQLErrorHTTPResponse(ex);
         }
     }
 }

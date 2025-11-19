@@ -79,8 +79,8 @@ public class ShoppingListController {
 
             insert.executeUpdate();
         } catch (SQLException ex) {
-            ex.printStackTrace();
-            return Database.getSQLErrorHTTPResponse();
+            
+            return Database.getSQLErrorHTTPResponse(ex);
         }
 
         return Response.Success();
@@ -112,8 +112,8 @@ public class ShoppingListController {
 
             return Response.Success(list);
         } catch (SQLException ex) {
-            ex.printStackTrace();
-            return Database.getSQLErrorHTTPResponse();
+            
+            return Database.getSQLErrorHTTPResponse(ex);
         }
     }
 }
