@@ -19,7 +19,6 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.chavna.pantryproject.Authorization.Login;
-import com.chavna.pantryproject.UserAccountController.FoodItemTemplate;
 
 import jakarta.annotation.Nullable;
 import jakarta.validation.Valid;
@@ -28,6 +27,18 @@ import lombok.AllArgsConstructor;
 
 @RestController
 public class PantryController {
+    public static class FoodItemTemplate {
+        @NotNull
+        public String name;
+        @NotNull
+        public Double amount;
+        @NotNull
+        public String unit;
+        @NotNull
+        public Integer shelfLifeDays;
+        @NotNull
+        public String category;
+    }
     
     @PostMapping("/create-food-item-template")
     public Response createFoodItemTemplate(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody FoodItemTemplate requestBody) {

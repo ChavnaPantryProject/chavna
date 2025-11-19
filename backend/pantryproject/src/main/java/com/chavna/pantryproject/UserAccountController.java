@@ -403,17 +403,4 @@ public class UserAccountController {
 
         return ResponseEntity.ok("Verification email sent.");
     }
-
-    public static class FoodItemTemplate {
-        @NotNull
-        public String name;
-        @NotNull
-        public Double amount;
-        @NotNull
-        public String unit;
-        @NotNull
-        public Integer shelfLifeDays;
-        @NotNull
-        public String category;
-    }
 }
