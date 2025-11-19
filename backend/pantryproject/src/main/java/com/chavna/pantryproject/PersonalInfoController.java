@@ -39,8 +39,6 @@ public class PersonalInfoController {
         else if (requestBody.email != null && requestBody.userId != null)
             return Response.Error(HttpStatus.BAD_REQUEST, "Request body may only contain email or user id, not both.");
 
-        Connection con = Database.getRemoteConnection();
-
         UUID authorizedUser;
         if (authorizationHeader != null)
             authorizedUser = Authorization.authorize(authorizationHeader).userId;
@@ -49,6 +47,8 @@ public class PersonalInfoController {
         
         UUID requestedUser;
         try {
+            Connection con = Database.getRemoteConnection();
+            
             if (requestBody.email != null) {
                 // Check if user exists
                 PreparedStatement idFromEmailStatement = con.prepareStatement(String.format("""
@@ -86,8 +86,8 @@ public class PersonalInfoController {
 
             return Response.Success(jsonObject);
         } catch (SQLException ex) {
-            ex.printStackTrace();
-            return Database.getSQLErrorHTTPResponse();
+            
+            return Database.getSQLErrorHTTPResponse(ex);
         }
     }
 
@@ -97,7 +97,6 @@ public class PersonalInfoController {
 
     @PostMapping("/set-personal-info")
     public Response setPersonalInfo(@RequestHeader("Authorization") String authorizationHeader, @RequestBody HashMap<String, Object> requestBody) {
-        Connection con = Database.getRemoteConnection();
         UUID user = Authorization.authorize(authorizationHeader).userId;
         if (requestBody.containsKey("user_id"))
             return Response.Error(HttpStatus.BAD_REQUEST, "Invalid column: \"user_id\"");
@@ -105,6 +104,8 @@ public class PersonalInfoController {
         requestBody.put("user_id", user);
 
         try {
+            Connection con = Database.getRemoteConnection();
+
             HashMap<String, Object> defaultInfo = Database.getDefaultTableEntry(con, PERSONAL_INFO_TABLE);
             String valuesString = "(";
             String columnsString = "(";

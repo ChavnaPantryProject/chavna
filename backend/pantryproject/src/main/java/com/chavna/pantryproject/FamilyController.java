@@ -104,8 +104,8 @@ public class FamilyController {
             updateQuery.setObject(2, user);
             updateQuery.executeUpdate();
         } catch (SQLException ex) {
-            ex.printStackTrace();
-            return Database.getSQLErrorHTTPResponse();
+            
+            return Database.getSQLErrorHTTPResponse(ex);
         }
 
         return Response.Success("Family created");
@@ -147,8 +147,8 @@ public class FamilyController {
             removeMemberQuery.setObject(1, memberId);
             removeMemberQuery.executeUpdate();
         } catch (SQLException ex) {
-            ex.printStackTrace();
-            return Database.getSQLErrorHTTPResponse();
+            
+            return Database.getSQLErrorHTTPResponse(ex);
         }
 
         return Response.Success("Left family");
@@ -190,8 +190,8 @@ public class FamilyController {
             removeFamily.setObject(1, familyId);
             removeFamily.executeUpdate();
         } catch (SQLException ex) {
-            ex.printStackTrace();
-            return Database.getSQLErrorHTTPResponse();
+            
+            return Database.getSQLErrorHTTPResponse(ex);
         }
 
         return Response.Success("Deleted family");
@@ -277,8 +277,8 @@ public class FamilyController {
 
             Email.sendEmail("noreply@email.chavnapantry.com", requestBody.email, emailContent, "Family Invitation Request.");
         } catch (SQLException ex) {
-            ex.printStackTrace();
-            return Database.getSQLErrorHTTPResponse();
+            
+            return Database.getSQLErrorHTTPResponse(ex);
         }
 
         return Response.Success("Invitation sent.");
@@ -373,8 +373,8 @@ public class FamilyController {
             updateQuery.setObject(2, invite.recipientId);
             updateQuery.executeUpdate();
         } catch (SQLException ex) {
-            ex.printStackTrace();
-            throw Database.getSQLErrorHTTPResponseException();
+            
+            throw Database.getSQLErrorHTTPResponseException(ex);
         }
         
         return ResponseEntity.ok("Invite accepted.");
@@ -427,8 +427,8 @@ public class FamilyController {
 
             return Response.Success(new GetFamilyMemembersResponse(members));
         } catch (SQLException ex) {
-            ex.printStackTrace();
-            return Database.getSQLErrorHTTPResponse();
+            
+            return Database.getSQLErrorHTTPResponse(ex);
         }
     }
 
@@ -531,8 +531,8 @@ public class FamilyController {
 
             return Response.Success("Member removed.");
         } catch (SQLException ex) {
-            ex.printStackTrace();
-            return Database.getSQLErrorHTTPResponse();
+            
+            return Database.getSQLErrorHTTPResponse(ex);
         }
     }
 }

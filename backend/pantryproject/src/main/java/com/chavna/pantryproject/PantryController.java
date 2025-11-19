@@ -19,7 +19,6 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.chavna.pantryproject.Authorization.Login;
-import com.chavna.pantryproject.UserAccountController.FoodItemTemplate;
 
 import jakarta.annotation.Nullable;
 import jakarta.validation.Valid;
@@ -28,6 +27,18 @@ import lombok.AllArgsConstructor;
 
 @RestController
 public class PantryController {
+    public static class FoodItemTemplate {
+        @NotNull
+        public String name;
+        @NotNull
+        public Double amount;
+        @NotNull
+        public String unit;
+        @NotNull
+        public Integer shelfLifeDays;
+        @NotNull
+        public String category;
+    }
     
     @PostMapping("/create-food-item-template")
     public Response createFoodItemTemplate(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody FoodItemTemplate requestBody) {
@@ -64,8 +75,8 @@ public class PantryController {
                 return Response.Fail("Category does not exist.");
 
             System.out.println("SQL Error Code: " + ex.getSQLState());
-            ex.printStackTrace();
-            return Database.getSQLErrorHTTPResponse();
+            
+            return Database.getSQLErrorHTTPResponse(ex);
         }
     }
 
@@ -132,9 +143,9 @@ public class PantryController {
 
             return Response.Success(templates);
         } catch (SQLException ex) {
-            ex.printStackTrace();
             
-            return Database.getSQLErrorHTTPResponse();
+            
+            return Database.getSQLErrorHTTPResponse(ex);
         }
     }
 
@@ -198,8 +209,8 @@ public class PantryController {
 
             return Response.Success("Items added: " + updated);
         } catch (SQLException ex) {
-            ex.printStackTrace();
-            return Database.getSQLErrorHTTPResponse();
+            
+            return Database.getSQLErrorHTTPResponse(ex);
         }
     }
 
@@ -274,8 +285,8 @@ public class PantryController {
 
             return Response.Success(new GetFoodItemsResponse(items));
         } catch (SQLException ex) {
-            ex.printStackTrace();
-            return Database.getSQLErrorHTTPResponse();
+            
+            return Database.getSQLErrorHTTPResponse(ex);
         }
     }
 
@@ -309,8 +320,8 @@ public class PantryController {
 
             }
         } catch (SQLException ex) {
-            ex.printStackTrace();
-            return Database.getSQLErrorHTTPResponse();
+            
+            return Database.getSQLErrorHTTPResponse(ex);
         }
         return Response.Success();
     }
@@ -341,8 +352,8 @@ public class PantryController {
                 return Response.Fail("Category already exists.");
             }
 
-            ex.printStackTrace();
-            return Database.getSQLErrorHTTPResponse();
+            
+            return Database.getSQLErrorHTTPResponse(ex);
         }
 
         return Response.Success("Category created.");
@@ -367,8 +378,8 @@ public class PantryController {
             if (removed == 0)
                 return Response.Fail("Category not found.");
         } catch (SQLException ex) {
-            ex.printStackTrace();
-            return Database.getSQLErrorHTTPResponse();
+            
+            return Database.getSQLErrorHTTPResponse(ex);
         }
 
         return Response.Success("Category removed.");
@@ -403,8 +414,8 @@ public class PantryController {
 
             return Response.Success(response);
         } catch (SQLException ex) {
-            ex.printStackTrace();
-            return Database.getSQLErrorHTTPResponse();
+            
+            return Database.getSQLErrorHTTPResponse(ex);
         }
     }
 }
