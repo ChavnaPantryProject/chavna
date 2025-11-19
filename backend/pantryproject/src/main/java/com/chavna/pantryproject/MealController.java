@@ -7,6 +7,7 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.UUID;
 
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -245,6 +246,50 @@ public class MealController {
             }
 
             return Response.Success(new UpdateMealResponse(added));
+        } catch (SQLException ex) {
+            return Database.getSQLErrorHTTPResponse(ex);
+        }
+    }
+
+    public static class MealResponse {
+        public UUID mealId;
+        public String name;
+    }
+
+    public static class GetMealsResponse {
+        public ArrayList<MealResponse> meals;
+
+        public GetMealsResponse() {
+            meals = new ArrayList<>();
+        }
+    }
+
+    @GetMapping("/get-meals")
+    public Response getMeals(@RequestHeader("Authorization") String authorizationHeader) {
+        Login login = Authorization.authorize(authorizationHeader);
+
+        try {
+            Connection con = Database.getRemoteConnection();
+
+            PreparedStatement statement = con.prepareStatement(String.format("""
+                SELECT id, name FROM %s
+                WHERE owner = ?
+            """, Database.MEALS_TABLE));
+            statement.setObject(1, login.userId);
+
+            ResultSet result = statement.executeQuery();
+
+            GetMealsResponse response = new GetMealsResponse();
+
+            while (result.next()) {
+                MealResponse meal = new MealResponse();
+                meal.mealId = (UUID) result.getObject(1);
+                meal.name = result.getString(2);
+
+                response.meals.add(meal);
+            }
+
+            return Response.Success(response);
         } catch (SQLException ex) {
             return Database.getSQLErrorHTTPResponse(ex);
         }
