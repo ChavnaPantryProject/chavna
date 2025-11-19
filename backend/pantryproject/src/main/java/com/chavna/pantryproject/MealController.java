@@ -8,11 +8,13 @@ import java.util.ArrayList;
 import java.util.UUID;
 
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.chavna.pantryproject.Authorization.Login;
 
+import jakarta.annotation.Nullable;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -26,6 +28,45 @@ public class MealController {
         public Double amount;
     }
 
+    public static class Meal {
+        @Nullable
+        public String name;
+        @NotNull
+        public ArrayList<Ingredient> ingredients;
+    }
+
+    private static int insertMealIngredients(Connection con, UUID mealId, ArrayList<Ingredient> ingredients) throws SQLException {
+            if (ingredients.size() == 0)
+                return 0;
+
+            String query = String.format("INSERT INTO %s (amount, template_id, meal_id, order_index) VALUES", Database.MEAL_INGREDIENTS_TABLE);
+            for (@SuppressWarnings("unused") var __ : ingredients) {
+                query += " (?, ?, ?, ?),";
+            }
+            query = query.substring(0, query.length() - 1);
+            PreparedStatement insert = con.prepareStatement(query);
+
+            int i = 1;
+            int order = 0;
+            for (Ingredient ingredient : ingredients) {
+                insert.setDouble(i, ingredient.amount);
+                i++;
+
+                insert.setObject(i, ingredient.templateId);
+                i++;
+
+                insert.setObject(i, mealId);
+                i++;
+
+                insert.setInt(i, order);
+                i++;
+
+                order++;
+            }
+
+            return insert.executeUpdate();
+    }
+
     public static class CreateMealRequest {
         @NotNull
         public String name;
@@ -37,7 +78,7 @@ public class MealController {
     }
 
     @PostMapping("/create-meal")
-    public Response createMeal(@RequestHeader("Authorization") String authorizationHeader, @Valid CreateMealRequest requestBody) {
+    public Response createMeal(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody CreateMealRequest requestBody) {
         Login login = Authorization.authorize(authorizationHeader);
 
         try {
@@ -90,23 +131,27 @@ public class MealController {
     }
 
     @PostMapping("/get-meal")
-    public Response getMeal(@RequestHeader("Authorization") String authorizationHeader, @Valid GetMealRequest requestBody) {
+    public Response getMeal(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody GetMealRequest requestBody) {
         Login login = Authorization.authorize(authorizationHeader);
 
         try {
             Connection con = Database.getRemoteConnection();
 
-            PreparedStatement statement = con.prepareStatement(String.format("""
-                SELECT * FROM %1$s
-                INNER JOIN %2$s
-                ON %1$s.owner = %2$s.id
+            String query = String.format("""
+                SELECT %2$s.name, %3$s.id, %1$s.amount, %3$s.name, %3$s.unit FROM %1$s
                 INNER JOIN %3$s
                 ON %1$s.template_id = %3$s.id
-                WHERE $2$s.id = ? AND %1$s.owner = ?;
-            """, Database.MEAL_INGREDIENTS_TABLE, Database.MEALS_TABLE, Database.FOOD_ITEM_TEMPLATES_TABLE));
+                INNER JOIN %2$s
+                ON %1$s.meal_id = %2$s.id
+                WHERE %2$s.id = ? AND %2$s.owner = ? AND %3$s.owner = ?
+                ORDER BY order_index;
+            """, Database.MEAL_INGREDIENTS_TABLE, Database.MEALS_TABLE, Database.FOOD_ITEM_TEMPLATES_TABLE);
+            System.out.println(query);
+            PreparedStatement statement = con.prepareStatement(query);
 
             statement.setObject(1, requestBody.mealId);
             statement.setObject(2, login.userId);
+            statement.setObject(3, login.userId);
 
             ResultSet result = statement.executeQuery();
 
@@ -114,13 +159,13 @@ public class MealController {
             String mealName = null;
             
             while (result.next()) {
-                mealName = result.getString(Database.MEALS_TABLE + ".name");
+                mealName = result.getString(1);
 
                 FlattenedIngredient ingredient = new FlattenedIngredient();
-                ingredient.templateId = (UUID) result.getObject(Database.FOOD_ITEM_TEMPLATES_TABLE + ".id");
-                ingredient.amount = result.getDouble(Database.MEAL_INGREDIENTS_TABLE + ".amount");
-                ingredient.name = result.getString(Database.FOOD_ITEM_TEMPLATES_TABLE + ".name");
-                ingredient.unit = result.getString(Database.FOOD_ITEM_TEMPLATES_TABLE + ".unit");
+                ingredient.templateId = (UUID) result.getObject(2);
+                ingredient.amount = result.getDouble(3);
+                ingredient.name = result.getString(4);
+                ingredient.unit = result.getString(5);
 
                 ingredients.add(ingredient);
             }
@@ -137,56 +182,50 @@ public class MealController {
         }
     }
 
-    public static class Meal {
-        public String name;
-        public ArrayList<Ingredient> ingredients;
-    }
-
     public static class UpdateMealRequest {
-        Meal meal;
+        @NotNull
+        public UUID mealId;
+        @NotNull
+        public Meal meal;
     }
 
     @PostMapping("/update-meal")
-    public Response setMeal(@RequestHeader("Authorization") String authorizationHeader, @Valid GetMealRequest requestBody) {
+    public Response setMeal(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody UpdateMealRequest requestBody) {
         Login login = Authorization.authorize(authorizationHeader);
 
         try {
             Connection con = Database.getRemoteConnection();
 
-            PreparedStatement statement = con.prepareStatement(String.format("""
-                SELECT * FROM %1$s
-                INNER JOIN %2$s
-                ON %1$s.owner = %2$s.id
-                INNER JOIN %3$s
-                ON %1$s.template_id = %3$s.id
-                WHERE $2$s.id = ? AND %1$s.owner = ?;
-            """, Database.MEAL_INGREDIENTS_TABLE, Database.MEALS_TABLE, Database.FOOD_ITEM_TEMPLATES_TABLE));
+            PreparedStatement deleteStatement = con.prepareStatement(String.format("""
+                DELETE FROM %1$s
+                USING %2$s
+                WHERE meal_id = %2$s.id
+                  AND meal_id = ?
+                  AND owner = ?;
+            """, Database.MEAL_INGREDIENTS_TABLE, Database.MEALS_TABLE));
+            deleteStatement.setObject(1, requestBody.mealId);
+            deleteStatement.setObject(2, login.userId);
 
-            statement.setObject(1, requestBody.mealId);
-            statement.setObject(2, login.userId);
+            deleteStatement.executeUpdate();
 
-            ResultSet result = statement.executeQuery();
+            if (requestBody.meal.name != null) {
+                PreparedStatement updateStatement = con.prepareStatement(String.format("""
+                    UPDATE %s
+                    SET name = ?
+                    WHERE id = ? AND owner = ?;
+                """, Database.MEALS_TABLE));
 
-            ArrayList<FlattenedIngredient> ingredients = new ArrayList<>();
-            String mealName = null;
-            
-            while (result.next()) {
-                mealName = result.getString(Database.MEALS_TABLE + ".name");
+                updateStatement.setString(1, requestBody.meal.name);
+                updateStatement.setObject(2, requestBody.mealId);
+                updateStatement.setObject(3, login.userId);
 
-                FlattenedIngredient ingredient = new FlattenedIngredient();
-                ingredient.templateId = (UUID) result.getObject(Database.FOOD_ITEM_TEMPLATES_TABLE + ".id");
-                ingredient.amount = result.getDouble(Database.MEAL_INGREDIENTS_TABLE + ".amount");
-                ingredient.name = result.getString(Database.FOOD_ITEM_TEMPLATES_TABLE + ".name");
-                ingredient.unit = result.getString(Database.FOOD_ITEM_TEMPLATES_TABLE + ".unit");
-
-                ingredients.add(ingredient);
+                if (updateStatement.executeUpdate() < 1)
+                    return Response.Fail("Meal ID Not Found.");
             }
 
-            FlattenedMeal meal = new FlattenedMeal();
-            meal.name = mealName;
-            meal.ingredients = ingredients;
+            insertMealIngredients(con, requestBody.mealId, requestBody.meal.ingredients);
 
-            return Response.Success(new GetMealResponse(meal));
+            return Response.Success();
         } catch (SQLException ex) {
             ex.printStackTrace();
 
