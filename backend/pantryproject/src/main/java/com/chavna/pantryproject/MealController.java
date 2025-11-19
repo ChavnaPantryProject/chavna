@@ -70,6 +70,7 @@ public class MealController {
     @AllArgsConstructor
     public static class CreateMealResponse {
         public UUID mealId;
+        public int ingredientsAdded;
     }
 
     @PostMapping("/create-meal")
@@ -94,9 +95,12 @@ public class MealController {
 
             UUID mealId = (UUID) result.getObject(1);
             
-            insertMealIngredients(con, mealId, requestBody.ingredients);
+            int added = insertMealIngredients(con, mealId, requestBody.ingredients);
 
-            return Response.Success(new CreateMealResponse(mealId));
+            if (added < requestBody.ingredients.size())
+                return Response.Fail("Failed to add some ingredients.", new CreateMealResponse(mealId, added));
+
+            return Response.Success(new CreateMealResponse(mealId, added));
         } catch (SQLException ex) {
             if (ex.getSQLState() == "23505")
                 return Response.Fail("Meal with that name already exists.");
@@ -193,6 +197,11 @@ public class MealController {
         public Meal meal;
     }
 
+    @AllArgsConstructor
+    public static class UpdateMealResponse {
+        public int ingredientsAdded;
+    }
+
     @PostMapping("/update-meal")
     public Response setMeal(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody UpdateMealRequest requestBody) {
         Login login = Authorization.authorize(authorizationHeader);
@@ -227,10 +236,15 @@ public class MealController {
                     return Response.Fail("Meal ID Not Found.");
             }
 
-            if (requestBody.meal.ingredients != null)
-                insertMealIngredients(con, requestBody.mealId, requestBody.meal.ingredients);
+            int added = 0;
+            if (requestBody.meal.ingredients != null) {
+                added = insertMealIngredients(con, requestBody.mealId, requestBody.meal.ingredients);
 
-            return Response.Success();
+                if (added < requestBody.meal.ingredients.size())
+                    return Response.Fail("Failed to add some ingredients.", new UpdateMealResponse(added));
+            }
+
+            return Response.Success(new UpdateMealResponse(added));
         } catch (SQLException ex) {
             return Database.getSQLErrorHTTPResponse(ex);
         }
