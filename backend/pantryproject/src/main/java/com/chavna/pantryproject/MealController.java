@@ -102,7 +102,8 @@ public class MealController {
 
             return Response.Success(new CreateMealResponse(mealId));
         } catch (SQLException ex) {
-            
+            if (ex.getSQLState() == "23505")
+                return Response.Fail("Meal with that name already exists.");
 
             return Database.getSQLErrorHTTPResponse(ex);
         }
@@ -227,8 +228,6 @@ public class MealController {
 
             return Response.Success();
         } catch (SQLException ex) {
-            
-
             return Database.getSQLErrorHTTPResponse(ex);
         }
     }
