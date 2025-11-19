@@ -23,8 +23,8 @@ public class Response extends ResponseEntity<Response.ResponseBody> {
         @Getter
         private String message;
 
-        public ResponseBody(boolean success, Object payload, String message) {
-            this.success = success ? "success" : "fail";
+        public ResponseBody(String success, Object payload, String message) {
+            this.success = success;
             this.payload = payload;
             this.message = message;
         }
@@ -37,46 +37,46 @@ public class Response extends ResponseEntity<Response.ResponseBody> {
     }
 
     public static Response Success() {
-        return new Response(new ResponseBody(true, null, null), HttpStatus.OK);
+        return new Response(new ResponseBody("success", null, null), HttpStatus.OK);
     }
 
     public static Response Success(String message) {
-        return new Response(new ResponseBody(true, null, message), HttpStatus.OK);
+        return new Response(new ResponseBody("success", null, message), HttpStatus.OK);
     }
 
     public static Response Success(Object payload) {
-        return new Response(new ResponseBody(true, payload, null), HttpStatus.OK);
+        return new Response(new ResponseBody("success", payload, null), HttpStatus.OK);
     }
 
     public static Response Success(String message, Object payload) {
-        return new Response(new ResponseBody(true, payload, message), HttpStatus.OK);
+        return new Response(new ResponseBody("success", payload, message), HttpStatus.OK);
     }
 
     public static Response Fail() {
-        return new Response(new ResponseBody(false, null, null), HttpStatus.OK);
+        return new Response(new ResponseBody("fail", null, null), HttpStatus.OK);
     }
 
     public static Response Fail(String message) {
-        return new Response(new ResponseBody(false, null, message), HttpStatus.OK);
+        return new Response(new ResponseBody("fail", null, message), HttpStatus.OK);
     }
 
     public static Response Fail(String message, Object payload) {
-        return new Response(new ResponseBody(false, payload, message), HttpStatus.OK);
+        return new Response(new ResponseBody("fail", payload, message), HttpStatus.OK);
     }
 
     public static Response Error(HttpStatusCode statusCode) {
-        return new Response(new ResponseBody(false, null, null), statusCode);
+        return new Response(new ResponseBody("error", null, null), statusCode);
     }
 
     public static Response Error(HttpStatusCode statusCode, String message) {
-        return new Response(new ResponseBody(false, null, message), statusCode);
+        return new Response(new ResponseBody("error", null, message), statusCode);
     }
 
     public static Response Error(HttpStatusCode statusCode, Object payload) {
-        return new Response(new ResponseBody(false, payload, null), statusCode);
+        return new Response(new ResponseBody("error", payload, null), statusCode);
     }
 
     public static Response Error(HttpStatusCode statusCode, String message, Object payload) {
-        return new Response(new ResponseBody(false, payload, message), statusCode);
+        return new Response(new ResponseBody("error", payload, message), statusCode);
     }
 }
