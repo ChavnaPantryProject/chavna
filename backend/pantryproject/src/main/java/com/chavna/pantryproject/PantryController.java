@@ -309,21 +309,34 @@ public class PantryController {
                     UPDATE %1$s
                     SET amount = ?, last_used = now()::date
                     FROM %2$s
-                    WHERE %1$s.id = ? AND %2$s.owner = ?;
+                    WHERE %1$s.template_id = %2$s.id
+                      AND %1$s.id = ? AND %2$s.owner = ?;
                 """, FOOD_ITEMS_TABLE, FOOD_ITEM_TEMPLATES_TABLE));
                 statement.setDouble(1, requestBody.newAmount);
                 statement.setObject(2, requestBody.foodItemId);
                 statement.setObject(3, login.userId);
 
-                statement.executeUpdate();
+                if (statement.executeUpdate() < 1)
+                    return Response.Fail("Food item not updated.");
             } else {
+                PreparedStatement statement = con.prepareStatement(String.format("""
+                    DELETE FROM %1$s
+                    USING %2$s
+                    WHERE %1$s.template_id = %2$s.id
+                      AND %1$s.id = ? AND %2$s.owner = ?;
+                """, Database.FOOD_ITEMS_TABLE, Database.FOOD_ITEM_TEMPLATES_TABLE));
 
+                statement.setObject(1, requestBody.foodItemId);
+                statement.setObject(2, login.userId);
+
+                if (statement.executeUpdate() < 1)
+                    return Response.Fail("Food item not updated.");
             }
         } catch (SQLException ex) {
             
             return Database.getSQLErrorHTTPResponse(ex);
         }
-        return Response.Success();
+        return Response.Success("Food item updated");
     }
 
     public static class CategoryRequest {

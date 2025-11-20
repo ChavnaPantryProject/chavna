@@ -12,16 +12,16 @@ import lombok.Getter;
 
 public class Response extends ResponseEntity<Response.ResponseBody> {
     @JsonInclude(Include.NON_NULL)
-    @JsonPropertyOrder({"success", "status", "payload", "message"})
+    @JsonPropertyOrder({"success", "status", "message", "payload"})
     static class ResponseBody {
         @Getter
         private String success;
         @Getter
         private int status;
         @Getter
-        private Object payload;
-        @Getter
         private String message;
+        @Getter
+        private Object payload;
 
         public ResponseBody(String success, Object payload, String message) {
             this.success = success;
