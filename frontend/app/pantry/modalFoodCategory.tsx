@@ -1,8 +1,9 @@
 // pantry/ModalFoodCategory.tsx
 import React , {useState, useEffect} from "react";
-import { Modal, View, Text, Pressable, StyleSheet, ActivityIndicator } from "react-native";
-import { Feather, Entypo } from "@expo/vector-icons";
+import { Modal, View, Text, Pressable, StyleSheet } from "react-native";
+import { Entypo } from "@expo/vector-icons";
 import { API_URL, retrieveValue } from "../util";
+import FoodRows from "./foodRows";
 
 type Props = {
   visible: boolean;
@@ -193,7 +194,11 @@ export default function ModalFoodCategory({ visible, onClose, title, children }:
       }}>
 
         {/* stop backdrop press from closing when tapping inside */}
-        <Pressable style={style.sheet} onPress={(e) => e.stopPropagation()}>
+        {/* make the content a View; consume taps so backdrop doesn't close */}
+        <View
+            style={style.sheet}
+            onStartShouldSetResponder={() => true}   // eat taps inside the sheet
+        >
 
           {/* category name header with an underline */}
           {title ? <Text style={style.title}>{title}</Text> : null}
@@ -237,34 +242,21 @@ export default function ModalFoodCategory({ visible, onClose, title, children }:
 
           </View>
 
-          {/* loop through each item they have in this category */}
-            <View style={{width: '100%'}}>
-              {loading ? (
-                <ActivityIndicator size="large" color="#499F44" style={{ marginTop: 50 }} />
-              ) : displayArr.length === 0 ? (
-                <Text style={{ textAlign: 'center', marginTop: 50, fontSize: 16, color: 'gray' }}>
-                  No items in this category
-                </Text>
-              ) : (
-                displayArr.map((foodItem, index) =>{
-                  return (
-                    <View key={index} style={style.entryOfFood}>
-                      <Text style={[style.specficFoodEntryColumn, {flex:1}]}>{foodItem.name}</Text>
-                      <Text style={[style.specficFoodEntryColumn, {flex:1}]}>{foodItem.weight}</Text>
-                      <Text style={[style.specficFoodEntryColumn, {flex:1}]}>{foodItem.qty}</Text>
-                      <Text style={[style.specficFoodEntryColumn, {flex:2}]}>{foodItem.expDate}</Text>
-                    </View>
-                  )
-                })
-              )}
-            </View>
+          {/* Diplay each specific food row */}
+          {/* Display each specific food row */}
+          <View style={style.rowsArea}>
+              <FoodRows
+                  loading={loading}
+                  displayArr={displayArr}
+              />
+          </View>
 
           {/* plus icon to add another category */}
           <Pressable onPress={() => {}}>
               
             <Text style={style.addButton}>+</Text>
           </Pressable>
-        </Pressable>
+        </View>
       </Pressable>
     </Modal>
   );
@@ -277,6 +269,13 @@ const style = StyleSheet.create({
     alignItems: "center",
     padding: 20,
     marginTop: 80
+  },
+
+  rowsArea: {
+    flex: 1,
+    alignSelf: "stretch",
+    width: "100%",
+    marginTop: 6,      // a little space under the headers
   },
 
   //modal container
@@ -327,23 +326,7 @@ const style = StyleSheet.create({
     fontWeight:'500'
   },
 
-  //each food entry row
-  entryOfFood:{
-    width: '100%',
-    borderWidth: 2,
-    borderColor: 'rgba(73,159,68,1)',
-    borderRadius: 5,
-    backgroundColor: 'white',
-    marginTop: 5,
-    padding: 3,
-    flexDirection: 'row',
-    justifyContent: 'space-between'
-    },
 
-    specficFoodEntryColumn:{
-      textAlign: 'center',
-      fontSize: 17,
-    },
 
     addButton:{
       fontSize: 40,
