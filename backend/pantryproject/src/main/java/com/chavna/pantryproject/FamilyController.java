@@ -9,7 +9,6 @@ import static com.chavna.pantryproject.Env.CHAVNA_URL;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.UUID;
@@ -23,6 +22,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import com.chavna.pantryproject.Response.ResponseBody;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwe;
@@ -52,9 +53,7 @@ public class FamilyController {
     public Response createFamily(@RequestHeader("Authorization") String authorizationHeader) {
         UUID user = Authorization.authorize(authorizationHeader).userId;
         
-        try {
-            Connection con = Database.getRemoteConnection();
-
+        Database.openDatabaseConnection((Connection con) -> {
             // Error if alreayd part of family
             PreparedStatement checkFamilyQuery = con.prepareStatement(String.format(
                 """
@@ -103,10 +102,9 @@ public class FamilyController {
             updateQuery.setObject(1, memberId);
             updateQuery.setObject(2, user);
             updateQuery.executeUpdate();
-        } catch (SQLException ex) {
-            
-            return Database.getSQLErrorHTTPResponse(ex);
-        }
+
+            return null;
+        }).throwIfError();
 
         return Response.Success("Family created");
     }
@@ -115,9 +113,7 @@ public class FamilyController {
     public Response leaveFamily(@RequestHeader("Authorization") String authorizationHeader) {
         UUID user = Authorization.authorize(authorizationHeader).userId;
         
-        try {
-            Connection con = Database.getRemoteConnection();
-
+        Database.openDatabaseConnection((Connection con) -> {
             // Get membership
             PreparedStatement checkFamilyQuery = con.prepareStatement(String.format(
                 """ 
@@ -146,10 +142,9 @@ public class FamilyController {
                 """, FAMILY_MEMBER_TABLE));
             removeMemberQuery.setObject(1, memberId);
             removeMemberQuery.executeUpdate();
-        } catch (SQLException ex) {
-            
-            return Database.getSQLErrorHTTPResponse(ex);
-        }
+
+            return null;
+        }).throwIfError();
 
         return Response.Success("Left family");
     }
@@ -158,9 +153,7 @@ public class FamilyController {
     public Response deleteFamily(@RequestHeader("Authorization") String authorizationHeader) {
         UUID user = Authorization.authorize(authorizationHeader).userId;
         
-        try {
-            Connection con = Database.getRemoteConnection();
-
+        Database.openDatabaseConnection((Connection con) -> {
             // Get membership
             PreparedStatement checkFamilyQuery = con.prepareStatement(String.format(
                 """ 
@@ -189,10 +182,9 @@ public class FamilyController {
                 """, FAMILY_TABLE));
             removeFamily.setObject(1, familyId);
             removeFamily.executeUpdate();
-        } catch (SQLException ex) {
-            
-            return Database.getSQLErrorHTTPResponse(ex);
-        }
+
+            return null;
+        }).throwIfError();
 
         return Response.Success("Deleted family");
     }
@@ -208,8 +200,7 @@ public class FamilyController {
            return Response.Error(HttpStatus.BAD_REQUEST, errors.getAllErrors().get(0).toString());
         UUID user = Authorization.authorize(authorizationHeader).userId;
         
-        try {
-            Connection con = Database.getRemoteConnection();
+        Database.openDatabaseConnection((Connection con) -> {
             // Verify email
             PreparedStatement emailQuery = con.prepareStatement(String.format(
                 """
@@ -276,10 +267,9 @@ public class FamilyController {
             , message, url);
 
             Email.sendEmail("noreply@email.chavnapantry.com", requestBody.email, emailContent, "Family Invitation Request.");
-        } catch (SQLException ex) {
             
-            return Database.getSQLErrorHTTPResponse(ex);
-        }
+            return null;
+        }).throwIfError();
 
         return Response.Success("Invitation sent.");
     }
@@ -326,55 +316,61 @@ public class FamilyController {
         Invite invite = parsed.accept(visitor);
 
         try {
-            Connection con = Database.getRemoteConnection();
+            Database.openDatabaseConnection((Connection con) -> {
+                PreparedStatement checkFamilyQuery = con.prepareStatement(String.format(
+                    """
+                    SELECT family_membership, invite_state FROM %s WHERE id = ?
+                    """, USERS_TABLE));
+                checkFamilyQuery.setObject(1, invite.recipientId);
+                ResultSet result = checkFamilyQuery.executeQuery();
 
-            PreparedStatement checkFamilyQuery = con.prepareStatement(String.format(
-                """
-                SELECT family_membership, invite_state FROM %s WHERE id = ?
-                """, USERS_TABLE));
-            checkFamilyQuery.setObject(1, invite.recipientId);
-            ResultSet result = checkFamilyQuery.executeQuery();
+                if (!result.next())
+                    throw new ResponseException(Response.Error(HttpStatus.NOT_FOUND, "Recipient id not found."));
 
-            if (!result.next())
-                throw new ResponseException(Response.Error(HttpStatus.NOT_FOUND, "Recipient id not found."));
+                UUID memberId = (UUID) result.getObject(1);
+                UUID inviteState = (UUID) result.getObject(2);
 
-            UUID memberId = (UUID) result.getObject(1);
-            UUID inviteState = (UUID) result.getObject(2);
+                // Error if alreayd part of family
+                if (memberId != null)
+                    return Response.Fail("You are already part of a family.");
 
-            // Error if alreayd part of family
-            if (memberId != null)
-                return ResponseEntity.ok("You are already part of a family.");
+                // Check invite_state
+                if (!inviteState.equals(invite.inviteState))
+                    return Response.Fail("Invalid invite.");
 
-            // Check invite_state
-            if (!inviteState.equals(invite.inviteState))
-                return ResponseEntity.ok("Invalid invite.");
+                // Create family membership
+                PreparedStatement createMembershipQuery = con.prepareStatement(String.format(
+                    """
+                    INSERT INTO %s (role, family_id)
+                    VALUES (?, ?)
+                    RETURNING member_id;
+                    """, FAMILY_MEMBER_TABLE));
+                createMembershipQuery.setInt(1, FamilyRole.Member.ordinal());
+                createMembershipQuery.setObject(2, invite.familyId);
+                result = createMembershipQuery.executeQuery();
+                result.next();
+                memberId = (UUID) result.getObject(1);
 
-            // Create family membership
-            PreparedStatement createMembershipQuery = con.prepareStatement(String.format(
-                """
-                INSERT INTO %s (role, family_id)
-                VALUES (?, ?)
-                RETURNING member_id;
-                """, FAMILY_MEMBER_TABLE));
-            createMembershipQuery.setInt(1, FamilyRole.Member.ordinal());
-            createMembershipQuery.setObject(2, invite.familyId);
-            result = createMembershipQuery.executeQuery();
-            result.next();
-            memberId = (UUID) result.getObject(1);
+                // Update member_id and invite_state
+                PreparedStatement updateQuery = con.prepareStatement(String.format(
+                    """
+                    UPDATE %s
+                    SET family_membership = ?, invite_state = gen_random_uuid()
+                    WHERE id = ?;
+                    """, USERS_TABLE));
+                updateQuery.setObject(1, memberId);
+                updateQuery.setObject(2, invite.recipientId);
+                updateQuery.executeUpdate();
 
-            // Update member_id and invite_state
-            PreparedStatement updateQuery = con.prepareStatement(String.format(
-                """
-                UPDATE %s
-                SET family_membership = ?, invite_state = gen_random_uuid()
-                WHERE id = ?;
-                """, USERS_TABLE));
-            updateQuery.setObject(1, memberId);
-            updateQuery.setObject(2, invite.recipientId);
-            updateQuery.executeUpdate();
-        } catch (SQLException ex) {
-            
-            throw Database.getSQLErrorHTTPResponseException(ex);
+                return null;
+            }).throwIfError();
+        } catch (ResponseException ex) {
+            ResponseBody body = ex.getResponse().getBody();
+
+            if (body.getSuccess() == "fail")
+                return ResponseEntity.ok(body.getMessage());
+            else
+                throw ex;
         }
         
         return ResponseEntity.ok("Invite accepted.");
@@ -396,9 +392,7 @@ public class FamilyController {
     public Response getFamilyMembers(@RequestHeader("Authorization") String authorizationHeader) {
         UUID user = Authorization.authorize(authorizationHeader).userId;
 
-        try {
-            Connection con = Database.getRemoteConnection();
-
+        Database.openDatabaseConnection((Connection con) -> {
             PreparedStatement query = con.prepareStatement(String.format(
                 """
                 WITH m AS (
@@ -426,10 +420,10 @@ public class FamilyController {
             }
 
             return Response.Success(new GetFamilyMemembersResponse(members));
-        } catch (SQLException ex) {
-            
-            return Database.getSQLErrorHTTPResponse(ex);
-        }
+        }).throwIfError();
+
+        // This should be unreachable
+        return null;
     }
 
     private static class RemoveFamilyMemberRequest {
@@ -446,9 +440,7 @@ public class FamilyController {
 
         UUID user = Authorization.authorize(authorizationHeader).userId;
         
-        try {
-            Connection con = Database.getRemoteConnection();
-
+        Database.openDatabaseConnection((Connection con) -> {
             // Get membership
             PreparedStatement checkFamilyQuery = con.prepareStatement(String.format(
                 """ 
@@ -530,9 +522,9 @@ public class FamilyController {
             removeMemberQuery.executeUpdate();
 
             return Response.Success("Member removed.");
-        } catch (SQLException ex) {
-            
-            return Database.getSQLErrorHTTPResponse(ex);
-        }
+        }).throwIfError();
+
+        // This should be unreachable.
+        return null;
     }
 }

@@ -5,7 +5,6 @@ import java.security.GeneralSecurityException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
@@ -163,9 +162,7 @@ public class Authorization {
 
         if (login instanceof NormalLogin) {
             // Get current login state
-            try {
-                Connection con = Database.getRemoteConnection();
-
+            Database.openDatabaseConnection((Connection con) -> {
                 PreparedStatement query = con.prepareStatement(String.format(
                     """
                     SELECT login_state FROM %s
@@ -181,10 +178,9 @@ public class Authorization {
 
                 if (!loginState.equals(((NormalLogin) login).loginState))
                     throw new ResponseException(Response.Error(HttpStatus.UNAUTHORIZED, "Invalid login token."));
-            } catch (SQLException ex) {
-                
-                throw new ResponseException(Response.Error(HttpStatus.INTERNAL_SERVER_ERROR, "SQL Error."));
-            }
+
+                return null;
+            }).throwIfError();
         } else {
             GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(new NetHttpTransport(), GsonFactory.getDefaultInstance())
                 .setAudience(Arrays.asList(Env.getenvNotNull("GOOGLE_CLIENT_ID")))

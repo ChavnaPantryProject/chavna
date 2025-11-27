@@ -44,9 +44,7 @@ public class PantryController {
     public Response createFoodItemTemplate(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody FoodItemTemplate requestBody) {
         Login login = Authorization.authorize(authorizationHeader);
 
-        try {
-            Connection con = Database.getRemoteConnection();
-
+        Database.openDatabaseConnection((Connection con) -> {
             PreparedStatement statement = con.prepareStatement(String.format("""
                 INSERT INTO %s (name, owner, amount, unit, shelf_life_days, category)
                 VALUES (?, ?, ?, ?, ?, ?)
@@ -70,14 +68,15 @@ public class PantryController {
             template.template = requestBody;
 
             return Response.Success(template);
-        } catch (SQLException ex) {
+        }).onSQLError((SQLException ex) -> {
             if (ex.getSQLState().equals("23503"))
                 return Response.Fail("Category does not exist.");
-
-            System.out.println("SQL Error Code: " + ex.getSQLState());
             
-            return Database.getSQLErrorHTTPResponse(ex);
-        }
+            return null;
+        }).throwIfError();
+
+        // This should be unreachable
+        return null;
     }
 
     public static class RegisteredFoodItemTemplate {
@@ -102,23 +101,23 @@ public class PantryController {
         if (requestBody == null)
             requestBody = new GetFoodItemTemplatesRequest();
 
-        try {
-            Connection con = Database.getRemoteConnection();
+        final var body = requestBody;
 
+        Database.openDatabaseConnection((Connection con) -> {
             String query = String.format("""
                 SELECT * FROM %s
                 WHERE owner = ?
             """, FOOD_ITEM_TEMPLATES_TABLE);
 
-            if (requestBody.search != null)
+            if (body.search != null)
                 query += " AND name LIKE ?";
 
             PreparedStatement statement;
             statement = con.prepareStatement(query);
             statement.setObject(1, login.userId);
 
-            if (requestBody.search != null) {
-                String like = '%' + requestBody.search + '%';
+            if (body.search != null) {
+                String like = '%' + body.search + '%';
                 statement.setString(2, like);
             }
 
@@ -142,11 +141,10 @@ public class PantryController {
             }
 
             return Response.Success(templates);
-        } catch (SQLException ex) {
-            
-            
-            return Database.getSQLErrorHTTPResponse(ex);
-        }
+        }).throwIfError();
+
+        // This should be unreachable
+        return null;
     }
 
     public static class FoodItemFromTemplate {
@@ -170,9 +168,7 @@ public class PantryController {
 
         Login login = Authorization.authorize(authorizationHeader);
 
-        try {
-            Connection con = Database.getRemoteConnection();
-
+        Database.openDatabaseConnection((Connection con) -> {
             String values = "";
             for (@SuppressWarnings("unused") var __ : requestBody.items)
                 values += "(CAST(? AS uuid), ?, now()::date, ?),";
@@ -208,10 +204,10 @@ public class PantryController {
                 return Response.Fail("No items added.");
 
             return Response.Success("Items added: " + updated);
-        } catch (SQLException ex) {
-            
-            return Database.getSQLErrorHTTPResponse(ex);
-        }
+        }).throwIfError();
+
+        // This should be unreachable
+        return null;
     }
 
     public static class GetFoodItemsRequest {
@@ -243,9 +239,9 @@ public class PantryController {
         if (requestBody == null)
             requestBody = new GetFoodItemsRequest();
 
-        try {
-            Connection con = Database.getRemoteConnection();
+        final var body = requestBody;
 
+        Database.openDatabaseConnection((Connection con) -> {
             String query = String.format("""
                 SELECT * FROM %s
                 INNER JOIN %s
@@ -253,7 +249,7 @@ public class PantryController {
                 WHERE owner = ? 
             """, FOOD_ITEMS_TABLE, FOOD_ITEM_TEMPLATES_TABLE);
 
-            if (requestBody.category != null)
+            if (body.category != null)
                 query += "AND category = ?";
 
             System.out.println(query);
@@ -261,8 +257,8 @@ public class PantryController {
             PreparedStatement statement = con.prepareStatement(query);
             statement.setObject(1, login.userId);
 
-            if (requestBody.category != null)
-                statement.setString(2, requestBody.category);
+            if (body.category != null)
+                statement.setString(2, body.category);
 
             ResultSet result = statement.executeQuery();
 
@@ -284,10 +280,10 @@ public class PantryController {
             }
 
             return Response.Success(new GetFoodItemsResponse(items));
-        } catch (SQLException ex) {
-            
-            return Database.getSQLErrorHTTPResponse(ex);
-        }
+        }).throwIfError();
+
+        // This should be unreachable
+        return null;
     }
 
     public static class UpdateFoodItemRequest {
@@ -301,9 +297,7 @@ public class PantryController {
     public Response updateFoodItem(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody UpdateFoodItemRequest requestBody) {
         Login login = Authorization.authorize(authorizationHeader);
 
-        try {
-            Connection con = Database.getRemoteConnection();
-
+        Database.openDatabaseConnection((Connection con) -> {
             if (requestBody.newAmount > 0) {
                 PreparedStatement statement = con.prepareStatement(String.format("""
                     UPDATE %1$s
@@ -332,10 +326,10 @@ public class PantryController {
                 if (statement.executeUpdate() < 1)
                     return Response.Fail("Food item not updated.");
             }
-        } catch (SQLException ex) {
-            
-            return Database.getSQLErrorHTTPResponse(ex);
-        }
+
+            return null;
+        }).throwIfError();
+
         return Response.Success("Food item updated");
     }
 
@@ -348,9 +342,7 @@ public class PantryController {
     public Response createCategory(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody CategoryRequest requestBody) {
         Login login = Authorization.authorize(authorizationHeader);
 
-        try {
-            Connection con = Database.getRemoteConnection();
-
+        Database.openDatabaseConnection((Connection con) -> {
             PreparedStatement statement = con.prepareStatement(String.format("""
                 INSERT INTO %s (name, owner)
                 VALUES (?, ?);
@@ -359,15 +351,14 @@ public class PantryController {
             statement.setObject(2, login.userId);
 
             statement.executeUpdate();
-        } catch (SQLException ex) {
 
-            if (ex.getSQLState().equals("23505")) {
+            return null;
+        }).onSQLError((SQLException ex) -> {
+            if (ex.getSQLState().equals("23505"))
                 return Response.Fail("Category already exists.");
-            }
-
             
-            return Database.getSQLErrorHTTPResponse(ex);
-        }
+            return null;
+        }).throwIfError();
 
         return Response.Success("Category created.");
     }
@@ -376,9 +367,7 @@ public class PantryController {
     public Response removeCategory(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody CategoryRequest requestBody) {
         Login login = Authorization.authorize(authorizationHeader);
 
-        try {
-            Connection con = Database.getRemoteConnection();
-
+        Database.openDatabaseConnection((Connection con) -> {
             PreparedStatement statement = con.prepareStatement(String.format("""
                 DELETE FROM %s
                 WHERE name = ? AND owner = ?;
@@ -390,10 +379,9 @@ public class PantryController {
 
             if (removed == 0)
                 return Response.Fail("Category not found.");
-        } catch (SQLException ex) {
-            
-            return Database.getSQLErrorHTTPResponse(ex);
-        }
+
+            return null;
+        }).throwIfError();
 
         return Response.Success("Category removed.");
     }
@@ -410,9 +398,7 @@ public class PantryController {
     public Response getCategories(@RequestHeader("Authorization") String authorizationHeader) {
         Login login = Authorization.authorize(authorizationHeader);
 
-        try {
-            Connection con = Database.getRemoteConnection();
-
+        Database.openDatabaseConnection((Connection con) -> {
             PreparedStatement statement = con.prepareStatement(String.format("""
                 SELECT name FROM %s
                 WHERE owner = ?
@@ -426,9 +412,9 @@ public class PantryController {
             }
 
             return Response.Success(response);
-        } catch (SQLException ex) {
-            
-            return Database.getSQLErrorHTTPResponse(ex);
-        }
+        }).throwIfError();
+
+        // This should be unreachable
+        return null;
     }
 }

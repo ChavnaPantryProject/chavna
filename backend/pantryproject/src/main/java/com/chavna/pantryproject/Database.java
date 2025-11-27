@@ -13,6 +13,8 @@ import org.apache.commons.dbcp2.BasicDataSource;
 
 import org.springframework.http.HttpStatus;
 
+import lombok.AllArgsConstructor;
+
 public class Database {
     public static final String FAMILY_TABLE = "family";
     public static final String FAMILY_MEMBER_TABLE = "family_member";
@@ -35,11 +37,13 @@ public class Database {
             dataSource.setDriverClassName("org.postgresql.Driver");
             dataSource.setUrl(jdbcUrl);
 
-            dataSource.setInitialSize(5);
-            dataSource.setMaxTotal(20);
-            dataSource.setMaxIdle(10);
-            dataSource.setMinIdle(5);
+            dataSource.setInitialSize(10);
+            dataSource.setMaxTotal(100);
+            dataSource.setMaxIdle(20);
+            dataSource.setMinIdle(10);
             dataSource.setMaxWait(Duration.ofSeconds(10));
+            dataSource.setMaxConn(Duration.ofSeconds(10)); // This appears to not work, but i'm leaving it here just in case it starts working one day.
+            dataSource.setDurationBetweenEvictionRuns(Duration.ofMinutes(30));
 
             return dataSource;
         }
@@ -66,9 +70,74 @@ public class Database {
 
         return jdbcUrl;
     }
+    public static interface ConnectionErrorHandler {
+        Response handleError(SQLException ex);
+    }
 
-    public static Connection getRemoteConnection() throws SQLException {
-        return dataSource.getConnection();
+    @AllArgsConstructor
+    public static class ConnectionResult {
+        SQLException ex;
+
+        /***
+         * If the result is an error, call this function to manually process it.
+         * @param errorHandler - function for handling error.
+         * @return itself
+         */
+        public ConnectionResult onSQLError(ConnectionErrorHandler errorHandler) {
+            Response response = errorHandler.handleError(ex);
+
+            if (response != null)
+                throw new ResponseException(response);
+
+            return this;
+        }
+
+        /***
+         * If the result is an error, throw an ResponseException
+         */
+        public void throwIfError() {
+            if (ex != null)
+                throw getSQLErrorHTTPResponseException(ex);
+        }
+    }
+
+    public static interface DatabaseConnection {
+        Response connect(Connection con) throws SQLException;
+    }
+
+    /***
+     * 
+     * @param connection - Function to use connection. Return null to continue execution, or return a Response object to throw a ResponseException (if you want your outer function to return early).
+     * @return Result type to manually handle the error or throw it.
+     */
+    public static ConnectionResult openDatabaseConnection(DatabaseConnection connection) {
+        Connection con = null;
+        ConnectionResult result = null;
+        try {
+            con = dataSource.getConnection();
+            Response response = connection.connect(con);
+
+            if (response != null)
+                throw new ResponseException(response);
+
+            result = new ConnectionResult(null);
+        } catch (SQLException ex) {
+            result = new ConnectionResult(ex);
+        } finally {
+            try {
+                if (con != null)
+                    con.close();
+            } catch (SQLException ex) {
+                if (result != null) {
+                    result.ex.printStackTrace();
+                    throw new RuntimeException("Double SQLException.", ex);
+                } else {
+                    result = new ConnectionResult(ex);
+                }
+            }
+        }
+
+        return result;
     }
 
     public static HashMap<String, Object> objectFromResultSet(ResultSet resultSet) throws SQLException {
@@ -153,14 +222,7 @@ public class Database {
         return result.getString(1);
     }
 
-    public static Response getSQLErrorHTTPResponse(SQLException ex) {
-        System.err.println("SQL State: " + ex.getSQLState());
-        ex.printStackTrace();
-
-        return Response.Error(HttpStatus.INTERNAL_SERVER_ERROR, "SQL Error.");
-    }
-
-    public static ResponseException getSQLErrorHTTPResponseException(SQLException ex) {
+    private static ResponseException getSQLErrorHTTPResponseException(SQLException ex) {
         System.err.println("SQL State: " + ex.getSQLState());
         ex.printStackTrace();
 

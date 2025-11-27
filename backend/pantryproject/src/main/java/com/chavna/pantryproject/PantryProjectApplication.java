@@ -10,6 +10,8 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @SpringBootApplication(exclude = {DataSourceAutoConfiguration.class})
 public class PantryProjectApplication {
 	public static void main(String[] args) {
+        // Initialize the connection pool.
+        Database.openDatabaseConnection((var) -> {return null;});
 		SpringApplication.run(PantryProjectApplication.class, args);
 	}
 
