@@ -147,7 +147,6 @@ public class MealController {
                 WHERE %2$s.id = ? AND %2$s.owner = ? AND %3$s.owner = ?
                 ORDER BY order_index;
             """, Database.MEAL_INGREDIENTS_TABLE, Database.MEALS_TABLE, Database.FOOD_ITEM_TEMPLATES_TABLE);
-            System.out.println(query);
             PreparedStatement statement = con.prepareStatement(query);
 
             statement.setObject(1, requestBody.mealId);

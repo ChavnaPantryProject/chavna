@@ -131,10 +131,6 @@ public class UserAccountController {
 
     @GetMapping("/google-login")
     public ResponseEntity<String> googleLogin(@RequestParam Map<String, String> params) {
-        for (String param : params.keySet()) {
-            System.out.println(param + ": " + params.get(param));
-        }
-
         // Use single element array to be able to modify it in the lambda expression.
         String[] authHTML = new String[1];
         if (params.size() == 0) {
@@ -161,13 +157,9 @@ public class UserAccountController {
             """;
         } else {
             String clientId = Env.getenvNotNull("GOOGLE_CLIENT_ID");
-            System.out.println();
-            System.out.println(GsonFactory.getDefaultInstance());
             GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(new NetHttpTransport(), GsonFactory.getDefaultInstance())
                 .setAudience(Arrays.asList(clientId))
                 .build();
-
-            System.out.println(verifier);
 
             String accessToken = params.get("id_token");
 
@@ -180,7 +172,6 @@ public class UserAccountController {
             }
 
             String email = googleIdToken.getPayload().getEmail();
-            System.out.println(email);
 
             // Check if account exists
             Database.openDatabaseConnection((Connection con) -> {

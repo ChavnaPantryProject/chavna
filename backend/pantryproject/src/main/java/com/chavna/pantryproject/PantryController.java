@@ -252,8 +252,6 @@ public class PantryController {
             if (body.category != null)
                 query += "AND category = ?";
 
-            System.out.println(query);
-
             PreparedStatement statement = con.prepareStatement(query);
             statement.setObject(1, login.userId);
 

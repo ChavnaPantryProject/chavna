@@ -128,7 +128,6 @@ public class PersonalInfoController {
                 ON CONFLICT (user_id) DO UPDATE SET
                 """ + updateString, PERSONAL_INFO_TABLE, columnsString, valuesString);
 
-            System.out.println(statementString);
             PreparedStatement statement = con.prepareStatement(statementString);
 
             for (int i = 1; i <= columns.size(); i++) {
