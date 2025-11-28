@@ -1,186 +1,84 @@
-import React, { useRef, useState } from "react";
-import { Text, View, StyleSheet, TouchableOpacity, Button, ActivityIndicator } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import { CameraView, CameraType, useCameraPermissions } from "expo-camera";
-import { useRouter } from "expo-router";
-import Tesseract from "tesseract.js";
+import React, { useRef, useState, useEffect } from "react";
+import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { Camera, useCameraDevice } from "react-native-vision-camera";
+import TextRecognition from "@react-native-ml-kit/text-recognition";
 
 export default function ScannerScreen() {
-  const router = useRouter();
-  const cameraRef = useRef<CameraView>(null);
+  const cameraRef = useRef<Camera>(null);
+  const device = useCameraDevice("back");
 
-  const [facing, setFacing] = useState<CameraType>("back");
-  const [permission, requestPermission] = useCameraPermissions();
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [permission, setPermission] = useState(false);
+  const [ocrText, setOcrText] = useState("");
 
-  if (!permission) return <View />;
-  if (!permission.granted) {
-    return (
-      <View style={styles.center}>
-        <Text style={styles.message}>We need your permission to show the camera</Text>
-        <Button title="Grant Permission" onPress={requestPermission} />
-      </View>
-    );
-  }
+  useEffect(() => {
+    (async () => {
+      const status = await Camera.requestCameraPermission();
+      setPermission(status === "granted");  // <-- FIXED HERE
+    })();
+  }, []);
 
-  function toggleCameraFacing() {
-    setFacing((prev) => (prev === "back" ? "front" : "back"));
-  }
+  if (!device) return <Text>Loading camera...</Text>;
+  if (!permission) return <Text>No camera permission</Text>;
 
-  const handleScan = async () => {
-    if (!cameraRef.current) return;
-
-    setIsProcessing(true);
-
+  async function takeAndScan() {
     try {
-      const photo = await cameraRef.current.takePictureAsync({
-        base64: true,
-        quality: 0.7,  // You can adjust this if needed
+      const photo = await cameraRef.current?.takePhoto({
+        flash: "off",
       });
 
-      const base64Image = `data:image/jpg;base64,${photo.base64}`;
+      if (!photo?.path) return;
 
-      const result = await Tesseract.recognize(base64Image, "eng", {
-        logger: (m) => console.log(m),
-      });
-
-      const extractedText = result.data.text || "";
-
-      router.push({
-        pathname: "/scannerConfirmation",
-        params: { text: extractedText },
-      });
-
-    } catch (err) {
-      console.error("Tesseract error:", err);
+      const result = await TextRecognition.recognize(photo.path);
+      setOcrText(result?.text || "");
+    } catch (e) {
+      const message = e instanceof Error ? e.message : JSON.stringify(e); // <-- FIXED HERE
+      console.error("OCR error:", message);
+      setOcrText("OCR failed: " + message);
     }
-
-    setIsProcessing(false);
-  };
+  }
 
   return (
-    <View style={styles.container}>
-      {/* Top Bar */}
-      <View style={styles.topBar}></View>
+    <View style={{ flex: 1 }}>
+      <Camera
+        ref={cameraRef}
+        style={{ flex: 1 }}
+        device={device}
+        isActive={true}
+        photo={true}
+      />
 
-      {/* Live Camera */}
-      <View style={styles.scannerArea}>
-        <CameraView style={styles.camera} facing={facing} ref={cameraRef} />
+      <TouchableOpacity style={styles.button} onPress={takeAndScan}>
+        <Text style={styles.buttonText}>Scan Text</Text>
+      </TouchableOpacity>
 
-        {/* Scanner UI Corners */}
-        <View style={styles.cornerTopLeft} />
-        <View style={styles.cornerTopRight} />
-        <View style={styles.cornerBottomLeft} />
-        <View style={styles.cornerBottomRight} />
-      </View>
-
-      {/* Bottom Navigation */}
-      <View style={styles.bottomBar}>
-        {/* Flip Camera */}
-        <TouchableOpacity style={styles.iconButton} onPress={toggleCameraFacing}>
-          <Ionicons name="camera-reverse" size={28} color="white" />
-        </TouchableOpacity>
-
-        {/* Scan Button */}
-        <TouchableOpacity style={styles.cameraButton} onPress={handleScan}>
-          {isProcessing ? (
-            <ActivityIndicator size="large" color="black" />
-          ) : (
-            <View style={styles.cameraInnerCircle} />
-          )}
-        </TouchableOpacity>
-
-        {/* Go Home */}
-        <TouchableOpacity style={styles.iconButton} onPress={() => router.push("/")}>
-          <Ionicons name="home-outline" size={28} color="white" />
-        </TouchableOpacity>
+      <View style={styles.resultBox}>
+        <Text style={{ color: "white" }}>{ocrText}</Text>
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: "#DCEFD7" },
-  topBar: { 
-    height: 70, 
-    backgroundColor: "#499F4458" },
-  scannerArea: { 
-    flex: 1, 
-    justifyContent: "center", 
-    alignItems: "center" },
-  camera: { ...StyleSheet.absoluteFillObject },
-
-  cornerTopLeft: {
-    position: "absolute", 
-    top: 20, 
-    left: 20,
-    width: 30, 
-    height: 30, 
-    borderTopWidth: 3, 
-    borderLeftWidth: 3, 
-    borderColor: "black",
+  button: {
+    position: "absolute",
+    bottom: 150,
+    alignSelf: "center",
+    backgroundColor: "black",
+    padding: 16,
+    borderRadius: 12,
   },
-  cornerTopRight: {
-    position: "absolute", 
-    top: 20, 
-    right: 20,
-    width: 30, 
-    height: 30, 
-    borderTopWidth: 3, 
-    borderRightWidth: 3, 
-    borderColor: "black",
+  buttonText: {
+    color: "white",
+    fontSize: 18,
   },
-  cornerBottomLeft: {
-    position: "absolute", 
-    bottom: 20, 
-    left: 20,
-    width: 30, 
-    height: 30, 
-    borderBottomWidth: 3, 
-    borderLeftWidth: 3, 
-    borderColor: "black",
+  resultBox: {
+    position: "absolute",
+    bottom: 10,
+    left: 10,
+    right: 10,
+    minHeight: 80,
+    backgroundColor: "#000000aa",
+    padding: 12,
+    borderRadius: 10,
   },
-  cornerBottomRight: {
-    position: "absolute", 
-    bottom: 20, 
-    right: 20,
-    width: 30, 
-    height: 30, 
-    borderBottomWidth: 3, 
-    borderRightWidth: 3, 
-    borderColor: "black",
-  },
-
-  bottomBar: { 
-    flexDirection: "row", 
-    justifyContent: "space-around", 
-    paddingVertical: 20, 
-    backgroundColor: "#499F4458" },
-  iconButton: { 
-    padding: 10 },
-
-  cameraButton: {
-    width: 60, 
-    height: 60, 
-    borderRadius: 30,
-    backgroundColor: "white", 
-    justifyContent: "center", 
-    alignItems: "center",
-  },
-  cameraInnerCircle: {
-    width: 40, 
-    height: 40, 
-    borderRadius: 20, 
-    backgroundColor: "#499F44",
-  },
-
-  center: { 
-    flex: 1, 
-    justifyContent: "center", 
-    alignItems: "center" },
-  message: { 
-    textAlign: "center", 
-    marginBottom: 10 },
 });
