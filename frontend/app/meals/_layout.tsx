@@ -46,6 +46,13 @@ export default function MealLayout() {
                     presentation: "card",
                 }}
             />
+            <Stack.Screen
+                name="(tabs)/meal"
+                options={{
+                    animation: "slide_from_left",
+                    presentation: "card",
+                }}
+            />
         </Stack>
     );
 }

@@ -66,7 +66,7 @@ const MealScreen = () => {
 
   // navigate to meal info page (unique for each meal)
   const goToMealInfo = (mealId: string) => {
-    router.push("/meals/meal_ingredient?id=${mealId}");
+    router.push(`/meals/meal_ingredient?id=${mealId}`);
   };
 
   // rendering each meal card

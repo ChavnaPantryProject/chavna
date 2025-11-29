@@ -401,9 +401,10 @@ const styles = StyleSheet.create({
         gap: 10,
     },
 
-    addButton: { 
-        alignSelf: "center", 
-        marginTop: 10 
+    amountContainer: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 10,
     },
 
     deleteButton: {
