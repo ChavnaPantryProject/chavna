@@ -19,6 +19,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { Stack } from "expo-router";
 
 export default function MealIngredientScreen() {
     const router = useRouter();
@@ -69,7 +70,11 @@ export default function MealIngredientScreen() {
         <SafeAreaView style={styles.container}>
             {/* Header */}
             <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.back()}>
+                <TouchableOpacity 
+                    onPress={() => {
+                        router.push("/(tabs)/meal");
+                    }}
+                >
                     <Ionicons name="chevron-back" size={24} color="black" />
                 </TouchableOpacity>
 
