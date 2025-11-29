@@ -6,7 +6,6 @@ import static com.chavna.pantryproject.Database.USERS_TABLE;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.UUID;
@@ -45,10 +44,8 @@ public class PersonalInfoController {
         else
             authorizedUser = null;
         
-        UUID requestedUser;
-        try {
-            Connection con = Database.getRemoteConnection();
-            
+        Database.openDatabaseConnection((Connection con) -> {
+            UUID requestedUser;
             if (requestBody.email != null) {
                 // Check if user exists
                 PreparedStatement idFromEmailStatement = con.prepareStatement(String.format("""
@@ -85,10 +82,10 @@ public class PersonalInfoController {
             }
 
             return Response.Success(jsonObject);
-        } catch (SQLException ex) {
-            
-            return Database.getSQLErrorHTTPResponse(ex);
-        }
+        }).throwIfError();
+
+        // This should be unreachable
+        return null;
     }
 
     private static String shortenString(String string, int amount) {
@@ -103,9 +100,7 @@ public class PersonalInfoController {
         
         requestBody.put("user_id", user);
 
-        try {
-            Connection con = Database.getRemoteConnection();
-
+        Database.openDatabaseConnection((Connection con) -> {
             HashMap<String, Object> defaultInfo = Database.getDefaultTableEntry(con, PERSONAL_INFO_TABLE);
             String valuesString = "(";
             String columnsString = "(";
@@ -133,7 +128,6 @@ public class PersonalInfoController {
                 ON CONFLICT (user_id) DO UPDATE SET
                 """ + updateString, PERSONAL_INFO_TABLE, columnsString, valuesString);
 
-            System.out.println(statementString);
             PreparedStatement statement = con.prepareStatement(statementString);
 
             for (int i = 1; i <= columns.size(); i++) {
@@ -144,9 +138,9 @@ public class PersonalInfoController {
             }
 
             statement.executeUpdate();
-        } catch (SQLException ex) {
 
-        }
+            return null;
+        }).throwIfError();
 
         return Response.Success();
     }

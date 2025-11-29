@@ -78,9 +78,7 @@ public class MealController {
     public Response createMeal(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody CreateMealRequest requestBody) {
         Login login = Authorization.authorize(authorizationHeader);
 
-        try {
-            Connection con = Database.getRemoteConnection();
-
+        Database.openDatabaseConnection((Connection con) -> {
             PreparedStatement statement = con.prepareStatement(String.format("""
                 INSERT INTO %s (owner, name)
                 VALUES (?, ?)
@@ -102,12 +100,15 @@ public class MealController {
                 return Response.Fail("Failed to add some ingredients.", new CreateMealResponse(mealId, added));
 
             return Response.Success(new CreateMealResponse(mealId, added));
-        } catch (SQLException ex) {
+        }).onSQLError((SQLException ex) -> {
             if (ex.getSQLState() == "23505")
                 return Response.Fail("Meal with that name already exists.");
 
-            return Database.getSQLErrorHTTPResponse(ex);
-        }
+            return null;
+        }).throwIfError();
+
+        // This should be unreachable
+        return null;
     }
 
     public static class FlattenedIngredient {
@@ -136,9 +137,7 @@ public class MealController {
     public Response getMeal(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody GetMealRequest requestBody) {
         Login login = Authorization.authorize(authorizationHeader);
 
-        try {
-            Connection con = Database.getRemoteConnection();
-
+        Database.openDatabaseConnection((Connection con) -> {
             String query = String.format("""
                 SELECT %2$s.name, %3$s.id, %1$s.amount, %3$s.name, %3$s.unit FROM %1$s
                 INNER JOIN %3$s
@@ -148,7 +147,6 @@ public class MealController {
                 WHERE %2$s.id = ? AND %2$s.owner = ? AND %3$s.owner = ?
                 ORDER BY order_index;
             """, Database.MEAL_INGREDIENTS_TABLE, Database.MEALS_TABLE, Database.FOOD_ITEM_TEMPLATES_TABLE);
-            System.out.println(query);
             PreparedStatement statement = con.prepareStatement(query);
 
             statement.setObject(1, requestBody.mealId);
@@ -172,16 +170,18 @@ public class MealController {
                 ingredients.add(ingredient);
             }
 
+            if (mealName == null)
+                return Response.Fail("Meal not found.");
+
             FlattenedMeal meal = new FlattenedMeal();
             meal.name = mealName;
             meal.ingredients = ingredients;
 
             return Response.Success(new GetMealResponse(meal));
-        } catch (SQLException ex) {
-            
+        }).throwIfError();
 
-            return Database.getSQLErrorHTTPResponse(ex);
-        }
+        // This should be unreachable
+        return null;
     }
 
     public static class Meal {
@@ -207,9 +207,7 @@ public class MealController {
     public Response setMeal(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody UpdateMealRequest requestBody) {
         Login login = Authorization.authorize(authorizationHeader);
 
-        try {
-            Connection con = Database.getRemoteConnection();
-
+        Database.openDatabaseConnection((Connection con) -> {
             PreparedStatement deleteStatement = con.prepareStatement(String.format("""
                 DELETE FROM %1$s
                 USING %2$s
@@ -246,9 +244,10 @@ public class MealController {
             }
 
             return Response.Success(new UpdateMealResponse(added));
-        } catch (SQLException ex) {
-            return Database.getSQLErrorHTTPResponse(ex);
-        }
+        }).throwIfError();
+
+        // This should be unreachable
+        return null;
     }
 
     public static class MealResponse {
@@ -268,9 +267,7 @@ public class MealController {
     public Response getMeals(@RequestHeader("Authorization") String authorizationHeader) {
         Login login = Authorization.authorize(authorizationHeader);
 
-        try {
-            Connection con = Database.getRemoteConnection();
-
+        Database.openDatabaseConnection((Connection con) -> {
             PreparedStatement statement = con.prepareStatement(String.format("""
                 SELECT id, name FROM %s
                 WHERE owner = ?
@@ -290,8 +287,9 @@ public class MealController {
             }
 
             return Response.Success(response);
-        } catch (SQLException ex) {
-            return Database.getSQLErrorHTTPResponse(ex);
-        }
+        }).throwIfError();
+
+        // This should be unreachable
+        return null;
     }
 }
