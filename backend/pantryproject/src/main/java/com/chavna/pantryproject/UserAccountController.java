@@ -397,6 +397,13 @@ public class UserAccountController {
         return Response.Success("Authorized.", new LoginResponse(newToken));
     }
 
+    @GetMapping("/validate-login")
+    public Response validateLogin(@RequestHeader("Authorization") String authorizationHeader) {
+        Authorization.authorize(authorizationHeader);
+
+        return Response.Success();
+    }
+
     @GetMapping("/verify")
     public ResponseEntity<String> sendVerificationEmail(@RequestParam("email") String email) {
         Email.verifyEmailAddress(email);
