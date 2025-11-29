@@ -1,7 +1,8 @@
+
 import React, { useRef, useState, useEffect } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { Camera, useCameraDevice } from "react-native-vision-camera";
-import TextRecognition from "@react-native-ml-kit/text-recognition";
+import * as FileSystem from "expo-file-system/legacy"; // ✅ Legacy import
 
 export default function ScannerScreen() {
   const cameraRef = useRef<Camera>(null);
@@ -12,8 +13,13 @@ export default function ScannerScreen() {
 
   useEffect(() => {
     (async () => {
-      const status = await Camera.requestCameraPermission();
-      setPermission(status === "granted");  // <-- FIXED HERE
+      try {
+        const status = await Camera.requestCameraPermission();
+        setPermission(status === "granted");
+      } catch (err) {
+        console.error("Permission error:", err);
+        setPermission(false);
+      }
     })();
   }, []);
 
@@ -22,18 +28,65 @@ export default function ScannerScreen() {
 
   async function takeAndScan() {
     try {
-      const photo = await cameraRef.current?.takePhoto({
-        flash: "off",
+      setOcrText("Processing...");
+
+      if (!cameraRef.current) {
+        setOcrText("Camera not ready");
+        return;
+      }
+
+      const photo = await cameraRef.current.takePhoto({ flash: "off" });
+
+      if (!photo?.path) {
+        setOcrText("Photo capture failed (no path)");
+        return;
+      }
+
+      console.log("PHOTO PATH:", photo.path);
+
+      await new Promise((r) => setTimeout(r, 200));
+
+      const photoUri = `file://${photo.path}`;
+
+      // ✅ Read image as Base64 using legacy API
+      const base64 = await FileSystem.readAsStringAsync(photoUri, {
+        encoding: "base64",
       });
 
-      if (!photo?.path) return;
-
-      const result = await TextRecognition.recognize(photo.path);
-      setOcrText(result?.text || "");
+      // ✅ Send to Google Vision API
+      const cloudText = await sendToGoogleVision(base64);
+      setOcrText(cloudText || "Cloud OCR failed");
     } catch (e) {
-      const message = e instanceof Error ? e.message : JSON.stringify(e); // <-- FIXED HERE
-      console.error("OCR error:", message);
-      setOcrText("OCR failed: " + message);
+      console.error("OCR error:", e);
+      const msg = e instanceof Error ? e.message : JSON.stringify(e);
+      setOcrText("OCR failed: " + msg);
+    }
+  }
+
+  async function sendToGoogleVision(base64Image: string) {
+    try {
+      const apiKey = "YOUR_GOOGLE_VISION_API_KEY"; // Replace with your key
+      const response = await fetch(
+        `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            requests: [
+              {
+                image: { content: base64Image },
+                features: [{ type: "TEXT_DETECTION" }],
+              },
+            ],
+          }),
+        }
+      );
+
+      const data = await response.json();
+      return data.responses?.[0]?.fullTextAnnotation?.text || "";
+    } catch (err) {
+      console.error("Google Vision error:", err);
+      return null;
     }
   }
 
