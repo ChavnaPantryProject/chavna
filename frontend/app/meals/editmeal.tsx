@@ -284,6 +284,8 @@ const styles = StyleSheet.create({
 
     topSection: {
         alignItems: "center",
+        paddingHorizontal: 25,
+        paddingTop: 20,
     },
 
     scrollContainer: {
@@ -399,9 +401,10 @@ const styles = StyleSheet.create({
         gap: 10,
     },
 
-    amountText: {
-        fontSize: 15,
-        color: "#000",
+    amountContainer: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 10,
     },
 
     deleteButton: {
