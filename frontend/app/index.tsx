@@ -1,16 +1,93 @@
 // app/index.tsx
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, Image } from 'react-native';
 import { router, type Href } from 'expo-router';
+import { retrieveValue, storeValue, API_URL, Response } from './util';
+import { jwtDecode } from 'jwt-decode';
+
+const TIMEOUT_DURATION = 1200;
+
+async function checkLogin(): Promise<boolean> {
+    const jwt: string | null = await retrieveValue('jwt');
+
+    if (jwt == null)
+        return false;
+
+    const decodedJwt = jwtDecode(jwt);
+    const duration = decodedJwt.exp! - decodedJwt.iat!;
+    const now = Math.floor(Date.now() / 1000);
+    const jwtAge = now - decodedJwt.iat!;
+
+    if (jwtAge > duration / 2) {
+        if (jwtAge > duration)
+            return false;
+
+        // Get a new token if the current jwt age is more than half of its lifetime.
+        let response = await fetch(`${API_URL}/refresh-token`, {
+            method: 'GET',
+            headers: {
+                Authorization: `Bearer ${jwt}`
+            },
+        });
+
+        if (response == null)
+            return false;
+
+        let body: Response = await response.json();
+
+        if (body == null)
+            return false;
+
+        if (body.success === 'success') {
+            await storeValue('jwt', body.payload!.jwt);
+        }
+
+        return true;
+    } else {
+        // Verify current token if it is still fresh
+        let response = await fetch(`${API_URL}/validate-login`, {
+            method: 'GET',
+            headers: {
+                Authorization: `Bearer ${jwt}`
+            },
+        });
+
+        if (response == null)
+            return false;
+
+        let body: Response = await response.json();
+
+        if (body == null)
+            return false;
+
+        return body.success === 'success';
+    }
+}
 
 export default function Splash() {
+    const [login, setLogin] = useState<boolean | null>(null);
+
     useEffect(() => {
-        const t = setTimeout(() => {
-            const target: Href = '/login';
-            router.replace(target);
-        }, 1200);
+        (async () => {
+            setLogin(await checkLogin());
+        })();
+
+        let t = setTimeout(() => {
+            router.replace('/login');
+        }, TIMEOUT_DURATION);
+
         return () => clearTimeout(t);
     }, []);
+
+    useEffect(() => {
+        if (login === null)
+            return;
+
+        if (login === true)
+            router.replace('/(tabs)/home');
+        else
+            router.replace('/login');
+    }, [login]);
 
     return (
         <View style={styles.screen}>

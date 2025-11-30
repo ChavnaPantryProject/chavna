@@ -1,13 +1,55 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {Text, View, StyleSheet, TouchableOpacity, Button,} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { CameraView, CameraType, useCameraPermissions } from "expo-camera";
+import { API_URL, Response } from "../util";
 
 export default function ScannerScreen() {
   const router = useRouter();
   const [facing, setFacing] = useState<CameraType>("back");
   const [permission, requestPermission] = useCameraPermissions();
+  const ref = useRef<CameraView>(null);
+  const [image, setImage] = useState<string>("");
+
+  const takePicture = async () => {
+    const photo = await ref.current?.takePictureAsync({
+      pictureRef: false,
+      base64: true
+    });
+    console.log("take picture");
+    if (photo?.base64) {
+      console.log("process photo");
+      setImage(photo.base64);
+
+      const response = await fetch(`${API_URL}/scan-receipt`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          base64Image: photo.base64
+        })
+      });
+
+
+      if (response === null)
+        return;
+
+      const body: Response = await response.json();
+
+      if (body === null)
+        return;
+
+      if (body.success === "success") {
+        const lines = body.payload as Array<string>;
+        for (const s of lines) {
+          console.log(s);
+        }
+      }
+    }
+
+
+    // router.push("/scannerConfirmation")
+  };
 
   if (!permission) {
     return <View />;
@@ -33,7 +75,7 @@ export default function ScannerScreen() {
 
       {/* Scanner Area with Live Camera */}
       <View style={styles.scannerArea}>
-        <CameraView style={styles.camera} facing={facing} />
+        <CameraView style={styles.camera} ref={ref} facing={facing} />
         {/* Scanner corners */}
         <View style={styles.cornerTopLeft} />
         <View style={styles.cornerTopRight} />
@@ -51,7 +93,7 @@ export default function ScannerScreen() {
         {/* Middle Button */}
         <TouchableOpacity
           style={styles.cameraButton}
-          onPress={() => router.push("/scannerConfirmation")}
+          onPress={() => takePicture()}
         >
           <View style={styles.cameraInnerCircle} />
         </TouchableOpacity>

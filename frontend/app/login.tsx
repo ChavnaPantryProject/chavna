@@ -12,13 +12,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import * as SecureStore from 'expo-secure-store';
 import { router, type Href } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import * as crypto from "expo-crypto";
 import { Buffer } from 'buffer';
-import { API_URL } from './util';
+import { API_URL, storeValue } from './util';
 
 type Mode = 'login' | 'signup';
 
@@ -70,16 +69,6 @@ export default function AuthScreen() {
         const controller = new AbortController();
         const id = setTimeout(() => controller.abort(), ms);
         return fetch(input, { ...init, signal: controller.signal }).finally(() => clearTimeout(id));
-    }
-
-    // Persist token
-    async function saveToken(token: string) {
-        try {
-            await SecureStore.setItemAsync('jwt', token);
-        } catch {
-            try { localStorage.setItem('jwt', token);
-             } catch { }
-        }
     }
 
     // Validation helpers
@@ -140,7 +129,7 @@ export default function AuthScreen() {
 
             setSubmitError('Login successful. Redirecting...');
             const token = data.payload.jwt;
-            await saveToken(token);
+            await storeValue('jwt', token);
             router.replace('/(tabs)/home');
         } catch (err: any) {
             const msg =
