@@ -1,7 +1,16 @@
 import React from "react";
-import { View, Text, StyleSheet, ActivityIndicator, ScrollView } from "react-native";
+import {
+    View,
+    Text,
+    StyleSheet,
+    ActivityIndicator,
+    ScrollView,
+    Pressable,
+} from "react-native";
+import { Swipeable } from "react-native-gesture-handler";
 
 type FoodItem = {
+    id: string;      // ← make sure we get this from backend
     name: string;
     weight: number;
     qty: number;
@@ -11,9 +20,10 @@ type FoodItem = {
 type Props = {
     loading: boolean;
     displayArr: FoodItem[];
+    onDelete: (id: string) => void;
 };
 
-const FoodRows = ({ loading, displayArr }: Props) => {
+const FoodRows = ({ loading, displayArr, onDelete }: Props) => {
     if (loading) {
         return (
             <View style={styles.centerWrap}>
@@ -37,16 +47,36 @@ const FoodRows = ({ loading, displayArr }: Props) => {
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
         >
-            {displayArr.map((foodItem, index) => {
-                return (
-                    <View key={`${foodItem.name}-${index}`} style={styles.entryOfFood}>
-                        <Text style={[styles.specficFoodEntryColumn, styles.flex1]}>{foodItem.name}</Text>
-                        <Text style={[styles.specficFoodEntryColumn, styles.flex1]}>{foodItem.weight}</Text>
-                        <Text style={[styles.specficFoodEntryColumn, styles.flex1]}>{foodItem.qty}</Text>
-                        <Text style={[styles.specficFoodEntryColumn, styles.flex2]}>{foodItem.expDate}</Text>
+            {displayArr.map((foodItem) => (
+                <Swipeable
+                    key={foodItem.id}
+                    renderRightActions={() => (
+                        <View style={styles.rightAction}>
+                            <Pressable
+                                style={styles.deleteBtn}
+                                onPress={() => onDelete(foodItem.id)}
+                            >
+                                <Text style={styles.deleteText}>Delete</Text>
+                            </Pressable>
+                        </View>
+                    )}
+                >
+                    <View style={styles.entryOfFood}>
+                        <Text style={[styles.specficFoodEntryColumn, styles.flex1]}>
+                            {foodItem.name}
+                        </Text>
+                        <Text style={[styles.specficFoodEntryColumn, styles.flex1]}>
+                            {foodItem.weight}
+                        </Text>
+                        <Text style={[styles.specficFoodEntryColumn, styles.flex1]}>
+                            {foodItem.qty}
+                        </Text>
+                        <Text style={[styles.specficFoodEntryColumn, styles.flex2]}>
+                            {foodItem.expDate}
+                        </Text>
                     </View>
-                );
-            })}
+                </Swipeable>
+            ))}
         </ScrollView>
     );
 };
@@ -99,6 +129,27 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "center",
+    },
+
+    rightAction: {
+        justifyContent: "center",
+        alignItems: "center",
+        marginTop: 5,
+        marginLeft: 8,
+        backgroundColor: "#DC2626",
+        borderRadius: 5,
+        paddingHorizontal: 16,
+    },
+
+    deleteBtn: {
+        paddingVertical: 8,
+        paddingHorizontal: 4,
+    },
+
+    deleteText: {
+        color: "white",
+        fontWeight: "600",
+        fontSize: 14,
     },
 });
 

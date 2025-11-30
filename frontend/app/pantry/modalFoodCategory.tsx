@@ -25,6 +25,7 @@ type BackendFoodItem = {
 }
 
 type FoodItem = {
+  id: string;
   name: string;
   weight: number;
   qty: number;
@@ -103,6 +104,7 @@ export default function ModalFoodCategory({ visible, onClose, title, children }:
         const backendItems: BackendFoodItem[] = data.payload?.items || []
         // Map backend items to frontend format
         const mappedItems: FoodItem[] = backendItems.map(item => ({
+          id: item.id,
           name: item.name,
           weight: 0,
           qty: item.amount,
@@ -179,7 +181,11 @@ export default function ModalFoodCategory({ visible, onClose, title, children }:
   }
   // --------------------------End of sorting functions ----------------------------------------
 
-
+  //deleted food by id
+  const handleDeleteFood = (id: string) => {
+    setArrOfFood(prev => prev.filter(item => item.id !== id));
+    setDisplayArr(prev => prev.filter(item => item.id !== id));
+  };
   return (
     <Modal
       visible={visible}
@@ -248,6 +254,7 @@ export default function ModalFoodCategory({ visible, onClose, title, children }:
               <FoodRows
                   loading={loading}
                   displayArr={displayArr}
+                  onDelete={handleDeleteFood}
               />
           </View>
 
