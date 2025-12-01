@@ -1,16 +1,9 @@
 import React from "react";
-import {
-    View,
-    Text,
-    StyleSheet,
-    ActivityIndicator,
-    ScrollView,
-    Pressable,
-} from "react-native";
+import { View, Text, StyleSheet, ActivityIndicator, Pressable } from "react-native";
 import { Swipeable } from "react-native-gesture-handler";
 
 type FoodItem = {
-    id: string;      // ← make sure we get this from backend
+    id: string;
     name: string;
     weight: number;
     qty: number;
@@ -41,12 +34,7 @@ const FoodRows = ({ loading, displayArr, onDelete }: Props) => {
     }
 
     return (
-        <ScrollView
-            style={styles.scroll}
-            contentContainerStyle={styles.listContainer}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-        >
+        <View style={styles.listContainer}>
             {displayArr.map((foodItem) => (
                 <Swipeable
                     key={foodItem.id}
@@ -77,17 +65,13 @@ const FoodRows = ({ loading, displayArr, onDelete }: Props) => {
                     </View>
                 </Swipeable>
             ))}
-        </ScrollView>
+        </View>
     );
 };
 
 const styles = StyleSheet.create({
-    scroll: {
-        flex: 1,
-        alignSelf: "stretch",
-    },
-
     listContainer: {
+        width: "100%",
         paddingHorizontal: 10,
         paddingBottom: 24,
     },
