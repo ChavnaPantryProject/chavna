@@ -11,7 +11,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 public class PantryProjectApplication {
 	public static void main(String[] args) {
         // Initialize the connection pool.
-        Database.openConnection((var) -> {return null;});
+        Database.openConnection((var) -> {return null;}).ignoreResponse();
 		SpringApplication.run(PantryProjectApplication.class, args);
 	}
 
