@@ -115,7 +115,7 @@ const styles = StyleSheet.create({
   },
   topBar: {
     height: 70,
-    backgroundColor: "#2F4F2F", // Dark green
+    backgroundColor: "#499F4458",
   },
   scannerArea: {
     flex: 1,
@@ -171,7 +171,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-around",
     alignItems: "center",
     paddingVertical: 20,
-    backgroundColor: "#2F4F2F", // Dark green
+    backgroundColor: "#499F4458",
   },
   iconButton: {
     width: 50,
@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: "#2F4F2F",
+    backgroundColor: "#499F44",
   },
   resultBox: {
     position: "absolute",
