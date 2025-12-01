@@ -44,7 +44,7 @@ public class PersonalInfoController {
         else
             authorizedUser = null;
         
-        Database.openDatabaseConnection((Connection con) -> {
+        Database.openConnection((Connection con) -> {
             UUID requestedUser;
             if (requestBody.email != null) {
                 // Check if user exists
@@ -82,7 +82,9 @@ public class PersonalInfoController {
             }
 
             return Response.Success(jsonObject);
-        }).throwIfError();
+        })
+        .throwIfError()
+        .throwResponse();
 
         // This should be unreachable
         return null;
@@ -100,7 +102,7 @@ public class PersonalInfoController {
         
         requestBody.put("user_id", user);
 
-        Database.openDatabaseConnection((Connection con) -> {
+        Database.openConnection((Connection con) -> {
             HashMap<String, Object> defaultInfo = Database.getDefaultTableEntry(con, PERSONAL_INFO_TABLE);
             String valuesString = "(";
             String columnsString = "(";
@@ -140,7 +142,9 @@ public class PersonalInfoController {
             statement.executeUpdate();
 
             return null;
-        }).throwIfError();
+        })
+        .throwIfError()
+        .throwResponse();
 
         return Response.Success();
     }

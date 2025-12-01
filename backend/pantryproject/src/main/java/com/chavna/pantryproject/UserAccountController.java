@@ -74,7 +74,7 @@ public class UserAccountController {
         if (errors.hasErrors())
            return Response.Error(HttpStatus.BAD_REQUEST, errors.getAllErrors().get(0).toString());
         
-        Database.openDatabaseConnection((Connection con) -> {
+        Database.openConnection((Connection con) -> {
             PreparedStatement statement = con.prepareStatement("SELECT password_hash, id, login_state FROM " + USERS_TABLE + " where email = ?");
             statement.setString(1, request.email);
             ResultSet results = statement.executeQuery();
@@ -93,7 +93,9 @@ public class UserAccountController {
             }
 
             return null;
-        }).throwIfError();
+        })
+        .throwIfError()
+        .throwResponse();
 
         return Response.Fail("Invalid login credentials");
     }
@@ -174,7 +176,7 @@ public class UserAccountController {
             String email = googleIdToken.getPayload().getEmail();
 
             // Check if account exists
-            Database.openDatabaseConnection((Connection con) -> {
+            Database.openConnection((Connection con) -> {
                 PreparedStatement emailStatement = con.prepareStatement(String.format("""
                     SELECT id, password_hash FROM %s
                     WHERE email = ?
@@ -224,7 +226,9 @@ public class UserAccountController {
                 """, params.get("state") + "?success=true&token=" + loginToken);
 
                 return null;
-            }).throwIfError();
+            })
+            .throwIfError()
+            .throwResponse();
 
         }
  
@@ -246,7 +250,7 @@ public class UserAccountController {
         if (errors.hasErrors())
             return Response.Error(HttpStatus.BAD_REQUEST, errors.getAllErrors().get(0).toString());
 
-        Database.openDatabaseConnection((Connection con) -> {
+        Database.openConnection((Connection con) -> {
             PreparedStatement statement = con.prepareStatement("SELECT 1 FROM " + USERS_TABLE + " where email = ?");
             statement.setString(1, request.email);
             ResultSet results = statement.executeQuery();
@@ -255,7 +259,9 @@ public class UserAccountController {
                 return Response.Success(new UserExistsResponse(results.getInt(1) == 1));
 
             return null;
-        }).throwIfError();
+        })
+        .throwIfError()
+        .throwResponse();
 
         return Response.Success(false);
     }
@@ -275,7 +281,7 @@ public class UserAccountController {
         if (!emailValidation.matcher(request.email).matches())
             return Response.Fail("Invalid email address.");
 
-        Database.openDatabaseConnection((Connection con) -> {
+        Database.openConnection((Connection con) -> {
             PreparedStatement statement = con.prepareStatement("SELECT 1 FROM " + USERS_TABLE + " where email = ?");
             statement.setString(1, request.email);
             ResultSet results = statement.executeQuery();
@@ -284,7 +290,9 @@ public class UserAccountController {
                 return Response.Error(HttpStatus.CONFLICT, "User with email already exists.");
 
             return null;
-        }).throwIfError();
+        })
+        .throwIfError()
+        .throwResponse();
         
         String token = Authorization.createSingupToken(request.email, request.password);
 
@@ -345,7 +353,7 @@ public class UserAccountController {
 
         CreateAccountRequest request = parsed.accept(visitor);
 
-        Database.openDatabaseConnection((Connection con) -> {
+        Database.openConnection((Connection con) -> {
             BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(BCryptVersion.$2B, 8);
             String hash = encoder.encode(request.password);
             
@@ -364,7 +372,9 @@ public class UserAccountController {
                 return Response.Fail("User with email already exists.");
 
             return null;
-        }).throwIfError();
+        })
+        .throwIfError()
+        .throwResponse();
 
         return ResponseEntity.ok("Account succesfully created.");
     }

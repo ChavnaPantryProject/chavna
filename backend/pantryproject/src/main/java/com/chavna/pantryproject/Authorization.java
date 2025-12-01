@@ -162,7 +162,7 @@ public class Authorization {
 
         if (login instanceof NormalLogin) {
             // Get current login state
-            Database.openDatabaseConnection((Connection con) -> {
+            Database.openConnection((Connection con) -> {
                 PreparedStatement query = con.prepareStatement(String.format(
                     """
                     SELECT login_state FROM %s
@@ -180,7 +180,9 @@ public class Authorization {
                     throw new ResponseException(Response.Error(HttpStatus.UNAUTHORIZED, "Invalid login token."));
 
                 return null;
-            }).throwIfError();
+            })
+            .throwIfError()
+            .throwResponse();
         } else {
             GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(new NetHttpTransport(), GsonFactory.getDefaultInstance())
                 .setAudience(Arrays.asList(Env.getenvNotNull("GOOGLE_CLIENT_ID")))

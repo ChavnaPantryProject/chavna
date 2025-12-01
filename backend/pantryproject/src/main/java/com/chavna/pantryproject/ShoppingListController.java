@@ -37,7 +37,7 @@ public class ShoppingListController {
     public Response updateShoppingList(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody ShoppingList requestBody) {
         Login login = Authorization.authorize(authorizationHeader);
 
-        Database.openDatabaseConnection((Connection con) -> {
+        Database.openConnection((Connection con) -> {
             PreparedStatement delete = con.prepareStatement(String.format("""
                 DELETE FROM %s
                 WHERE user_id = ?
@@ -77,7 +77,9 @@ public class ShoppingListController {
             insert.executeUpdate();
 
             return null;
-        }).throwIfError();
+        })
+        .throwIfError()
+        .throwResponse();
 
         return Response.Success();
     }
@@ -86,7 +88,7 @@ public class ShoppingListController {
     public Response getShoppingList(@RequestHeader("Authorization") String authorizationHeader) {
         Login login = Authorization.authorize(authorizationHeader);
 
-        Database.openDatabaseConnection((Connection con) -> {
+        Database.openConnection((Connection con) -> {
             PreparedStatement statement = con.prepareStatement(String.format("""
                 SELECT item_name, buy_item FROM %s
                 WHERE user_id = ?
@@ -105,7 +107,9 @@ public class ShoppingListController {
             }
 
             return Response.Success(list);
-        }).throwIfError();
+        })
+        .throwIfError()
+        .throwResponse();
 
         // This should be unreachable
         return null;

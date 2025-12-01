@@ -78,7 +78,7 @@ public class MealController {
     public Response createMeal(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody CreateMealRequest requestBody) {
         Login login = Authorization.authorize(authorizationHeader);
 
-        Database.openDatabaseConnection((Connection con) -> {
+        Database.openConnection((Connection con) -> {
             PreparedStatement statement = con.prepareStatement(String.format("""
                 INSERT INTO %s (owner, name)
                 VALUES (?, ?)
@@ -105,7 +105,9 @@ public class MealController {
                 return Response.Fail("Meal with that name already exists.");
 
             return null;
-        }).throwIfError();
+        })
+        .throwIfError()
+        .throwResponse();
 
         // This should be unreachable
         return null;
@@ -137,7 +139,7 @@ public class MealController {
     public Response getMeal(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody GetMealRequest requestBody) {
         Login login = Authorization.authorize(authorizationHeader);
 
-        Database.openDatabaseConnection((Connection con) -> {
+        Database.openConnection((Connection con) -> {
             String query = String.format("""
                 SELECT %2$s.name, %3$s.id, %1$s.amount, %3$s.name, %3$s.unit FROM %1$s
                 INNER JOIN %3$s
@@ -178,7 +180,9 @@ public class MealController {
             meal.ingredients = ingredients;
 
             return Response.Success(new GetMealResponse(meal));
-        }).throwIfError();
+        })
+        .throwIfError()
+        .throwResponse();
 
         // This should be unreachable
         return null;
@@ -207,7 +211,7 @@ public class MealController {
     public Response setMeal(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody UpdateMealRequest requestBody) {
         Login login = Authorization.authorize(authorizationHeader);
 
-        Database.openDatabaseConnection((Connection con) -> {
+        Database.openConnection((Connection con) -> {
             PreparedStatement deleteStatement = con.prepareStatement(String.format("""
                 DELETE FROM %1$s
                 USING %2$s
@@ -244,7 +248,9 @@ public class MealController {
             }
 
             return Response.Success(new UpdateMealResponse(added));
-        }).throwIfError();
+        })
+        .throwIfError()
+        .throwResponse();
 
         // This should be unreachable
         return null;
@@ -267,7 +273,7 @@ public class MealController {
     public Response getMeals(@RequestHeader("Authorization") String authorizationHeader) {
         Login login = Authorization.authorize(authorizationHeader);
 
-        Database.openDatabaseConnection((Connection con) -> {
+        Database.openConnection((Connection con) -> {
             PreparedStatement statement = con.prepareStatement(String.format("""
                 SELECT id, name FROM %s
                 WHERE owner = ?
@@ -287,7 +293,9 @@ public class MealController {
             }
 
             return Response.Success(response);
-        }).throwIfError();
+        })
+        .throwIfError()
+        .throwResponse();
 
         // This should be unreachable
         return null;

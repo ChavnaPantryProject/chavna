@@ -44,7 +44,7 @@ public class PantryController {
     public Response createFoodItemTemplate(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody FoodItemTemplate requestBody) {
         Login login = Authorization.authorize(authorizationHeader);
 
-        Database.openDatabaseConnection((Connection con) -> {
+        Database.openConnection((Connection con) -> {
             PreparedStatement statement = con.prepareStatement(String.format("""
                 INSERT INTO %s (name, owner, amount, unit, shelf_life_days, category)
                 VALUES (?, ?, ?, ?, ?, ?)
@@ -73,7 +73,9 @@ public class PantryController {
                 return Response.Fail("Category does not exist.");
             
             return null;
-        }).throwIfError();
+        })
+        .throwIfError()
+        .throwResponse();
 
         // This should be unreachable
         return null;
@@ -103,7 +105,7 @@ public class PantryController {
 
         final var body = requestBody;
 
-        Database.openDatabaseConnection((Connection con) -> {
+        Database.openConnection((Connection con) -> {
             String query = String.format("""
                 SELECT * FROM %s
                 WHERE owner = ?
@@ -141,7 +143,9 @@ public class PantryController {
             }
 
             return Response.Success(templates);
-        }).throwIfError();
+        })
+        .throwIfError()
+        .throwResponse();
 
         // This should be unreachable
         return null;
@@ -168,7 +172,7 @@ public class PantryController {
 
         Login login = Authorization.authorize(authorizationHeader);
 
-        Database.openDatabaseConnection((Connection con) -> {
+        Database.openConnection((Connection con) -> {
             String values = "";
             for (@SuppressWarnings("unused") var __ : requestBody.items)
                 values += "(CAST(? AS uuid), ?, now()::date, ?),";
@@ -204,7 +208,9 @@ public class PantryController {
                 return Response.Fail("No items added.");
 
             return Response.Success("Items added: " + updated);
-        }).throwIfError();
+        })
+        .throwIfError()
+        .throwResponse();
 
         // This should be unreachable
         return null;
@@ -241,7 +247,7 @@ public class PantryController {
 
         final var body = requestBody;
 
-        Database.openDatabaseConnection((Connection con) -> {
+        Database.openConnection((Connection con) -> {
             String query = String.format("""
                 SELECT * FROM %s
                 INNER JOIN %s
@@ -278,7 +284,9 @@ public class PantryController {
             }
 
             return Response.Success(new GetFoodItemsResponse(items));
-        }).throwIfError();
+        })
+        .throwIfError()
+        .throwResponse();
 
         // This should be unreachable
         return null;
@@ -295,7 +303,7 @@ public class PantryController {
     public Response updateFoodItem(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody UpdateFoodItemRequest requestBody) {
         Login login = Authorization.authorize(authorizationHeader);
 
-        Database.openDatabaseConnection((Connection con) -> {
+        Database.openConnection((Connection con) -> {
             if (requestBody.newAmount > 0) {
                 PreparedStatement statement = con.prepareStatement(String.format("""
                     UPDATE %1$s
@@ -326,7 +334,9 @@ public class PantryController {
             }
 
             return null;
-        }).throwIfError();
+        })
+        .throwIfError()
+        .throwResponse();
 
         return Response.Success("Food item updated");
     }
@@ -340,7 +350,7 @@ public class PantryController {
     public Response createCategory(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody CategoryRequest requestBody) {
         Login login = Authorization.authorize(authorizationHeader);
 
-        Database.openDatabaseConnection((Connection con) -> {
+        Database.openConnection((Connection con) -> {
             PreparedStatement statement = con.prepareStatement(String.format("""
                 INSERT INTO %s (name, owner)
                 VALUES (?, ?);
@@ -356,7 +366,9 @@ public class PantryController {
                 return Response.Fail("Category already exists.");
             
             return null;
-        }).throwIfError();
+        })
+        .throwIfError()
+        .throwResponse();
 
         return Response.Success("Category created.");
     }
@@ -365,7 +377,7 @@ public class PantryController {
     public Response removeCategory(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody CategoryRequest requestBody) {
         Login login = Authorization.authorize(authorizationHeader);
 
-        Database.openDatabaseConnection((Connection con) -> {
+        Database.openConnection((Connection con) -> {
             PreparedStatement statement = con.prepareStatement(String.format("""
                 DELETE FROM %s
                 WHERE name = ? AND owner = ?;
@@ -379,7 +391,9 @@ public class PantryController {
                 return Response.Fail("Category not found.");
 
             return null;
-        }).throwIfError();
+        })
+        .throwIfError()
+        .throwResponse();
 
         return Response.Success("Category removed.");
     }
@@ -396,7 +410,7 @@ public class PantryController {
     public Response getCategories(@RequestHeader("Authorization") String authorizationHeader) {
         Login login = Authorization.authorize(authorizationHeader);
 
-        Database.openDatabaseConnection((Connection con) -> {
+        Database.openConnection((Connection con) -> {
             PreparedStatement statement = con.prepareStatement(String.format("""
                 SELECT name FROM %s
                 WHERE owner = ?
@@ -410,7 +424,9 @@ public class PantryController {
             }
 
             return Response.Success(response);
-        }).throwIfError();
+        })
+        .throwIfError()
+        .throwResponse();
 
         // This should be unreachable
         return null;

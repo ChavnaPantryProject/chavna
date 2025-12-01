@@ -13,6 +13,8 @@ import org.apache.commons.dbcp2.BasicDataSource;
 
 import org.springframework.http.HttpStatus;
 
+import com.google.errorprone.annotations.CheckReturnValue;
+
 import lombok.AllArgsConstructor;
 
 public class Database {
@@ -77,12 +79,14 @@ public class Database {
     @AllArgsConstructor
     public static class ConnectionResult {
         SQLException ex;
+        Response response;
 
         /***
          * If the result is an error, call this function to manually process it.
          * @param errorHandler - function for handling error.
          * @return itself
          */
+        @CheckReturnValue
         public ConnectionResult onSQLError(ConnectionErrorHandler errorHandler) {
             Response response = errorHandler.handleError(ex);
 
@@ -95,9 +99,23 @@ public class Database {
         /***
          * If the result is an error, throw an ResponseException
          */
-        public void throwIfError() {
+        @CheckReturnValue
+        public ConnectionResult throwIfError() {
             if (ex != null)
                 throw getSQLErrorHTTPResponseException(ex);
+
+            return this;
+        }
+
+        public Response getResponse() {
+            return response;
+        }
+
+        public void ignoreResponse() {}
+
+        public void throwResponse() {
+            if (response != null)
+                throw new ResponseException(response);
         }
     }
 
@@ -110,19 +128,21 @@ public class Database {
      * @param connection - Function to use connection. Return null to continue execution, or return a Response object to throw a ResponseException (if you want your outer function to return early).
      * @return Result type to manually handle the error or throw it.
      */
-    public static ConnectionResult openDatabaseConnection(DatabaseConnection connection) {
+
+    @CheckReturnValue
+    public static ConnectionResult openConnection(DatabaseConnection connection) {
         Connection con = null;
         ConnectionResult result = null;
         try {
             con = dataSource.getConnection();
             Response response = connection.connect(con);
 
-            if (response != null)
-                throw new ResponseException(response);
+            // if (response != null)
+            //     throw new ResponseException(response);
 
-            result = new ConnectionResult(null);
+            result = new ConnectionResult(null, response);
         } catch (SQLException ex) {
-            result = new ConnectionResult(ex);
+            result = new ConnectionResult(ex, null);
         } finally {
             try {
                 if (con != null)
@@ -132,7 +152,7 @@ public class Database {
                     result.ex.printStackTrace();
                     throw new RuntimeException("Double SQLException.", ex);
                 } else {
-                    result = new ConnectionResult(ex);
+                    result = new ConnectionResult(ex, null);
                 }
             }
         }
