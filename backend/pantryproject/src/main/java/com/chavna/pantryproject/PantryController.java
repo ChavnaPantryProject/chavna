@@ -438,4 +438,86 @@ public class PantryController {
         // This should be unreachable
         return null;
     }
+
+    public static class GetScanKeyRequest {
+        @NotNull
+        public String key;
+    }
+
+    @AllArgsConstructor
+    public static class GetScanKeyResponse {
+        public UUID templateId;
+    }
+
+    @PostMapping("get-scan-key")
+    public Response getScanKey(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody GetScanKeyRequest requestBody) {
+        Login login = Authorization.authorize(authorizationHeader);
+        UUID familyOwner = Authorization.getFamilyOwnerId(login);
+
+        UUID[] templateId = {null};
+        Database.openConnection((Connection con) -> {
+            PreparedStatement statement = con.prepareStatement("""
+                SELECT template_id FROM scan_items
+                WHERE scan_text = ? AND owner = ?;
+            """);
+
+            statement.setString(1, requestBody.key);
+            statement.setObject(2, familyOwner);
+
+            ResultSet result = statement.executeQuery();
+
+            if (result.next())
+                templateId[0] = (UUID) result.getObject(1);
+
+            return null;
+        })
+        .throwIfError()
+        .ignoreResponse();
+
+        return Response.Success(new GetScanKeyResponse(templateId[0]));
+    }
+
+    public static class SetScanKeyRequest {
+        @NotNull
+        public String key;
+        @Nullable
+        public UUID templateId;
+    }
+
+    @PostMapping("/set-scan-key")
+    public Response setScanKey(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody SetScanKeyRequest requestBody) {
+        Login login = Authorization.authorize(authorizationHeader);
+        UUID familyOwner = Authorization.getFamilyOwnerId(login);
+
+        Database.openConnection((Connection con) -> {
+            PreparedStatement deleteStatement = con.prepareStatement("""
+                DELETE FROM scan_items
+                WHERE scan_text = ? AND owner = ?;
+            """);
+
+            deleteStatement.setString(1, requestBody.key);
+            deleteStatement.setObject(2, familyOwner);
+
+            deleteStatement.executeUpdate();
+
+            if (requestBody.templateId != null) {
+                PreparedStatement statement = con.prepareStatement("""
+                    INSERT INTO scan_items (scan_text, template_id, owner)
+                    VALUES (?, ?, ?)
+                """);
+
+                statement.setString(1, requestBody.key);
+                statement.setObject(2, requestBody.templateId);
+                statement.setObject(3, familyOwner);
+
+                statement.executeUpdate();
+            }
+
+            return null;
+        })
+        .throwIfError()
+        .throwResponse();
+
+        return Response.Success("Key added.");
+    }
 }

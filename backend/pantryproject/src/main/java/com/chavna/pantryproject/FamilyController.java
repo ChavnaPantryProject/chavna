@@ -342,7 +342,7 @@ public class FamilyController {
             ResultSet result = checkFamilyQuery.executeQuery();
 
             if (!result.next())
-                throw new ResponseException(Response.Error(HttpStatus.NOT_FOUND, "Recipient id not found."));
+                return Response.Error(HttpStatus.NOT_FOUND, "Recipient id not found.");
 
             UUID memberId = (UUID) result.getObject(1);
             UUID inviteState = (UUID) result.getObject(2);
