@@ -432,10 +432,18 @@ export default function AddTemplateScreen() {
             {/* Hide native header and use custom one so we can style underline freely */}
             <Stack.Screen options={{ headerShown: false }} />
 
-            {/* Custom header */}
+            {/* Custom header with back arrow */}
             <View style={styles.customHeader}>
+                <Pressable onPress={() => router.back()} style={styles.backBtn}>
+                    <Ionicons name="arrow-back" size={24} color="black" />
+                </Pressable>
+
                 <Text style={styles.customHeaderTitle}>Add Item</Text>
+
+                {/* Spacer so title stays visually centered */}
+                <View style={{ width: 24 }} />
             </View>
+
 
             <ScrollView
                 contentContainerStyle={styles.container}
@@ -562,13 +570,21 @@ const styles = StyleSheet.create({
     customHeader: {
         paddingTop: 12,
         paddingBottom: 10,
+        paddingHorizontal: 16,
+        flexDirection: "row",
         alignItems: "center",
         borderBottomWidth: StyleSheet.hairlineWidth,
         borderBottomColor: "#4CAF50", // thin green underline
     },
+    backBtn: {
+        paddingRight: 8,
+        paddingVertical: 4,
+    },
     customHeaderTitle: {
+        flex: 1,
         fontSize: 18,
         fontWeight: "700",
+        textAlign: "center",
     },
     container: {
         padding: 16,
