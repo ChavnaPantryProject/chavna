@@ -27,6 +27,7 @@ public class ReceiptParser {
             return width / text.length();
         }
 
+        @Override
         public Word clone() {
             Point[] points = new Point[originalPolygon.length];
             for (int i = 0; i < originalPolygon.length; i++) {
@@ -36,6 +37,7 @@ public class ReceiptParser {
             return new Word(x, y, width, height, originalPolygon, text);
         }
 
+        @Override
         public int compareTo(Word other) {
             return Float.compare(x, other.x);
         }

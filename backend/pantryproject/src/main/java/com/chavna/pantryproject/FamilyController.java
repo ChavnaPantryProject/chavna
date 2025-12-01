@@ -10,7 +10,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
@@ -39,9 +39,19 @@ import lombok.AllArgsConstructor;
 @RestController
 public class FamilyController {
     public static enum FamilyRole {
-        None,
-        Owner,
-        Member
+        None(0),
+        Owner(1),
+        Member(2);
+
+        private final int intValue;
+
+        private FamilyRole(int intValue) {
+            this.intValue = intValue;
+        }
+
+        public int intValue() {
+            return intValue;
+        }
     }
 
 
@@ -86,7 +96,7 @@ public class FamilyController {
                 VALUES (?, ?)
                 RETURNING member_id;
                 """, FAMILY_MEMBER_TABLE));
-            createMembershipQuery.setInt(1, FamilyRole.Owner.ordinal());
+            createMembershipQuery.setInt(1, FamilyRole.Owner.intValue());
             createMembershipQuery.setObject(2, familyId);
             result = createMembershipQuery.executeQuery();
             result.next();
@@ -249,7 +259,7 @@ public class FamilyController {
             String userIdentity = String.format("the family of %s", Database.getUserEmail(con, user));
             String url = CHAVNA_URL + "accept-invite?token=" + token;
 
-            HashMap<String, Object> personalInfo = Database.getUserPersonalInfo(con, user);
+            Map<String, Object> personalInfo = Database.getUserPersonalInfo(con, user);
             String name = (String) personalInfo.get("first_name");
             if (name != null)
                 userIdentity = String.format("%s's", name);
@@ -352,7 +362,7 @@ public class FamilyController {
                 VALUES (?, ?)
                 RETURNING member_id;
                 """, FAMILY_MEMBER_TABLE));
-            createMembershipQuery.setInt(1, FamilyRole.Member.ordinal());
+            createMembershipQuery.setInt(1, FamilyRole.Member.intValue());
             createMembershipQuery.setObject(2, invite.familyId);
             result = createMembershipQuery.executeQuery();
             result.next();

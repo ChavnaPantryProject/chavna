@@ -12,6 +12,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.List;
 import java.util.UUID;
 
 import javax.crypto.SecretKey;
@@ -31,6 +32,7 @@ import io.jsonwebtoken.security.Keys;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
+import com.google.common.base.Splitter;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 
 public class Authorization {
@@ -112,12 +114,12 @@ public class Authorization {
     * @return      the user id assocciated with the token.
     */
     public static Login authorize(String authorizationHeader) {
-        String[] split = authorizationHeader.split(" ");
+        List<String> split = Splitter.on(" ").splitToList(authorizationHeader);
 
-        if (split.length != 2 || !split[0].equals("Bearer"))
+        if (split.size() != 2 || !split.get(0).equals("Bearer"))
             throw new ResponseException(Response.Error(HttpStatus.BAD_REQUEST, "Invalid authorization header."));
 
-        String token = split[1];
+        String token = split.get(1);
 
         JwtParser parser = Jwts.parser()
             .verifyWith(jwtKey)

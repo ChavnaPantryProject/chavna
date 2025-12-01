@@ -103,6 +103,7 @@ public class UserAccountController {
     static final String GOOGLE_PASSWORD_STRING = "GoogleAccount";
     static final byte[] GOOGLE_PASSWORD_HASH = createGoogleHash();
 
+    @SuppressWarnings("DefaultCharset")
     static byte[] createGoogleHash() {
         byte[] bytes = GOOGLE_PASSWORD_STRING.getBytes();
 
@@ -319,6 +320,7 @@ public class UserAccountController {
     }
 
     @GetMapping("/confirm-account")
+    @SuppressWarnings("DefaultCharset")
     public ResponseEntity<String> confirmAccount(@RequestParam("token") String token) throws SQLException {
         JwtParser parser = Jwts.parser()
             .decryptWith(Authorization.encryptionKey)

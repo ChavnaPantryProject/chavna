@@ -7,7 +7,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
@@ -26,9 +26,8 @@ public class PersonalInfoController {
     }
 
     @AllArgsConstructor
-    private static class GetPersonalInfoResponse {
-        @SuppressWarnings("unused")
-        public HashMap<String, Object> personal_info;
+    public static class GetPersonalInfoResponse {
+        public Map<String, Object> personal_info;
     }
 
     @PostMapping("/get-personal-info")
@@ -72,7 +71,7 @@ public class PersonalInfoController {
                     return Response.Error(HttpStatus.NOT_FOUND, "User with provided id does not exist.");
             }
 
-            HashMap<String, Object> jsonObject = Database.getUserPersonalInfo(con, requestedUser);
+            Map<String, Object> jsonObject = Database.getUserPersonalInfo(con, requestedUser);
 
             // Check authorization if user's profie isn't public
             if (!(boolean) jsonObject.get("public")) {
@@ -81,7 +80,7 @@ public class PersonalInfoController {
                     return Response.Error(HttpStatus.UNAUTHORIZED, "User has private personal info. Authorization required.");
             }
 
-            return Response.Success(jsonObject);
+            return Response.Success(new GetPersonalInfoResponse(jsonObject));
         })
         .throwIfError()
         .throwResponse();
@@ -95,7 +94,7 @@ public class PersonalInfoController {
     }
 
     @PostMapping("/set-personal-info")
-    public Response setPersonalInfo(@RequestHeader("Authorization") String authorizationHeader, @RequestBody HashMap<String, Object> requestBody) {
+    public Response setPersonalInfo(@RequestHeader("Authorization") String authorizationHeader, @RequestBody Map<String, Object> requestBody) {
         UUID user = Authorization.authorize(authorizationHeader).userId;
         if (requestBody.containsKey("user_id"))
             return Response.Error(HttpStatus.BAD_REQUEST, "Invalid column: \"user_id\"");
@@ -103,7 +102,7 @@ public class PersonalInfoController {
         requestBody.put("user_id", user);
 
         Database.openConnection((Connection con) -> {
-            HashMap<String, Object> defaultInfo = Database.getDefaultTableEntry(con, PERSONAL_INFO_TABLE);
+            Map<String, Object> defaultInfo = Database.getDefaultTableEntry(con, PERSONAL_INFO_TABLE);
             String valuesString = "(";
             String columnsString = "(";
             String updateString = "";

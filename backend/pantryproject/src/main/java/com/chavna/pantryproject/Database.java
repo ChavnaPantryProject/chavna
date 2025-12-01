@@ -7,6 +7,7 @@ import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.time.Duration;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 import org.apache.commons.dbcp2.BasicDataSource;
@@ -124,12 +125,13 @@ public class Database {
     }
 
     /***
-     * 
+     * Opens a database connection from the connection pool.
      * @param connection - Function to use connection. Return null to continue execution, or return a Response object to throw a ResponseException (if you want your outer function to return early).
      * @return Result type to manually handle the error or throw it.
      */
 
     @CheckReturnValue
+    @SuppressWarnings("Finally")
     public static ConnectionResult openConnection(DatabaseConnection connection) {
         Connection con = null;
         ConnectionResult result = null;
@@ -160,7 +162,7 @@ public class Database {
         return result;
     }
 
-    public static HashMap<String, Object> objectFromResultSet(ResultSet resultSet) throws SQLException {
+    public static Map<String, Object> objectFromResultSet(ResultSet resultSet) throws SQLException {
         ResultSetMetaData metadata = resultSet.getMetaData();
 
         HashMap<String, Object> map = new HashMap<>();
@@ -173,7 +175,7 @@ public class Database {
         return map;
     }
 
-    public static HashMap<String, Object> getDefaultTableEntry(Connection dbConnection, String tableName) throws SQLException {
+    public static Map<String, Object> getDefaultTableEntry(Connection dbConnection, String tableName) throws SQLException {
         HashMap<String, Object> object = new HashMap<>();
 
         PreparedStatement statement = dbConnection.prepareStatement(
@@ -207,7 +209,7 @@ public class Database {
         return object;
     }
 
-    public static HashMap<String, Object> getUserPersonalInfo(Connection con, UUID user) throws SQLException {
+    public static Map<String, Object> getUserPersonalInfo(Connection con, UUID user) throws SQLException {
         PreparedStatement personalInfoStatement = con.prepareStatement(String.format(
             """
             SELECT * FROM %s WHERE user_id = ?
@@ -215,7 +217,7 @@ public class Database {
         personalInfoStatement.setObject(1, user);
         ResultSet query2 = personalInfoStatement.executeQuery();
         
-        HashMap<String, Object> jsonObject;
+        Map<String, Object> jsonObject;
         if (query2.next()) {
             jsonObject = Database.objectFromResultSet(query2);
         } else {
