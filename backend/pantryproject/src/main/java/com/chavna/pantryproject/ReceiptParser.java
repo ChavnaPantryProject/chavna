@@ -1,5 +1,6 @@
 package com.chavna.pantryproject;
 
+import java.util.List;
 import java.util.TreeSet;
 
 import lombok.AllArgsConstructor;
@@ -7,67 +8,76 @@ import lombok.Getter;
 
 public class ReceiptParser {
     @AllArgsConstructor
+    public static class Point {
+        public float x;
+        public float y;
+    }
+
+    @AllArgsConstructor
     public static class Word implements Cloneable, Comparable<Word> {
+        private float x;
+        private float y;
+        private float width;
+        private float height;
         @Getter
-        private double x;
-        @Getter
-        private double y;
-        @Getter
-        private double width;
-        @Getter
-        private double height;
+        private Point[] originalPolygon;
         @Getter
         private String text;
 
-        public double getCharacterWidth() {
+        public float getCharacterWidth() {
             return width / text.length();
         }
 
         public Word clone() {
-            return new Word(x, y, width, height, text);
+            Point[] points = new Point[originalPolygon.length];
+            for (int i = 0; i < originalPolygon.length; i++) {
+                points[i] = new Point(originalPolygon[i].x, originalPolygon[i].y);
+            }
+
+            return new Word(x, y, width, height, originalPolygon, text);
         }
 
         public int compareTo(Word other) {
-            return Double.compare(x, other.x);
+            return Float.compare(x, other.x);
         }
     }
 
     public static class LineBlock implements Comparable<LineBlock> {
         @Getter
-        private double x;
+        private float x;
         @Getter
-        private double y;
+        private float y;
         @Getter
-        private double width;
+        private float width;
         @Getter
-        private double height;
+        private float height;
         private Word[] words;
 
         private LineBlock(Word[] words) {
             this.words = words;
 
-            Double x = null;
+            Float x = null;
             for (Word w : words) {
                 if (x == null || w.x < x)
                     x = w.x;
             }
             this.x = x != null? x : 0;
 
-            Double y = null;
+            Float y = null;
             for (Word w : words) {
                 if (y == null || w.y < y)
                     y = w.y;
             }
             this.y = y != null? y : 0;
 
-            Double xMax = null;
+            Float xMax = null;
             for (Word w : words) {
                 if (xMax == null || w.x + w.width > xMax)
                     xMax = w.x + w.width;
             }
             width = (xMax != null? xMax : 0) - this.x;
 
-            Double yMax = null;
+            Float yMax = null;
             for (Word w : words) {
                 if (yMax == null || w.y + w.height > yMax)
                     yMax = w.y + w.height;
@@ -81,19 +91,19 @@ public class ReceiptParser {
 
         @Override
         public int compareTo(LineBlock other) {
-            double aCenter = centerY();
-            double bCenter = other.centerY();
+            float aCenter = centerY();
+            float bCenter = other.centerY();
 
             // If either block's y center is within the other's y bounds, they are considered on the same line.
             if ((bCenter <= y + height && bCenter >= y) || (aCenter <= other.y + other.height && aCenter >= other.y))
                 return 0;
 
             // Otherwise compare the y position of their centers
-            return Double.compare(aCenter, bCenter);
+            return Float.compare(aCenter, bCenter);
         }
 
-        public double centerY() {
-            return getY() + getHeight() / 2.0;
+        public float centerY() {
+            return getY() + getHeight() / 2;
         }
 
         public Word[] getWords() {
