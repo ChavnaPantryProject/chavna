@@ -29,6 +29,90 @@ type ShoppingListItem = {
   isChecked: boolean
 }
 
+type ExpiringItem = {
+  id: string;
+  name: string;
+  daysLeft: number;
+};
+
+function daysUntil(expiration: string): number | null {
+  if (!expiration) return null;
+
+  // Expecting format "YYYY-MM-DD"
+  const parts = expiration.split('-').map(Number);
+  if (parts.length !== 3) return null;
+
+  const [year, month, day] = parts;
+  if (!year || !month || !day) return null;
+
+  const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+  const today = new Date();
+  const todayUTC = Date.UTC(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate()
+  );
+
+  const expUTC = Date.UTC(year, month - 1, day);
+
+  return Math.round((expUTC - todayUTC) / MS_PER_DAY);
+}
+
+
+// Keep up to 2 weeks in the future, and 1 week in the past
+const EXPIRY_WINDOW_FUTURE = 14;
+const EXPIRY_WINDOW_PAST = 7;
+
+async function getExpiringSoonItems(): Promise<ExpiringItem[]> {
+  const loginToken: string = (await retrieveValue('jwt'))!;
+
+  const response = await fetch(`${API_URL}/get-food-items`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${loginToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({}), // no category -> all items
+  });
+
+  const body = await response.json();
+
+  if (!response.ok) throw body;
+  if (body.success !== 'success') throw body;
+
+  const items = body.payload.items as Array<{
+    id: string;
+    name: string;
+    expiration: string;
+  }>;
+
+  console.log('get-food-items items:', items.map(i => ({
+    name: i.name,
+    expiration: i.expiration,
+  })));
+
+  const result: ExpiringItem[] = [];
+
+  for (const item of items) {
+    const diff = daysUntil(item.expiration); // can be negative
+    if (diff === null) continue;
+
+    // keep from 7 days ago up to 14 days from now
+    if (diff >= -EXPIRY_WINDOW_PAST && diff <= EXPIRY_WINDOW_FUTURE) {
+      result.push({
+        id: item.id,
+        name: item.name,
+        daysLeft: diff, // may be negative if expired
+      });
+    }
+  }
+
+  return result;
+}
+
+
+
 async function getShoppingList(): Promise<Array<ShoppingListItem>> {
   let loginToken: string = (await retrieveValue("jwt"))!;
   let response = await fetch(`${API_URL}/get-shopping-list`, {
@@ -105,6 +189,18 @@ export default function HomeScreen() {
   }, []);
 
   useEffect(() => {
+    (async () => {
+      try {
+        const soon = await getExpiringSoonItems();
+        setExpiringItems(soon);
+      } catch (err) {
+        console.error('Failed to load expiring items', err);
+      }
+    })();
+  }, []);
+
+
+  useEffect(() => {
     if (updateItems) {
       setUpdateItems(false);
 
@@ -114,31 +210,11 @@ export default function HomeScreen() {
       })));
     }
   }, [updateItems]);
+  
 
-    // SAMPLE DATA FOR EXPIRATION WARNING
+    // Expiration Warning
   const [expiringOpen, setExpiringOpen] = useState(false);
-  const expiringItems = [
-    { id: 'e1', name: 'Spinach', daysLeft: 1 },
-    { id: 'e2', name: 'Milk', daysLeft: 2 },
-    { id: 'e3', name: 'Strawberries', daysLeft: 3 },
-    { id: 'e4', name: 'Bananas', daysLeft: 4 },
-    { id: 'e5', name: 'Yogurt', daysLeft: 1 },
-    { id: 'e6', name: 'Avocado', daysLeft: 2 },
-    { id: 'e7', name: 'Blueberries', daysLeft: 3 },
-    { id: 'e8', name: 'Romaine Lettuce', daysLeft: 2 },
-    { id: 'e9', name: 'Chicken Breast', daysLeft: 1 },
-    { id: 'e10', name: 'Ground Beef', daysLeft: 2 },
-    { id: 'e11', name: 'Sliced Turkey', daysLeft: 3 },
-    { id: 'e12', name: 'Mozzarella Cheese', daysLeft: 4 },
-    { id: 'e13', name: 'Heavy Cream', daysLeft: 1 },
-    { id: 'e14', name: 'Eggs', daysLeft: 5 },
-    { id: 'e15', name: 'Carrots', daysLeft: 6 },
-    { id: 'e16', name: 'Bell Peppers', daysLeft: 4 },
-    { id: 'e17', name: 'Onions', daysLeft: 7 },
-    { id: 'e18', name: 'Hummus', daysLeft: 3 },
-    { id: 'e19', name: 'Tortillas', daysLeft: 5 },
-    { id: 'e20', name: 'Sour Cream', daysLeft: 2 },
-  ];
+  const [expiringItems, setExpiringItems] = useState<ExpiringItem[]>([]);
 
     // Bottom sheet open/close + derived count
   const [menuOpen, setMenuOpen] = useState(false);
@@ -589,7 +665,6 @@ function ConfirmDialog({
   );
 }
 
-
 function ExpiringPopover({
   visible,
   onClose,
@@ -614,21 +689,48 @@ function ExpiringPopover({
   const translateY = slide.interpolate({ inputRange: [0, 1], outputRange: [-10, 0] });
   const MAX_HEIGHT = Math.min(360, Dimensions.get('window').height * 0.5);
 
-  const Row = ({ name, daysLeft }: { name: string; daysLeft: number }) => (
-    <View style={expStyles.row}>
-      <Text style={expStyles.rowName} numberOfLines={1}>{name}</Text>
-      <View style={[
-        expStyles.badge,
-        daysLeft <= 1 ? { backgroundColor: '#FCE4E4' } :
-          daysLeft === 2 ? { backgroundColor: '#FFF4D6' } :
-            { backgroundColor: '#E7F3E9' },
-      ]}>
-        <Text style={expStyles.badgeText}>
-          {daysLeft} {daysLeft === 1 ? 'day' : 'days'}
+  const expired = items
+    .filter(it => it.daysLeft < 0)
+    .sort((a, b) => a.daysLeft - b.daysLeft);
+
+  const soon = items
+    .filter(it => it.daysLeft >= 0)
+    .sort((a, b) => a.daysLeft - b.daysLeft);
+
+  const Row = ({ name, daysLeft }: { name: string; daysLeft: number }) => {
+    const isExpired = daysLeft < 0;
+    const abs = Math.abs(daysLeft);
+
+    let label: string;
+    if (isExpired) {
+      label = abs === 0 ? 'Expired' : `${abs} day${abs === 1 ? '' : 's'} ago`;
+    } else if (daysLeft === 0) {
+      label = 'Today';
+    } else {
+      label = `${daysLeft} day${daysLeft === 1 ? '' : 's'}`;
+    }
+
+    const badgeBackground = isExpired
+      ? '#FCE4E4'
+      : daysLeft <= 1
+        ? '#FCE4E4'
+        : daysLeft === 2
+          ? '#FFF4D6'
+          : '#E7F3E9';
+
+    return (
+      <View style={expStyles.row}>
+        <Text style={expStyles.rowName} numberOfLines={1}>
+          {name}
         </Text>
+        <View style={[expStyles.badge, { backgroundColor: badgeBackground }]}>
+          <Text style={expStyles.badgeText}>{label}</Text>
+        </View>
       </View>
-    </View>
-  );
+    );
+  };
+
+  const hasAny = expired.length > 0 || soon.length > 0;
 
   return (
     <Modal visible transparent animationType="none" statusBarTranslucent onRequestClose={onClose}>
@@ -643,28 +745,46 @@ function ExpiringPopover({
         ]}
       >
         <View style={expStyles.card}>
-          <Text style={expStyles.title}>Expiring Soon</Text>
-          <View style={expStyles.divider} />
 
-          {items.length === 0 ? (
-            <Text style={expStyles.empty}>No items expiring soon.</Text>
+
+          {!hasAny ? (
+            <Text style={expStyles.empty}>No items expiring or recently expired.</Text>
           ) : (
-              <ScrollView
-                style={{ maxHeight: MAX_HEIGHT }}
-                contentContainerStyle={{ gap: 10, paddingBottom: 4 }}
-                showsVerticalScrollIndicator={false}
-                bounces={false}
-                alwaysBounceVertical={false}
-                contentInsetAdjustmentBehavior="never"
-                overScrollMode="never"
-              >
-                {[...items]
-                  .sort((a, b) => a.daysLeft - b.daysLeft)
-                  .map(it => (
-                    <Row key={it.id} name={it.name} daysLeft={it.daysLeft} />
-                  ))}
-              </ScrollView>
+            <ScrollView
+              style={{ maxHeight: MAX_HEIGHT }}
+              contentContainerStyle={{ gap: 10, paddingBottom: 4 }}
+              showsVerticalScrollIndicator={false}
+              bounces={false}
+              alwaysBounceVertical={false}
+              contentInsetAdjustmentBehavior="never"
+              overScrollMode="never"
+            >
+              {expired.length > 0 && (
+                <>
+                  <View style={expStyles.sectionHeaderBox}>
+                    <Text style={expStyles.sectionHeader}>Expired</Text>
+                  </View>
 
+                  {expired.map(it => (
+                    <Row key={`exp-${it.id}`} name={it.name} daysLeft={it.daysLeft} />
+                  ))}
+
+                  <View style={expStyles.sectionDivider} />
+                </>
+              )}
+
+              {soon.length > 0 && (
+                <>
+                  <View style={expStyles.sectionHeaderBox}>
+                    <Text style={expStyles.sectionHeader}>Expiring Soon</Text>
+                  </View>
+
+                  {soon.map(it => (
+                    <Row key={`soon-${it.id}`} name={it.name} daysLeft={it.daysLeft} />
+                  ))}
+                </>
+              )}
+            </ScrollView>
           )}
 
           <View style={{ height: 10 }} />
@@ -673,7 +793,6 @@ function ExpiringPopover({
               <Text style={expStyles.secondaryText}>Close</Text>
             </Pressable>
           </View>
-
         </View>
       </Animated.View>
     </Modal>
@@ -980,6 +1099,33 @@ const expStyles = StyleSheet.create({
     backgroundColor: '#59A463',
   },
   primaryText: { fontSize: 14, fontWeight: '700', color: '#fff' },
+  sectionLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#555',
+    marginBottom: 4,
+    marginTop: 2,
+  },
+  sectionDivider: {
+    height: 1,
+    backgroundColor: '#efefefff',
+    marginVertical: 6,
+  },
+  sectionHeaderBox: {
+    width: '100%',
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+    backgroundColor: '#73bd86bb',
+    borderRadius: 6,
+    marginTop: 4,
+    alignItems: 'center',
+  },
+  sectionHeader: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#333',
+    textAlign: 'center',
+  },
 });
 
 const confirmStyles = StyleSheet.create({
