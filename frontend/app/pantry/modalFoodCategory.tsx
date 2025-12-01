@@ -128,6 +128,39 @@ export default function ModalFoodCategory({ visible, onClose, title }: Props) {
         }
     };
 
+const deleteFoodItem = async (id: string) => {
+    try {
+        const token = await retrieveValue("jwt");
+        if (!token) {
+            console.error("No authentication token found");
+            return;
+        }
+
+        const response = await fetch(`${API_URL}/update-food-item`, {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${token}`,
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                foodItemId: id,
+                newAmount: 0     // backend interprets this as delete
+            })
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.success === "success") {
+            console.log("Item deleted!");
+        } else {
+            console.error("Delete failed:", data.message || data);
+        }
+
+    } catch (error) {
+        console.error("Error deleting food item:", error);
+    }
+};
+
     //----------------------- Functions for sorting -----------------------
     // name ascending
     function sortAscName() {
@@ -195,6 +228,7 @@ export default function ModalFoodCategory({ visible, onClose, title }: Props) {
     const handleDeleteFood = (id: string) => {
         setArrOfFood((prev) => prev.filter((item) => item.id !== id));
         setDisplayArr((prev) => prev.filter((item) => item.id !== id));
+        deleteFoodItem(id);
     };
 
     return (
