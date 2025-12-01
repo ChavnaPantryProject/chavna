@@ -5,6 +5,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.chavna.pantryproject.ReceiptParser.Word;
+
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 
@@ -57,8 +59,11 @@ public class OcrController {
             ReceiptParser parser = new ReceiptParser();
 
             for (Block block : detectResponse.blocks()) {
-                if (block.blockType() == BlockType.LINE)
-                    parser.addBlock(block);
+                if (block.blockType() == BlockType.WORD) {
+                    var bounds = block.geometry().boundingBox();
+                    parser.addWord(new Word(bounds.left(), bounds.top(), bounds.width(), bounds.height(), block.text()));
+                    System.out.println(block.text());
+                }
             }
 
             return Response.Success(parser.getLines());

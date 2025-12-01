@@ -40,8 +40,14 @@ export default function ScannerScreen() {
         return;
 
       if (body.success === "success") {
-        const lines = body.payload as Array<string>;
-        for (const s of lines) {
+        const lines: any[] = body.payload;
+        for (const line of lines) {
+          let s = "";
+
+          for (const word of line.words) {
+            s += word.text + '\t';
+          }
+
           console.log(s);
         }
       }
