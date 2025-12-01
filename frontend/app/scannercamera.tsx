@@ -2,7 +2,8 @@
 import React, { useRef, useState, useEffect } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { Camera, useCameraDevice } from "react-native-vision-camera";
-import * as FileSystem from "expo-file-system/legacy"; // ✅ Legacy import
+import TextRecognition from "@react-native-ml-kit/text-recognition";
+import * as FileSystem from "expo-file-system/legacy";
 
 export default function ScannerScreen() {
   const cameraRef = useRef<Camera>(null);
@@ -42,51 +43,19 @@ export default function ScannerScreen() {
         return;
       }
 
-      console.log("PHOTO PATH:", photo.path);
-
-      await new Promise((r) => setTimeout(r, 200));
-
       const photoUri = `file://${photo.path}`;
+      const newPath = FileSystem.cacheDirectory + "receipt.jpg";
 
-      // ✅ Read image as Base64 using legacy API
-      const base64 = await FileSystem.readAsStringAsync(photoUri, {
-        encoding: "base64",
-      });
+      //Copy to Expo-accessible directory
+      await FileSystem.copyAsync({ from: photoUri, to: newPath });
 
-      // ✅ Send to Google Vision API
-      const cloudText = await sendToGoogleVision(base64);
-      setOcrText(cloudText || "Cloud OCR failed");
+      //Run ML Kit OCR
+      const result = await TextRecognition.recognize(newPath);
+      setOcrText(result?.text || "No text detected");
     } catch (e) {
       console.error("OCR error:", e);
       const msg = e instanceof Error ? e.message : JSON.stringify(e);
       setOcrText("OCR failed: " + msg);
-    }
-  }
-
-  async function sendToGoogleVision(base64Image: string) {
-    try {
-      const apiKey = "YOUR_GOOGLE_VISION_API_KEY"; // Replace with your key
-      const response = await fetch(
-        `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            requests: [
-              {
-                image: { content: base64Image },
-                features: [{ type: "TEXT_DETECTION" }],
-              },
-            ],
-          }),
-        }
-      );
-
-      const data = await response.json();
-      return data.responses?.[0]?.fullTextAnnotation?.text || "";
-    } catch (err) {
-      console.error("Google Vision error:", err);
-      return null;
     }
   }
 

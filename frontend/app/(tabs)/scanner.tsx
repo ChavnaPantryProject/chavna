@@ -1,29 +1,63 @@
-import React, { useState } from "react";
-import {Text, View, StyleSheet, TouchableOpacity, Button,} from "react-native";
+
+import React, { useRef, useState, useEffect } from "react";
+import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { CameraView, CameraType, useCameraPermissions } from "expo-camera";
+import { Camera, useCameraDevice } from "react-native-vision-camera";
+import TextRecognition from "@react-native-ml-kit/text-recognition";
+import * as FileSystem from "expo-file-system/legacy";
 
 export default function ScannerScreen() {
   const router = useRouter();
-  const [facing, setFacing] = useState<CameraType>("back");
-  const [permission, requestPermission] = useCameraPermissions();
+  const cameraRef = useRef<Camera>(null);
+  const device = useCameraDevice("back");
 
-  if (!permission) {
-    return <View />;
-  }
+  const [permission, setPermission] = useState(false);
+  const [ocrText, setOcrText] = useState("");
 
-  if (!permission.granted) {
-    return (
-      <View style={styles.center}>
-        <Text style={styles.message}>We need your permission to show the camera</Text>
-        <Button title="Grant Permission" onPress={requestPermission} />
-      </View>
-    );
-  }
+  useEffect(() => {
+    (async () => {
+      try {
+        const status = await Camera.requestCameraPermission();
+        setPermission(status === "granted");
+      } catch (err) {
+        console.error("Permission error:", err);
+        setPermission(false);
+      }
+    })();
+  }, []);
 
-  function toggleCameraFacing() {
-    setFacing((current) => (current === "back" ? "front" : "back"));
+  if (!device) return <Text>Loading camera...</Text>;
+  if (!permission) return <Text>No camera permission</Text>;
+
+  async function takeAndScan() {
+    try {
+      setOcrText("Processing...");
+
+      if (!cameraRef.current) {
+        setOcrText("Camera not ready");
+        return;
+      }
+
+      const photo = await cameraRef.current.takePhoto({ flash: "off" });
+
+      if (!photo?.path) {
+        setOcrText("Photo capture failed (no path)");
+        return;
+      }
+
+      const photoUri = `file://${photo.path}`;
+      const newPath = FileSystem.cacheDirectory + "receipt.jpg";
+
+      await FileSystem.copyAsync({ from: photoUri, to: newPath });
+
+      const result = await TextRecognition.recognize(newPath);
+      setOcrText(result?.text || "No text detected");
+    } catch (e) {
+      console.error("OCR error:", e);
+      const msg = e instanceof Error ? e.message : JSON.stringify(e);
+      setOcrText("OCR failed: " + msg);
+    }
   }
 
   return (
@@ -31,9 +65,15 @@ export default function ScannerScreen() {
       {/* Top Bar */}
       <View style={styles.topBar}></View>
 
-      {/* Scanner Area with Live Camera */}
+      {/* Camera Area */}
       <View style={styles.scannerArea}>
-        <CameraView style={styles.camera} facing={facing} />
+        <Camera
+          ref={cameraRef}
+          style={styles.camera}
+          device={device}
+          isActive={true}
+          photo={true}
+        />
         {/* Scanner corners */}
         <View style={styles.cornerTopLeft} />
         <View style={styles.cornerTopRight} />
@@ -41,26 +81,25 @@ export default function ScannerScreen() {
         <View style={styles.cornerBottomRight} />
       </View>
 
+      {/* OCR Result */}
+      <View style={styles.resultBox}>
+        <Text style={{ color: "white" }}>{ocrText}</Text>
+      </View>
+
       {/* Bottom Navigation Bar */}
       <View style={styles.bottomBar}>
         {/* Left Button */}
-        <TouchableOpacity style={styles.iconButton} onPress={toggleCameraFacing}>
-          <Ionicons name="camera-reverse" size={28} color="white" />
+        <TouchableOpacity style={styles.iconButton} onPress={() => router.push("/barcodescanner")}>
+          <Ionicons name="stats-chart" size={28} color="white" />
         </TouchableOpacity>
 
-        {/* Middle Button */}
-        <TouchableOpacity
-          style={styles.cameraButton}
-          onPress={() => router.push("/scannerConfirmation")}
-        >
+        {/* Middle Button (Scan) */}
+        <TouchableOpacity style={styles.cameraButton} onPress={takeAndScan}>
           <View style={styles.cameraInnerCircle} />
         </TouchableOpacity>
 
-        {/* Right Button */}
-        <TouchableOpacity
-          style={styles.iconButton}
-          onPress={() => router.push("/")}
-        >
+        {/* Right Button (Home) */}
+        <TouchableOpacity style={styles.iconButton} onPress={() => router.push("/home")}>
           <Ionicons name="home-outline" size={28} color="white" />
         </TouchableOpacity>
       </View>
@@ -75,12 +114,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   topBar: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    alignItems: "center",
     height: 70,
-    paddingVertical: 20,
-    backgroundColor: "#499F4458",
+    backgroundColor: "#2F4F2F", // Dark green
   },
   scannerArea: {
     flex: 1,
@@ -136,32 +171,38 @@ const styles = StyleSheet.create({
     justifyContent: "space-around",
     alignItems: "center",
     paddingVertical: 20,
-    backgroundColor: "#499F4458",
+    backgroundColor: "#2F4F2F", // Dark green
   },
   iconButton: {
-    padding: 10,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: "white",
+    justifyContent: "center",
+    alignItems: "center",
   },
   cameraButton: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 70,
+    height: 70,
+    borderRadius: 35,
     backgroundColor: "white",
     justifyContent: "center",
     alignItems: "center",
   },
   cameraInnerCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#499F44",
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: "#2F4F2F",
   },
-  center: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  message: {
-    textAlign: "center",
-    marginBottom: 10,
+  resultBox: {
+    position: "absolute",
+    top: 80,
+    left: 10,
+    right: 10,
+    minHeight: 80,
+    backgroundColor: "#000000aa",
+    padding: 12,
+    borderRadius: 10,
   },
 });

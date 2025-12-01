@@ -81,7 +81,7 @@ export default function ScannerScreen() {
   );
 }
 
-// --- styles identical to your version ---
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
