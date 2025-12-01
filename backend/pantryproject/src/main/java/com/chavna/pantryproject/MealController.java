@@ -5,6 +5,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.web.bind.annotation.GetMapping;
@@ -29,7 +30,7 @@ public class MealController {
         public Double amount;
     }
 
-    private static int insertMealIngredients(Connection con, UUID mealId, ArrayList<Ingredient> ingredients) throws SQLException {
+    private static int insertMealIngredients(Connection con, UUID mealId, List<Ingredient> ingredients) throws SQLException {
             if (ingredients.size() == 0)
                 return 0;
 
@@ -65,7 +66,7 @@ public class MealController {
         @NotNull
         public String name;
         @NotNull
-        public ArrayList<Ingredient> ingredients;
+        public List<Ingredient> ingredients;
     }
 
     @AllArgsConstructor
@@ -101,7 +102,7 @@ public class MealController {
 
             return Response.Success(new CreateMealResponse(mealId, added));
         }).onSQLError((SQLException ex) -> {
-            if (ex.getSQLState() == "23505")
+            if (ex.getSQLState().equals("23505"))
                 return Response.Fail("Meal with that name already exists.");
 
             return null;
@@ -127,7 +128,7 @@ public class MealController {
 
     public static class FlattenedMeal {
         public String name;
-        public ArrayList<FlattenedIngredient> ingredients;
+        public List<FlattenedIngredient> ingredients;
     }
 
     @AllArgsConstructor
@@ -157,7 +158,7 @@ public class MealController {
 
             ResultSet result = statement.executeQuery();
 
-            ArrayList<FlattenedIngredient> ingredients = new ArrayList<>();
+            List<FlattenedIngredient> ingredients = new ArrayList<>();
             String mealName = null;
             
             while (result.next()) {
@@ -192,7 +193,7 @@ public class MealController {
         @Nullable
         public String name;
         @Nullable
-        public ArrayList<Ingredient> ingredients;
+        public List<Ingredient> ingredients;
     }
 
     public static class UpdateMealRequest {
@@ -262,7 +263,7 @@ public class MealController {
     }
 
     public static class GetMealsResponse {
-        public ArrayList<MealResponse> meals;
+        public List<MealResponse> meals;
 
         public GetMealsResponse() {
             meals = new ArrayList<>();

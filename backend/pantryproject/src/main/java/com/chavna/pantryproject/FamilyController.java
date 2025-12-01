@@ -377,7 +377,7 @@ public class FamilyController {
         if (response != null) {
             ResponseBody body = response.getBody();
 
-            if (body.getSuccess() == "fail")
+            if (body.getSuccess().equals("fail"))
                 return ResponseEntity.ok(body.getMessage());
             else
                 throw new ResponseException(response);
