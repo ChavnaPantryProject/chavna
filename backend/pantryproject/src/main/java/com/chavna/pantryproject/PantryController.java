@@ -44,7 +44,7 @@ public class PantryController {
     public Response createFoodItemTemplate(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody FoodItemTemplate requestBody) {
         Login login = Authorization.authorize(authorizationHeader);
 
-        Database.openDatabaseConnection((Connection con) -> {
+        Database.openConnection((Connection con) -> {
             PreparedStatement statement = con.prepareStatement(String.format("""
                 INSERT INTO %s (name, owner, amount, unit, shelf_life_days, category)
                 VALUES (?, ?, ?, ?, ?, ?)
@@ -73,7 +73,9 @@ public class PantryController {
                 return Response.Fail("Category does not exist.");
             
             return null;
-        }).throwIfError();
+        })
+        .throwIfError()
+        .throwResponse();
 
         // This should be unreachable
         return null;
@@ -97,13 +99,14 @@ public class PantryController {
     @PostMapping("/get-food-item-templates")
     public Response getFoodItemTemplates(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody(required = false) GetFoodItemTemplatesRequest requestBody) {
         Login login = Authorization.authorize(authorizationHeader);
+        UUID familyOwner = Authorization.getFamilyOwnerId(login);
         
         if (requestBody == null)
             requestBody = new GetFoodItemTemplatesRequest();
 
         final var body = requestBody;
 
-        Database.openDatabaseConnection((Connection con) -> {
+        Database.openConnection((Connection con) -> {
             String query = String.format("""
                 SELECT * FROM %s
                 WHERE owner = ?
@@ -114,7 +117,7 @@ public class PantryController {
 
             PreparedStatement statement;
             statement = con.prepareStatement(query);
-            statement.setObject(1, login.userId);
+            statement.setObject(1, familyOwner);
 
             if (body.search != null) {
                 String like = '%' + body.search + '%';
@@ -141,7 +144,9 @@ public class PantryController {
             }
 
             return Response.Success(templates);
-        }).throwIfError();
+        })
+        .throwIfError()
+        .throwResponse();
 
         // This should be unreachable
         return null;
@@ -167,8 +172,9 @@ public class PantryController {
             return Response.Success();
 
         Login login = Authorization.authorize(authorizationHeader);
+        UUID familyOwner = Authorization.getFamilyOwnerId(login);
 
-        Database.openDatabaseConnection((Connection con) -> {
+        Database.openConnection((Connection con) -> {
             String values = "";
             for (@SuppressWarnings("unused") var __ : requestBody.items)
                 values += "(CAST(? AS uuid), ?, now()::date, ?),";
@@ -196,7 +202,7 @@ public class PantryController {
                 i++;
             }
 
-            statement.setObject(i, login.userId);
+            statement.setObject(i, familyOwner);
 
             int updated = statement.executeUpdate();
 
@@ -204,7 +210,9 @@ public class PantryController {
                 return Response.Fail("No items added.");
 
             return Response.Success("Items added: " + updated);
-        }).throwIfError();
+        })
+        .throwIfError()
+        .throwResponse();
 
         // This should be unreachable
         return null;
@@ -235,13 +243,14 @@ public class PantryController {
     @PostMapping("/get-food-items")
     public Response getFoodItems(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody(required = false) GetFoodItemsRequest requestBody) {
         Login login = Authorization.authorize(authorizationHeader);
+        UUID familyOwner = Authorization.getFamilyOwnerId(login);
 
         if (requestBody == null)
             requestBody = new GetFoodItemsRequest();
 
         final var body = requestBody;
 
-        Database.openDatabaseConnection((Connection con) -> {
+        Database.openConnection((Connection con) -> {
             String query = String.format("""
                 SELECT * FROM %s
                 INNER JOIN %s
@@ -253,7 +262,7 @@ public class PantryController {
                 query += "AND category = ?";
 
             PreparedStatement statement = con.prepareStatement(query);
-            statement.setObject(1, login.userId);
+            statement.setObject(1, familyOwner);
 
             if (body.category != null)
                 statement.setString(2, body.category);
@@ -278,7 +287,9 @@ public class PantryController {
             }
 
             return Response.Success(new GetFoodItemsResponse(items));
-        }).throwIfError();
+        })
+        .throwIfError()
+        .throwResponse();
 
         // This should be unreachable
         return null;
@@ -294,8 +305,9 @@ public class PantryController {
     @PostMapping("/update-food-item")
     public Response updateFoodItem(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody UpdateFoodItemRequest requestBody) {
         Login login = Authorization.authorize(authorizationHeader);
+        UUID familyOwner = Authorization.getFamilyOwnerId(login);
 
-        Database.openDatabaseConnection((Connection con) -> {
+        Database.openConnection((Connection con) -> {
             if (requestBody.newAmount > 0) {
                 PreparedStatement statement = con.prepareStatement(String.format("""
                     UPDATE %1$s
@@ -306,7 +318,7 @@ public class PantryController {
                 """, FOOD_ITEMS_TABLE, FOOD_ITEM_TEMPLATES_TABLE));
                 statement.setDouble(1, requestBody.newAmount);
                 statement.setObject(2, requestBody.foodItemId);
-                statement.setObject(3, login.userId);
+                statement.setObject(3, familyOwner);
 
                 if (statement.executeUpdate() < 1)
                     return Response.Fail("Food item not updated.");
@@ -319,14 +331,16 @@ public class PantryController {
                 """, Database.FOOD_ITEMS_TABLE, Database.FOOD_ITEM_TEMPLATES_TABLE));
 
                 statement.setObject(1, requestBody.foodItemId);
-                statement.setObject(2, login.userId);
+                statement.setObject(2, familyOwner);
 
                 if (statement.executeUpdate() < 1)
                     return Response.Fail("Food item not updated.");
             }
 
             return null;
-        }).throwIfError();
+        })
+        .throwIfError()
+        .throwResponse();
 
         return Response.Success("Food item updated");
     }
@@ -339,14 +353,15 @@ public class PantryController {
     @PostMapping("/create-category")
     public Response createCategory(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody CategoryRequest requestBody) {
         Login login = Authorization.authorize(authorizationHeader);
+        UUID familyOwner = Authorization.getFamilyOwnerId(login);
 
-        Database.openDatabaseConnection((Connection con) -> {
+        Database.openConnection((Connection con) -> {
             PreparedStatement statement = con.prepareStatement(String.format("""
                 INSERT INTO %s (name, owner)
                 VALUES (?, ?);
             """, CATEGORIES_TABLE));
             statement.setString(1, requestBody.name);
-            statement.setObject(2, login.userId);
+            statement.setObject(2, familyOwner);
 
             statement.executeUpdate();
 
@@ -356,7 +371,9 @@ public class PantryController {
                 return Response.Fail("Category already exists.");
             
             return null;
-        }).throwIfError();
+        })
+        .throwIfError()
+        .throwResponse();
 
         return Response.Success("Category created.");
     }
@@ -364,14 +381,15 @@ public class PantryController {
     @PostMapping("/remove-category")
     public Response removeCategory(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody CategoryRequest requestBody) {
         Login login = Authorization.authorize(authorizationHeader);
+        UUID familyOwner = Authorization.getFamilyOwnerId(login);
 
-        Database.openDatabaseConnection((Connection con) -> {
+        Database.openConnection((Connection con) -> {
             PreparedStatement statement = con.prepareStatement(String.format("""
                 DELETE FROM %s
                 WHERE name = ? AND owner = ?;
             """, CATEGORIES_TABLE));
             statement.setString(1, requestBody.name);
-            statement.setObject(2, login.userId);
+            statement.setObject(2, familyOwner);
 
             int removed = statement.executeUpdate();
 
@@ -379,7 +397,9 @@ public class PantryController {
                 return Response.Fail("Category not found.");
 
             return null;
-        }).throwIfError();
+        })
+        .throwIfError()
+        .throwResponse();
 
         return Response.Success("Category removed.");
     }
@@ -395,13 +415,14 @@ public class PantryController {
     @GetMapping("/get-categories")
     public Response getCategories(@RequestHeader("Authorization") String authorizationHeader) {
         Login login = Authorization.authorize(authorizationHeader);
+        UUID familyOwner = Authorization.getFamilyOwnerId(login);
 
-        Database.openDatabaseConnection((Connection con) -> {
+        Database.openConnection((Connection con) -> {
             PreparedStatement statement = con.prepareStatement(String.format("""
                 SELECT name FROM %s
                 WHERE owner = ?
             """, CATEGORIES_TABLE));
-            statement.setObject(1, login.userId);
+            statement.setObject(1, familyOwner);
             ResultSet result = statement.executeQuery();
 
             GetCategoriesResponse response = new GetCategoriesResponse();
@@ -410,7 +431,9 @@ public class PantryController {
             }
 
             return Response.Success(response);
-        }).throwIfError();
+        })
+        .throwIfError()
+        .throwResponse();
 
         // This should be unreachable
         return null;

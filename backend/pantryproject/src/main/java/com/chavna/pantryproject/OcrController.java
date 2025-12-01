@@ -34,6 +34,7 @@ public class OcrController {
 
 
     @PostMapping("/scan-receipt")
+    @SuppressWarnings("CatchAndPrintStackTrace")
     public Response scanReceipt(@Valid @RequestBody ScanRequest requestBody) {
         
         TextractClient textractClient = TextractClient.builder()
@@ -64,6 +65,7 @@ public class OcrController {
             for (Block block : detectResponse.blocks()) {
                 if (block.blockType() == BlockType.WORD) {
                     // Some of this stuff can be null, so i'm not gonna risk it
+                    
                     try {
                         List<software.amazon.awssdk.services.textract.model.Point> polygon = block.geometry().polygon();
                         var a  = polygon.get(0);
