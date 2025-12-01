@@ -78,6 +78,7 @@ public class MealController {
     @PostMapping("/create-meal")
     public Response createMeal(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody CreateMealRequest requestBody) {
         Login login = Authorization.authorize(authorizationHeader);
+        UUID familyOwner = Authorization.getFamilyOwnerId(login);
 
         Database.openConnection((Connection con) -> {
             PreparedStatement statement = con.prepareStatement(String.format("""
@@ -86,7 +87,7 @@ public class MealController {
                 RETURNING id;   
             """, Database.MEALS_TABLE));
 
-            statement.setObject(1, login.userId);
+            statement.setObject(1, familyOwner);
             statement.setString(2, requestBody.name);
 
             ResultSet result = statement.executeQuery();
@@ -139,6 +140,7 @@ public class MealController {
     @PostMapping("/get-meal")
     public Response getMeal(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody GetMealRequest requestBody) {
         Login login = Authorization.authorize(authorizationHeader);
+        UUID familyOwner = Authorization.getFamilyOwnerId(login);
 
         Database.openConnection((Connection con) -> {
             String query = String.format("""
@@ -153,8 +155,8 @@ public class MealController {
             PreparedStatement statement = con.prepareStatement(query);
 
             statement.setObject(1, requestBody.mealId);
-            statement.setObject(2, login.userId);
-            statement.setObject(3, login.userId);
+            statement.setObject(2, familyOwner);
+            statement.setObject(3, familyOwner);
 
             ResultSet result = statement.executeQuery();
 
@@ -211,6 +213,7 @@ public class MealController {
     @PostMapping("/update-meal")
     public Response setMeal(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody UpdateMealRequest requestBody) {
         Login login = Authorization.authorize(authorizationHeader);
+        UUID familyOwner = Authorization.getFamilyOwnerId(login);
 
         Database.openConnection((Connection con) -> {
             PreparedStatement deleteStatement = con.prepareStatement(String.format("""
@@ -221,7 +224,7 @@ public class MealController {
                   AND owner = ?;
             """, Database.MEAL_INGREDIENTS_TABLE, Database.MEALS_TABLE));
             deleteStatement.setObject(1, requestBody.mealId);
-            deleteStatement.setObject(2, login.userId);
+            deleteStatement.setObject(2, familyOwner);
 
             deleteStatement.executeUpdate();
 
@@ -273,13 +276,14 @@ public class MealController {
     @GetMapping("/get-meals")
     public Response getMeals(@RequestHeader("Authorization") String authorizationHeader) {
         Login login = Authorization.authorize(authorizationHeader);
+        UUID familyOwner = Authorization.getFamilyOwnerId(login);
 
         Database.openConnection((Connection con) -> {
             PreparedStatement statement = con.prepareStatement(String.format("""
                 SELECT id, name FROM %s
                 WHERE owner = ?
             """, Database.MEALS_TABLE));
-            statement.setObject(1, login.userId);
+            statement.setObject(1, familyOwner);
 
             ResultSet result = statement.executeQuery();
 

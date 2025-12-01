@@ -1,5 +1,8 @@
 package com.chavna.pantryproject;
 
+import static com.chavna.pantryproject.Database.FAMILY_MEMBER_TABLE;
+import static com.chavna.pantryproject.Database.USERS_TABLE;
+
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.sql.Connection;
@@ -201,5 +204,41 @@ public class Authorization {
         }
 
         return login;
+    }
+
+    public static UUID getFamilyOwnerId(Login userLogin) {
+        // Default to current logged in user
+        UUID[] id = {userLogin.userId};
+
+        Database.openConnection((Connection con) -> {
+            PreparedStatement statement = con.prepareStatement(String.format("""
+                WITH m AS (
+                    SELECT id, family_id, role FROM %s
+                    INNER JOIN %s
+                    ON family_membership = member_id
+                )
+
+                SELECT id FROM m
+                WHERE family_id = (
+                    SELECT family_id FROM m
+                    WHERE id = ?
+                ) AND role = 1
+                LIMIT 1
+            """, FAMILY_MEMBER_TABLE, USERS_TABLE));
+
+            statement.setObject(1, userLogin.userId);
+
+            ResultSet result = statement.executeQuery();
+
+
+            if (result.next())
+                id[0] = (UUID) result.getObject(1);
+            
+            return null;
+        })
+        .throwIfError()
+        .ignoreResponse();
+
+        return id[0];
     }
 }

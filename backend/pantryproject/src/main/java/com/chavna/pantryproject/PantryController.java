@@ -99,6 +99,7 @@ public class PantryController {
     @PostMapping("/get-food-item-templates")
     public Response getFoodItemTemplates(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody(required = false) GetFoodItemTemplatesRequest requestBody) {
         Login login = Authorization.authorize(authorizationHeader);
+        UUID familyOwner = Authorization.getFamilyOwnerId(login);
         
         if (requestBody == null)
             requestBody = new GetFoodItemTemplatesRequest();
@@ -116,7 +117,7 @@ public class PantryController {
 
             PreparedStatement statement;
             statement = con.prepareStatement(query);
-            statement.setObject(1, login.userId);
+            statement.setObject(1, familyOwner);
 
             if (body.search != null) {
                 String like = '%' + body.search + '%';
@@ -171,6 +172,7 @@ public class PantryController {
             return Response.Success();
 
         Login login = Authorization.authorize(authorizationHeader);
+        UUID familyOwner = Authorization.getFamilyOwnerId(login);
 
         Database.openConnection((Connection con) -> {
             String values = "";
@@ -200,7 +202,7 @@ public class PantryController {
                 i++;
             }
 
-            statement.setObject(i, login.userId);
+            statement.setObject(i, familyOwner);
 
             int updated = statement.executeUpdate();
 
@@ -241,6 +243,7 @@ public class PantryController {
     @PostMapping("/get-food-items")
     public Response getFoodItems(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody(required = false) GetFoodItemsRequest requestBody) {
         Login login = Authorization.authorize(authorizationHeader);
+        UUID familyOwner = Authorization.getFamilyOwnerId(login);
 
         if (requestBody == null)
             requestBody = new GetFoodItemsRequest();
@@ -259,7 +262,7 @@ public class PantryController {
                 query += "AND category = ?";
 
             PreparedStatement statement = con.prepareStatement(query);
-            statement.setObject(1, login.userId);
+            statement.setObject(1, familyOwner);
 
             if (body.category != null)
                 statement.setString(2, body.category);
@@ -302,6 +305,7 @@ public class PantryController {
     @PostMapping("/update-food-item")
     public Response updateFoodItem(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody UpdateFoodItemRequest requestBody) {
         Login login = Authorization.authorize(authorizationHeader);
+        UUID familyOwner = Authorization.getFamilyOwnerId(login);
 
         Database.openConnection((Connection con) -> {
             if (requestBody.newAmount > 0) {
@@ -314,7 +318,7 @@ public class PantryController {
                 """, FOOD_ITEMS_TABLE, FOOD_ITEM_TEMPLATES_TABLE));
                 statement.setDouble(1, requestBody.newAmount);
                 statement.setObject(2, requestBody.foodItemId);
-                statement.setObject(3, login.userId);
+                statement.setObject(3, familyOwner);
 
                 if (statement.executeUpdate() < 1)
                     return Response.Fail("Food item not updated.");
@@ -327,7 +331,7 @@ public class PantryController {
                 """, Database.FOOD_ITEMS_TABLE, Database.FOOD_ITEM_TEMPLATES_TABLE));
 
                 statement.setObject(1, requestBody.foodItemId);
-                statement.setObject(2, login.userId);
+                statement.setObject(2, familyOwner);
 
                 if (statement.executeUpdate() < 1)
                     return Response.Fail("Food item not updated.");
@@ -349,6 +353,7 @@ public class PantryController {
     @PostMapping("/create-category")
     public Response createCategory(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody CategoryRequest requestBody) {
         Login login = Authorization.authorize(authorizationHeader);
+        UUID familyOwner = Authorization.getFamilyOwnerId(login);
 
         Database.openConnection((Connection con) -> {
             PreparedStatement statement = con.prepareStatement(String.format("""
@@ -356,7 +361,7 @@ public class PantryController {
                 VALUES (?, ?);
             """, CATEGORIES_TABLE));
             statement.setString(1, requestBody.name);
-            statement.setObject(2, login.userId);
+            statement.setObject(2, familyOwner);
 
             statement.executeUpdate();
 
@@ -376,6 +381,7 @@ public class PantryController {
     @PostMapping("/remove-category")
     public Response removeCategory(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody CategoryRequest requestBody) {
         Login login = Authorization.authorize(authorizationHeader);
+        UUID familyOwner = Authorization.getFamilyOwnerId(login);
 
         Database.openConnection((Connection con) -> {
             PreparedStatement statement = con.prepareStatement(String.format("""
@@ -383,7 +389,7 @@ public class PantryController {
                 WHERE name = ? AND owner = ?;
             """, CATEGORIES_TABLE));
             statement.setString(1, requestBody.name);
-            statement.setObject(2, login.userId);
+            statement.setObject(2, familyOwner);
 
             int removed = statement.executeUpdate();
 
@@ -409,13 +415,14 @@ public class PantryController {
     @GetMapping("/get-categories")
     public Response getCategories(@RequestHeader("Authorization") String authorizationHeader) {
         Login login = Authorization.authorize(authorizationHeader);
+        UUID familyOwner = Authorization.getFamilyOwnerId(login);
 
         Database.openConnection((Connection con) -> {
             PreparedStatement statement = con.prepareStatement(String.format("""
                 SELECT name FROM %s
                 WHERE owner = ?
             """, CATEGORIES_TABLE));
-            statement.setObject(1, login.userId);
+            statement.setObject(1, familyOwner);
             ResultSet result = statement.executeQuery();
 
             GetCategoriesResponse response = new GetCategoriesResponse();
