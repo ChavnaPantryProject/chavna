@@ -20,11 +20,9 @@ import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.textract.TextractClient;
 import software.amazon.awssdk.services.textract.model.Block;
 import software.amazon.awssdk.services.textract.model.BlockType;
-import software.amazon.awssdk.services.textract.model.BoundingBox;
 import software.amazon.awssdk.services.textract.model.DetectDocumentTextRequest;
 import software.amazon.awssdk.services.textract.model.DetectDocumentTextResponse;
 import software.amazon.awssdk.services.textract.model.Document;
-import software.amazon.awssdk.services.textract.model.Geometry;
 
 @RestController
 public class OcrController {

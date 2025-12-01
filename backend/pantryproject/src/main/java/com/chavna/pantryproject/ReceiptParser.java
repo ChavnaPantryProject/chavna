@@ -1,6 +1,5 @@
 package com.chavna.pantryproject;
 
-import java.util.List;
 import java.util.TreeSet;
 
 import lombok.AllArgsConstructor;
