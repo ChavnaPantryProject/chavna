@@ -1,6 +1,7 @@
 // pantry/ModalFoodCategory.tsx
 import React, { useState, useEffect } from "react";
 import { Modal, View, Text, Pressable, StyleSheet, ScrollView, StyleSheet as RNStyleSheet } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Entypo } from "@expo/vector-icons";
 import { API_URL, retrieveValue } from "../util";
 import FoodRows from "./foodRows";
@@ -238,136 +239,138 @@ const deleteFoodItem = async (id: string) => {
             animationType="fade"
             onRequestClose={onClose}
         >
-            {/* Outer container for backdrop + sheet */}
-            <View style={style.backdrop}>
-                {/* Backdrop touch area (outside the sheet) */}
-                <Pressable
-                    style={RNStyleSheet.absoluteFill}
-                    onPress={() => {
-                        resetState();
-                        onClose();
-                    }}
-                />
+            <GestureHandlerRootView style={{ flex: 1 }}>
+                {/* Outer container for backdrop + sheet */}
+                <View style={style.backdrop}>
+                    {/* Backdrop touch area (outside the sheet) */}
+                    <Pressable
+                        style={RNStyleSheet.absoluteFill}
+                        onPress={() => {
+                            resetState();
+                            onClose();
+                        }}
+                    />
 
-                {/* Sheet content (not inside the Pressable) */}
-                <View style={style.sheet}>
-                    {/* category name header with an underline */}
-                    {title ? <Text style={style.title}>{title}</Text> : null}
+                    {/* Sheet content (not inside the Pressable) */}
+                    <View style={style.sheet}>
+                        {/* category name header with an underline */}
+                        {title ? <Text style={style.title}>{title}</Text> : null}
 
-                    {/* column headers with the filter icon */}
-                    <View style={style.columnFilters}>
-                        <View style={[style.specificFilterColumn, { flex: 1 }]}>
-                            <Text style={style.filterText}>Name</Text>
+                        {/* column headers with the filter icon */}
+                        <View style={style.columnFilters}>
+                            <View style={[style.specificFilterColumn, { flex: 1 }]}>
+                                <Text style={style.filterText}>Name</Text>
 
-                            <Pressable
-                                onPress={() =>
-                                    setDisplayArr(
-                                        nameArrow ? sortDescName() : sortAscName()
-                                    )
-                                }
-                            >
-                                <Entypo
-                                    name={nameArrow ? "triangle-down" : "triangle-up"}
-                                    size={15}
-                                    color={
-                                        activeFilter == "name"
-                                            ? ACTIVEFILTERCOLOR
-                                            : NONACTIVEFILTERCOLOR
+                                <Pressable
+                                    onPress={() =>
+                                        setDisplayArr(
+                                            nameArrow ? sortDescName() : sortAscName()
+                                        )
                                     }
-                                />
-                            </Pressable>
+                                >
+                                    <Entypo
+                                        name={nameArrow ? "triangle-down" : "triangle-up"}
+                                        size={15}
+                                        color={
+                                            activeFilter == "name"
+                                                ? ACTIVEFILTERCOLOR
+                                                : NONACTIVEFILTERCOLOR
+                                        }
+                                    />
+                                </Pressable>
+                            </View>
+
+                            <View style={[style.specificFilterColumn, { flex: 1.1 }]}>
+                                <Text style={style.filterText}>Weight</Text>
+
+                                <Pressable
+                                    onPress={() =>
+                                        setDisplayArr(
+                                            weightArrow ? sortDescWeight() : sortAscWeight()
+                                        )
+                                    }
+                                >
+                                    <Entypo
+                                        name={weightArrow ? "triangle-down" : "triangle-up"}
+                                        size={15}
+                                        color={
+                                            activeFilter == "weight"
+                                                ? ACTIVEFILTERCOLOR
+                                                : NONACTIVEFILTERCOLOR
+                                        }
+                                    />
+                                </Pressable>
+                            </View>
+
+                            <View style={[style.specificFilterColumn, { flex: 1 }]}>
+                                <Text style={style.filterText}>Qty</Text>
+
+                                <Pressable
+                                    onPress={() =>
+                                        setDisplayArr(
+                                            qtyArrow ? sortDescQty() : sortAscQty()
+                                        )
+                                    }
+                                >
+                                    <Entypo
+                                        name={qtyArrow ? "triangle-down" : "triangle-up"}
+                                        size={15}
+                                        color={
+                                            activeFilter == "qty"
+                                                ? ACTIVEFILTERCOLOR
+                                                : NONACTIVEFILTERCOLOR
+                                        }
+                                    />
+                                </Pressable>
+                            </View>
+
+                            <View style={[style.specificFilterColumn, { flex: 1.2 }]}>
+                                <Text style={style.filterText}>Exp Date</Text>
+                                <Pressable
+                                    onPress={() =>
+                                        setDisplayArr(
+                                            expDateArrow
+                                                ? sortDescExpDate()
+                                                : sortAscExpDate()
+                                        )
+                                    }
+                                >
+                                    <Entypo
+                                        name={expDateArrow ? "triangle-down" : "triangle-up"}
+                                        size={15}
+                                        color={
+                                            activeFilter == "expDate"
+                                                ? ACTIVEFILTERCOLOR
+                                                : NONACTIVEFILTERCOLOR
+                                        }
+                                    />
+                                </Pressable>
+                            </View>
                         </View>
 
-                        <View style={[style.specificFilterColumn, { flex: 1.1 }]}>
-                            <Text style={style.filterText}>Weight</Text>
-
-                            <Pressable
-                                onPress={() =>
-                                    setDisplayArr(
-                                        weightArrow ? sortDescWeight() : sortAscWeight()
-                                    )
-                                }
+                        {/* rows area (scrolls vertically) */}
+                        <View style={style.rowsArea}>
+                            <ScrollView
+                                style={{ flex: 1, alignSelf: "stretch" }}
+                                contentContainerStyle={{ paddingBottom: 24 }}
+                                showsVerticalScrollIndicator={false}
+                                keyboardShouldPersistTaps="handled"
                             >
-                                <Entypo
-                                    name={weightArrow ? "triangle-down" : "triangle-up"}
-                                    size={15}
-                                    color={
-                                        activeFilter == "weight"
-                                            ? ACTIVEFILTERCOLOR
-                                            : NONACTIVEFILTERCOLOR
-                                    }
+                                <FoodRows
+                                    loading={loading}
+                                    displayArr={displayArr}
+                                    onDelete={handleDeleteFood}
                                 />
-                            </Pressable>
+                            </ScrollView>
                         </View>
 
-                        <View style={[style.specificFilterColumn, { flex: 1 }]}>
-                            <Text style={style.filterText}>Qty</Text>
-
-                            <Pressable
-                                onPress={() =>
-                                    setDisplayArr(
-                                        qtyArrow ? sortDescQty() : sortAscQty()
-                                    )
-                                }
-                            >
-                                <Entypo
-                                    name={qtyArrow ? "triangle-down" : "triangle-up"}
-                                    size={15}
-                                    color={
-                                        activeFilter == "qty"
-                                            ? ACTIVEFILTERCOLOR
-                                            : NONACTIVEFILTERCOLOR
-                                    }
-                                />
-                            </Pressable>
-                        </View>
-
-                        <View style={[style.specificFilterColumn, { flex: 1.2 }]}>
-                            <Text style={style.filterText}>Exp Date</Text>
-                            <Pressable
-                                onPress={() =>
-                                    setDisplayArr(
-                                        expDateArrow
-                                            ? sortDescExpDate()
-                                            : sortAscExpDate()
-                                    )
-                                }
-                            >
-                                <Entypo
-                                    name={expDateArrow ? "triangle-down" : "triangle-up"}
-                                    size={15}
-                                    color={
-                                        activeFilter == "expDate"
-                                            ? ACTIVEFILTERCOLOR
-                                            : NONACTIVEFILTERCOLOR
-                                    }
-                                />
-                            </Pressable>
-                        </View>
+                        {/* plus icon to add another category (hook up later) */}
+                        <Pressable onPress={() => {}}>
+                            <Text style={style.addButton}>+</Text>
+                        </Pressable>
                     </View>
-
-                    {/* rows area (scrolls vertically) */}
-                    <View style={style.rowsArea}>
-                        <ScrollView
-                            style={{ flex: 1, alignSelf: "stretch" }}
-                            contentContainerStyle={{ paddingBottom: 24 }}
-                            showsVerticalScrollIndicator={false}
-                            keyboardShouldPersistTaps="handled"
-                        >
-                            <FoodRows
-                                loading={loading}
-                                displayArr={displayArr}
-                                onDelete={handleDeleteFood}
-                            />
-                        </ScrollView>
-                    </View>
-
-                    {/* plus icon to add another category (hook up later) */}
-                    <Pressable onPress={() => {}}>
-                        <Text style={style.addButton}>+</Text>
-                    </Pressable>
                 </View>
-            </View>
+            </GestureHandlerRootView>
         </Modal>
     );
 }
