@@ -43,6 +43,7 @@ public class PantryController {
     @PostMapping("/create-food-item-template")
     public Response createFoodItemTemplate(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody FoodItemTemplate requestBody) {
         Login login = Authorization.authorize(authorizationHeader);
+        UUID familyOwner = Authorization.getFamilyOwnerId(login);
 
         Database.openConnection((Connection con) -> {
             PreparedStatement statement = con.prepareStatement(String.format("""
@@ -52,7 +53,7 @@ public class PantryController {
             """, FOOD_ITEM_TEMPLATES_TABLE));
 
             statement.setString(1, requestBody.name);
-            statement.setObject(2, login.userId);
+            statement.setObject(2, familyOwner);
             statement.setDouble(3, requestBody.amount);
             statement.setString(4, requestBody.unit);
             statement.setInt(5, requestBody.shelfLifeDays);
@@ -208,6 +209,33 @@ public class PantryController {
 
             if (updated == 0)
                 return Response.Fail("No items added.");
+
+            // Update most recent unit price
+            String updateValues = "";
+
+            for (@SuppressWarnings("unused") var __ : requestBody.items)
+                updateValues += "(?, ?),";
+
+            updateValues = updateValues.substring(0, updateValues.length() - 1);
+
+            PreparedStatement updateQuery = con.prepareStatement(String.format("""
+                UPDATE %1$s
+                SET most_recent_unit_price = data.unit_price
+                FROM (VALUES
+                    %2$s
+                ) AS data (id, unit_price)
+                WHERE %1$s.id = data.id
+            """, FOOD_ITEM_TEMPLATES_TABLE, updateValues));
+
+            i = 1;
+            for (FoodItemFromTemplate item : requestBody.items) {
+                updateQuery.setObject(i, item.templateId);
+                i++;
+                updateQuery.setObject(i, item.unitPrice);
+                i++;
+            }
+
+            updateQuery.executeUpdate();
 
             return Response.Success("Items added: " + updated);
         })
