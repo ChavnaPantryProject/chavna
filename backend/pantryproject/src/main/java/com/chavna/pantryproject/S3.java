@@ -4,6 +4,8 @@ import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
+import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 import java.awt.image.BufferedImage;
@@ -53,6 +55,21 @@ public class S3 {
         }
 
         return bytes;
+    }
+
+    public static boolean imageExists(String key) {
+        try {
+            HeadObjectRequest request = HeadObjectRequest.builder()
+                .bucket(PICTURES_BUCKET)
+                .key(key)
+                .build();
+            
+            s3Client.headObject(request);
+
+            return true;
+        } catch (NoSuchKeyException ex) {
+            return false;
+        }
     }
 
     public static String getImageKey(String prefix, UUID id) {
