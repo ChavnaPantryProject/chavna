@@ -21,11 +21,15 @@ import {
     Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
 export default function MealIngredientScreen() {
     const router = useRouter();
+    const { id } = useLocalSearchParams();
     const [menuVisible, setMenuVisible] = useState(false);
+
+    console.log("Meal ID:", id);
 
     // ingredient list data
     const ingredients = [
@@ -156,7 +160,11 @@ export default function MealIngredientScreen() {
                 {/* Navigation Button to Nutrition Info */}
                 <TouchableOpacity
                     style={styles.linkContainer}
-                    onPress={() => router.replace('/meals/mealinfo')}
+                    onPress={() => router.push({
+                        pathname: '/meals/mealinfo',
+                        params: { id }
+                    })
+                }
                 >
                     <Text style={styles.linkText}>Go to Nutrition {'>'}</Text>
                 </TouchableOpacity>

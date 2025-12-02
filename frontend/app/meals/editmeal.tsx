@@ -401,10 +401,11 @@ const styles = StyleSheet.create({
         gap: 10,
     },
 
-    amountContainer: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 10,
+    amountText: {
+        fontSize: 15,
+        color: "#000",
+        minWidth: 50, // keeps numbers aligned
+        textAlign: "right", // aligns numbers to the right
     },
 
     deleteButton: {
