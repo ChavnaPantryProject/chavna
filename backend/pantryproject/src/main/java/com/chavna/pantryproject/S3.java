@@ -14,13 +14,13 @@ import java.util.UUID;
 import javax.imageio.ImageIO;
 
 public class S3 {
+    private static S3Client s3Client = S3Client.builder()
+        .region(Region.US_EAST_1)
+        .build();
+    
     public static final String PICTURES_BUCKET = "chavna-pictures";
 
     public static void uploadImage(BufferedImage image, String key) {
-        S3Client s3Client = S3Client.builder()
-            .region(Region.US_EAST_1)
-            .build();
-
         PutObjectRequest putObjectRequest = PutObjectRequest.builder()
             .bucket(PICTURES_BUCKET)
             .key(key)
@@ -38,12 +38,6 @@ public class S3 {
     }
 
     public static byte[] getImage(String key) {
-        S3Client s3Client = S3Client.builder()
-            .region(Region.US_EAST_1)
-            .build();
-
-        // ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-
         GetObjectRequest getObjectRequest = GetObjectRequest.builder()
             .bucket(PICTURES_BUCKET)
             .key(key)
