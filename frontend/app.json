@@ -40,7 +40,15 @@
           }
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#499f44",
+          "sounds": []
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
