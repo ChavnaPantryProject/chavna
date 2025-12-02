@@ -2,7 +2,6 @@ package com.chavna.pantryproject;
 
 import static com.chavna.pantryproject.Database.FOOD_ITEMS_TABLE;
 import static com.chavna.pantryproject.Database.FOOD_ITEM_TEMPLATES_TABLE;
-import static com.chavna.pantryproject.Env.CHAVNA_URL;
 
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
@@ -26,6 +25,8 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.chavna.pantryproject.Authorization.Login;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonInclude.Include;
 
 import jakarta.annotation.Nullable;
 import jakarta.validation.Valid;
@@ -138,6 +139,7 @@ public class MealController {
         public UUID mealId;
     }
 
+    @JsonInclude(Include.NON_NULL)
     public static class FlattenedMeal {
         public String name;
         public boolean isFavorite;
@@ -152,7 +154,7 @@ public class MealController {
 
     private FlattenedMeal getFlattenedMeal(Connection con, UUID mealId, UUID owner) throws SQLException {
         String query = String.format("""
-            SELECT %2$s.name, %3$s.id, %1$s.amount, %3$s.name, %3$s.unit, %2$s.is_favorite, %2$s.meal_picture FROM %1$s
+            SELECT %2$s.name, %3$s.id, %1$s.amount, %3$s.name, %3$s.unit, %2$s.is_favorite FROM %1$s
             INNER JOIN %3$s
             ON %1$s.template_id = %3$s.id
             INNER JOIN %2$s
@@ -171,7 +173,6 @@ public class MealController {
         List<FlattenedIngredient> ingredients = new ArrayList<>();
         String mealName = null;
         Boolean isFavorite = null;
-        String mealPicture = null;
         while (result.next()) {
             mealName = result.getString(1);
 
@@ -181,7 +182,6 @@ public class MealController {
             ingredient.name = result.getString(4);
             ingredient.unit = result.getString(5);
             isFavorite = result.getBoolean(6);
-            mealPicture = result.getString(7);
 
             ingredients.add(ingredient);
         }
@@ -193,7 +193,10 @@ public class MealController {
         meal.name = mealName;
         meal.ingredients = ingredients;
         meal.isFavorite = isFavorite != null && isFavorite;
-        meal.mealPictureURL = CHAVNA_URL + "/images/" + mealPicture;
+
+        String key = S3.getImageKey("meal", mealId);
+        if (S3.imageExists(key))
+            meal.mealPictureURL = S3.getImageURL(key);
 
         return meal;
     }
@@ -332,6 +335,7 @@ public class MealController {
         return null;
     }
 
+    @JsonInclude(Include.NON_NULL)
     public static class MealResponse {
         public UUID mealId;
         public String name;
@@ -368,6 +372,10 @@ public class MealController {
                 meal.mealId = (UUID) result.getObject(1);
                 meal.name = result.getString(2);
                 meal.isFavorite = result.getBoolean(3);
+                
+                String key = S3.getImageKey("meal", meal.mealId);
+                if (S3.imageExists(key))
+                    meal.mealPictureURL = S3.getImageURL(key);
 
                 response.meals.add(meal);
             }

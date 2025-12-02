@@ -8,6 +8,8 @@ import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
+import static com.chavna.pantryproject.Env.CHAVNA_URL;
+
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -74,5 +76,9 @@ public class S3 {
 
     public static String getImageKey(String prefix, UUID id) {
         return prefix + "-" + id.toString() + ".jpg";
+    }
+
+    public static String getImageURL(String key) {
+        return CHAVNA_URL + "/images/" + key;
     }
 }
