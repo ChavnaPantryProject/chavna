@@ -10,8 +10,10 @@ const TIMEOUT_DURATION = 1200;
 async function checkLogin(): Promise<boolean> {
     const jwt: string | null = await retrieveValue('jwt');
 
-    if (jwt == null)
+    if (jwt == null) {
+        console.log("jwt null");
         return false;
+    }
 
     const decodedJwt = jwtDecode(jwt);
     const duration = decodedJwt.exp! - decodedJwt.iat!;
@@ -30,13 +32,17 @@ async function checkLogin(): Promise<boolean> {
             },
         });
 
-        if (response == null)
+        if (response == null || !response.ok) {
+            console.log("bad response on refresh", response);
             return false;
+        }
 
-        let body: Response = await response.json();
+        let body: Response<any> = await response.json();
 
-        if (body == null)
+        if (body == null) {
+            console.log("no body on refresh");
             return false;
+        }
 
         if (body.success === 'success') {
             await storeValue('jwt', body.payload!.jwt);
@@ -52,13 +58,17 @@ async function checkLogin(): Promise<boolean> {
             },
         });
 
-        if (response == null)
+        if (response == null || !response.ok) {
+            console.log("bad response on verify", response);
             return false;
+        }
 
-        let body: Response = await response.json();
+        let body: Response<any> = await response.json();
 
-        if (body == null)
+        if (body == null) {
+            console.log("no body on verify");
             return false;
+        }
 
         return body.success === 'success';
     }

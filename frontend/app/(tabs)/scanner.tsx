@@ -1,9 +1,10 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {Text, View, StyleSheet, TouchableOpacity, Button,} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { CameraView, CameraType, useCameraPermissions } from "expo-camera";
 import { API_URL, Response } from "../util";
+import { useGlobalSearchParams } from "expo-router/build/hooks";
 
 export default function ScannerScreen() {
   const router = useRouter();
@@ -11,6 +12,11 @@ export default function ScannerScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const ref = useRef<CameraView>(null);
   const [image, setImage] = useState<string>("");
+  const { selectedTemplate } = useGlobalSearchParams<{selectedTemplate: string}>();
+
+  useEffect(() => {
+    console.log(selectedTemplate);
+  }, [selectedTemplate])
 
   const takePicture = async () => {
     const photo = await ref.current?.takePictureAsync({
@@ -34,7 +40,7 @@ export default function ScannerScreen() {
       if (response === null)
         return;
 
-      const body: Response = await response.json();
+      const body: Response<any> = await response.json();
 
       if (body === null)
         return;
@@ -80,9 +86,15 @@ export default function ScannerScreen() {
       <View style={styles.topBar}>
         <TouchableOpacity
           style={styles.addTemplateButton}
-          onPress={() => router.push("/addTemplate")}
+          onPress={() => router.push('/select-template')}
         >
           <Text style={styles.addTemplateText}>Manually Add Item</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.addTemplateButton}
+          onPress={() => console.log(selectedTemplate)}
+        >
+          <Text style={styles.addTemplateText}>Print params</Text>
         </TouchableOpacity>
       </View>
 

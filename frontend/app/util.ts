@@ -1,3 +1,4 @@
+import { Router } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 
 export async function storeValue(key: string, value: string) {
@@ -36,9 +37,14 @@ export const API_URL = (process.env.EXPO_PUBLIC_API_URL || 'https://api.chavnapa
     ''
 );
 
-export type Response = {
+export type Response<T> = {
   success: 'success' | 'fail' | 'error', // Currently errors still return 'fail'. Expect this to be changed in the future.
   status: number, // status code (200 unless otherwise specified)
   message?: string,
-  payload?: any // JSON object containng response payload
+  payload?: T // JSON object containng response payload
+}
+
+export function goBackWithParams(router: Router, params: any) {
+    router.back();
+    router.setParams(params);
 }
