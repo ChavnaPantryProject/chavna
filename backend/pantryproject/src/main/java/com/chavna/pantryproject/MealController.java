@@ -4,14 +4,21 @@ import static com.chavna.pantryproject.Database.FOOD_ITEMS_TABLE;
 import static com.chavna.pantryproject.Database.FOOD_ITEM_TEMPLATES_TABLE;
 import static com.chavna.pantryproject.Env.CHAVNA_URL;
 
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
 
+import javax.imageio.ImageIO;
+
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -235,6 +242,35 @@ public class MealController {
     public Response setMeal(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody UpdateMealRequest requestBody) {
         Login login = Authorization.authorize(authorizationHeader);
         UUID familyOwner = Authorization.getFamilyOwnerId(login);
+
+        if (requestBody.meal.mealPictureBase64 != null) {
+            BufferedImage image;
+            // Attempt to decode the image
+            try {
+                // I blatanly copy pasted this from Gemini
+
+                // Remove the "data:image/png;base64," prefix if present
+                if (requestBody.meal.mealPictureBase64.startsWith("data:image"))
+                    requestBody.meal.mealPictureBase64 = requestBody.meal.mealPictureBase64.substring(requestBody.meal.mealPictureBase64.indexOf(",") + 1);
+                
+                // Decode the Base64 string to a byte array
+                byte[] decodedBytes = Base64.getDecoder().decode(requestBody.meal.mealPictureBase64);
+                ByteArrayInputStream bytes = new ByteArrayInputStream(decodedBytes);
+
+                image = ImageIO.read(bytes);
+            } catch (IllegalArgumentException ex) {
+                return Response.Error(HttpStatus.BAD_REQUEST, "Meal picture is not a valid base64 string.");
+            } catch (IOException ex) {
+                return Response.Error(HttpStatus.INTERNAL_SERVER_ERROR, "Unable to decode image.", ex);
+            }
+
+            String mealKey = S3.getImageKey("meal", requestBody.mealId);
+            try {
+                S3.uploadImage(image, mealKey);
+            } catch (Exception ex) {
+                return Response.Error(HttpStatus.INTERNAL_SERVER_ERROR, "Unable to upload image.");
+            }
+        }
 
         Database.openConnection((Connection con) -> {
             if (requestBody.meal.name != null) {
