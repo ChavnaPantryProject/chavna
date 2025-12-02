@@ -6,7 +6,7 @@ plugins {
 }
 
 group = 'com.chavna'
-version = '0.0.21'
+version = '0.0.22'
 description = 'REST API for pantry project backend'
 
 java {
@@ -29,7 +29,9 @@ dependencies {
     errorprone("com.google.errorprone:error_prone_core:2.28.0")
 	
 	implementation platform('software.amazon.awssdk:bom:2.21.1')
-	implementation 'software.amazon.awssdk:sesv2' 
+	implementation 'software.amazon.awssdk:sesv2'
+    implementation("software.amazon.awssdk:s3")
+	implementation("software.amazon.awssdk:textract")
 
 	implementation 'org.springframework.boot:spring-boot-starter-web'
 	implementation 'org.springframework.boot:spring-boot-starter-security'
@@ -52,7 +54,6 @@ dependencies {
     implementation 'com.google.auth:google-auth-library-oauth2-http:1.40.0'
 	implementation("com.google.http-client:google-http-client:2.0.2")
 	
-	implementation("software.amazon.awssdk:textract")
 }
 
 tasks.named('test') {

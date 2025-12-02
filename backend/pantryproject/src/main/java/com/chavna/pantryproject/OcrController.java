@@ -26,6 +26,10 @@ import software.amazon.awssdk.services.textract.model.Document;
 
 @RestController
 public class OcrController {
+    private static TextractClient textractClient = TextractClient.builder()
+        .region(Region.US_EAST_1)
+        .build();
+
     public static class ScanRequest {
         @NotNull
         public String base64Image;
@@ -36,10 +40,6 @@ public class OcrController {
     @PostMapping("/scan-receipt")
     @SuppressWarnings("CatchAndPrintStackTrace")
     public Response scanReceipt(@Valid @RequestBody ScanRequest requestBody) {
-        
-        TextractClient textractClient = TextractClient.builder()
-            .region(Region.US_EAST_1)
-            .build();
 
         try {
             // I blatanly copy pasted this from Gemini

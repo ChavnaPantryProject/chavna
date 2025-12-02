@@ -1,5 +1,6 @@
 package com.chavna.pantryproject;
 
+import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
@@ -52,6 +53,7 @@ import lombok.AllArgsConstructor;
 
 @RestController
 public class UserAccountController {
+    public static final String PROFILE_PICTURE_PREFIX = "profilepic";
     public static final Pattern emailValidation = Pattern.compile("(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*|\"(?:[\\x01-\\x08\\x0b\\x0c\\x0e-\\x1f\\x21\\x23-\\x5b\\x5d-\\x7f]|\\\\[\\x01-\\x09\\x0b\\x0c\\x0e-\\x7f])*\")@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\\[(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?|[a-z0-9-]*[a-z0-9]:(?:[\\x01-\\x08\\x0b\\x0c\\x0e-\\x1f\\x21-\\x5a\\x53-\\x7f]|\\\\[\\x01-\\x09\\x0b\\x0c\\x0e-\\x7f])+)\\])");
 
     public static class LoginRequest {
@@ -410,5 +412,53 @@ public class UserAccountController {
         Email.verifyEmailAddress(email);
 
         return ResponseEntity.ok("Verification email sent.");
+    }
+
+    public static class GetProfilePictureRequest {
+        @NotNull
+        public UUID userId;
+    }
+
+    @AllArgsConstructor
+    public static class GetProfilePictureResponse {
+        public String profilePictureURL;
+    }
+
+    @PostMapping("/get-profile-picture")
+    public Response getProfilePicture(@Valid @RequestBody GetProfilePictureRequest requestBody) {
+        String key = S3.getImageKey(PROFILE_PICTURE_PREFIX, requestBody.userId);
+        if (S3.imageExists(key)) {
+            String url = S3.getImageURL(key);
+            return Response.Success(new GetProfilePictureResponse(url));
+        } else
+            return Response.Success(new GetProfilePictureResponse(null));
+    }
+
+    public static class SetProfilePictureRequest {
+        public String profilePictureBase64;
+    }
+
+    @PostMapping("/set-profile-picture")
+    public Response setProfilePicture(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody SetProfilePictureRequest requestBody) {
+        Login login = Authorization.authorize(authorizationHeader);
+
+        BufferedImage image;
+        // Attempt to decode the image
+        try {
+            image = S3.decodeBase64Image(requestBody.profilePictureBase64);
+        } catch (IllegalArgumentException ex) {
+            return Response.Error(HttpStatus.BAD_REQUEST, "Meal picture is not a valid base64 string.");
+        } catch (IOException ex) {
+            return Response.Error(HttpStatus.INTERNAL_SERVER_ERROR, "Unable to decode image.", ex);
+        }
+
+        String key = S3.getImageKey(PROFILE_PICTURE_PREFIX, login.userId);
+        try {
+            S3.uploadImage(image, key);
+        } catch (Exception ex) {
+            return Response.Fail("Unable to upload image.");
+        }
+
+        return Response.Success("Profile picture set.");
     }
 }
