@@ -2,6 +2,7 @@ package com.chavna.pantryproject;
 
 import static com.chavna.pantryproject.Database.FOOD_ITEMS_TABLE;
 import static com.chavna.pantryproject.Database.FOOD_ITEM_TEMPLATES_TABLE;
+import static com.chavna.pantryproject.Env.CHAVNA_URL;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -123,7 +124,6 @@ public class MealController {
         public String name;
         public double amount;
         public String unit;
-        public boolean isFavorite;
     }
 
     public static class GetMealRequest {
@@ -133,6 +133,8 @@ public class MealController {
 
     public static class FlattenedMeal {
         public String name;
+        public boolean isFavorite;
+        public String mealPictureURL;
         public List<FlattenedIngredient> ingredients;
     }
 
@@ -143,7 +145,7 @@ public class MealController {
 
     private FlattenedMeal getFlattenedMeal(Connection con, UUID mealId, UUID owner) throws SQLException {
         String query = String.format("""
-            SELECT %2$s.name, %3$s.id, %1$s.amount, %3$s.name, %3$s.unit, %2$s.is_favorite FROM %1$s
+            SELECT %2$s.name, %3$s.id, %1$s.amount, %3$s.name, %3$s.unit, %2$s.is_favorite, %2$s.meal_picture FROM %1$s
             INNER JOIN %3$s
             ON %1$s.template_id = %3$s.id
             INNER JOIN %2$s
@@ -161,7 +163,8 @@ public class MealController {
 
         List<FlattenedIngredient> ingredients = new ArrayList<>();
         String mealName = null;
-        
+        Boolean isFavorite = null;
+        String mealPicture = null;
         while (result.next()) {
             mealName = result.getString(1);
 
@@ -170,7 +173,8 @@ public class MealController {
             ingredient.amount = result.getDouble(3);
             ingredient.name = result.getString(4);
             ingredient.unit = result.getString(5);
-            ingredient.isFavorite = result.getBoolean(6);
+            isFavorite = result.getBoolean(6);
+            mealPicture = result.getString(7);
 
             ingredients.add(ingredient);
         }
@@ -181,6 +185,8 @@ public class MealController {
         FlattenedMeal meal = new FlattenedMeal();
         meal.name = mealName;
         meal.ingredients = ingredients;
+        meal.isFavorite = isFavorite != null && isFavorite;
+        meal.mealPictureURL = CHAVNA_URL + "/images/" + mealPicture;
 
         return meal;
     }
@@ -209,6 +215,8 @@ public class MealController {
         public List<Ingredient> ingredients;
         @Nullable
         public Boolean isFavorite;
+        @Nullable
+        String mealPictureBase64;
     }
 
     public static class UpdateMealRequest {
@@ -292,6 +300,7 @@ public class MealController {
         public UUID mealId;
         public String name;
         public boolean isFavorite;
+        public String mealPictureURL;
     }
 
     public static class GetMealsResponse {
