@@ -89,11 +89,13 @@ public class Database {
          */
         @CheckReturnValue
         public ConnectionResult onSQLError(ConnectionErrorHandler errorHandler) {
-            Response response = errorHandler.handleError(ex);
+            if (ex != null) {
+                Response response = errorHandler.handleError(ex);
 
-            if (response != null)
-                throw new ResponseException(response);
-
+                if (response != null)
+                    throw new ResponseException(response);
+            }
+            
             return this;
         }
 
