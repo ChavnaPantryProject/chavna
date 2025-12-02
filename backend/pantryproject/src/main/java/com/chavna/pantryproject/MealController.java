@@ -5,6 +5,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.web.bind.annotation.GetMapping;
@@ -29,7 +30,7 @@ public class MealController {
         public Double amount;
     }
 
-    private static int insertMealIngredients(Connection con, UUID mealId, ArrayList<Ingredient> ingredients) throws SQLException {
+    private static int insertMealIngredients(Connection con, UUID mealId, List<Ingredient> ingredients) throws SQLException {
             if (ingredients.size() == 0)
                 return 0;
 
@@ -65,7 +66,7 @@ public class MealController {
         @NotNull
         public String name;
         @NotNull
-        public ArrayList<Ingredient> ingredients;
+        public List<Ingredient> ingredients;
     }
 
     @AllArgsConstructor
@@ -77,15 +78,16 @@ public class MealController {
     @PostMapping("/create-meal")
     public Response createMeal(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody CreateMealRequest requestBody) {
         Login login = Authorization.authorize(authorizationHeader);
+        UUID familyOwner = Authorization.getFamilyOwnerId(login);
 
-        Database.openDatabaseConnection((Connection con) -> {
+        Database.openConnection((Connection con) -> {
             PreparedStatement statement = con.prepareStatement(String.format("""
                 INSERT INTO %s (owner, name)
                 VALUES (?, ?)
                 RETURNING id;   
             """, Database.MEALS_TABLE));
 
-            statement.setObject(1, login.userId);
+            statement.setObject(1, familyOwner);
             statement.setString(2, requestBody.name);
 
             ResultSet result = statement.executeQuery();
@@ -101,11 +103,13 @@ public class MealController {
 
             return Response.Success(new CreateMealResponse(mealId, added));
         }).onSQLError((SQLException ex) -> {
-            if (ex.getSQLState() == "23505")
+            if (ex.getSQLState().equals("23505"))
                 return Response.Fail("Meal with that name already exists.");
 
             return null;
-        }).throwIfError();
+        })
+        .throwIfError()
+        .throwResponse();
 
         // This should be unreachable
         return null;
@@ -125,7 +129,7 @@ public class MealController {
 
     public static class FlattenedMeal {
         public String name;
-        public ArrayList<FlattenedIngredient> ingredients;
+        public List<FlattenedIngredient> ingredients;
     }
 
     @AllArgsConstructor
@@ -136,8 +140,9 @@ public class MealController {
     @PostMapping("/get-meal")
     public Response getMeal(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody GetMealRequest requestBody) {
         Login login = Authorization.authorize(authorizationHeader);
+        UUID familyOwner = Authorization.getFamilyOwnerId(login);
 
-        Database.openDatabaseConnection((Connection con) -> {
+        Database.openConnection((Connection con) -> {
             String query = String.format("""
                 SELECT %2$s.name, %3$s.id, %1$s.amount, %3$s.name, %3$s.unit FROM %1$s
                 INNER JOIN %3$s
@@ -150,12 +155,12 @@ public class MealController {
             PreparedStatement statement = con.prepareStatement(query);
 
             statement.setObject(1, requestBody.mealId);
-            statement.setObject(2, login.userId);
-            statement.setObject(3, login.userId);
+            statement.setObject(2, familyOwner);
+            statement.setObject(3, familyOwner);
 
             ResultSet result = statement.executeQuery();
 
-            ArrayList<FlattenedIngredient> ingredients = new ArrayList<>();
+            List<FlattenedIngredient> ingredients = new ArrayList<>();
             String mealName = null;
             
             while (result.next()) {
@@ -178,7 +183,9 @@ public class MealController {
             meal.ingredients = ingredients;
 
             return Response.Success(new GetMealResponse(meal));
-        }).throwIfError();
+        })
+        .throwIfError()
+        .throwResponse();
 
         // This should be unreachable
         return null;
@@ -188,7 +195,7 @@ public class MealController {
         @Nullable
         public String name;
         @Nullable
-        public ArrayList<Ingredient> ingredients;
+        public List<Ingredient> ingredients;
     }
 
     public static class UpdateMealRequest {
@@ -206,8 +213,9 @@ public class MealController {
     @PostMapping("/update-meal")
     public Response setMeal(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody UpdateMealRequest requestBody) {
         Login login = Authorization.authorize(authorizationHeader);
+        UUID familyOwner = Authorization.getFamilyOwnerId(login);
 
-        Database.openDatabaseConnection((Connection con) -> {
+        Database.openConnection((Connection con) -> {
             PreparedStatement deleteStatement = con.prepareStatement(String.format("""
                 DELETE FROM %1$s
                 USING %2$s
@@ -216,7 +224,7 @@ public class MealController {
                   AND owner = ?;
             """, Database.MEAL_INGREDIENTS_TABLE, Database.MEALS_TABLE));
             deleteStatement.setObject(1, requestBody.mealId);
-            deleteStatement.setObject(2, login.userId);
+            deleteStatement.setObject(2, familyOwner);
 
             deleteStatement.executeUpdate();
 
@@ -244,7 +252,9 @@ public class MealController {
             }
 
             return Response.Success(new UpdateMealResponse(added));
-        }).throwIfError();
+        })
+        .throwIfError()
+        .throwResponse();
 
         // This should be unreachable
         return null;
@@ -256,7 +266,7 @@ public class MealController {
     }
 
     public static class GetMealsResponse {
-        public ArrayList<MealResponse> meals;
+        public List<MealResponse> meals;
 
         public GetMealsResponse() {
             meals = new ArrayList<>();
@@ -266,13 +276,14 @@ public class MealController {
     @GetMapping("/get-meals")
     public Response getMeals(@RequestHeader("Authorization") String authorizationHeader) {
         Login login = Authorization.authorize(authorizationHeader);
+        UUID familyOwner = Authorization.getFamilyOwnerId(login);
 
-        Database.openDatabaseConnection((Connection con) -> {
+        Database.openConnection((Connection con) -> {
             PreparedStatement statement = con.prepareStatement(String.format("""
                 SELECT id, name FROM %s
                 WHERE owner = ?
             """, Database.MEALS_TABLE));
-            statement.setObject(1, login.userId);
+            statement.setObject(1, familyOwner);
 
             ResultSet result = statement.executeQuery();
 
@@ -287,7 +298,9 @@ public class MealController {
             }
 
             return Response.Success(response);
-        }).throwIfError();
+        })
+        .throwIfError()
+        .throwResponse();
 
         // This should be unreachable
         return null;

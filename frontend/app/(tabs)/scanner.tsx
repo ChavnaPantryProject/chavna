@@ -77,7 +77,15 @@ export default function ScannerScreen() {
   return (
     <View style={styles.container}>
       {/* Top Bar */}
-      <View style={styles.topBar}></View>
+      <View style={styles.topBar}>
+        <TouchableOpacity
+          style={styles.addTemplateButton}
+          onPress={() => router.push("/addTemplate")}
+        >
+          <Text style={styles.addTemplateText}>Manually Add Item</Text>
+        </TouchableOpacity>
+      </View>
+
 
       {/* Scanner Area with Live Camera */}
       <View style={styles.scannerArea}>
@@ -124,12 +132,28 @@ const styles = StyleSheet.create({
   },
   topBar: {
     flexDirection: "row",
-    justifyContent: "space-around",
+    justifyContent: "flex-end",
     alignItems: "center",
     height: 70,
     paddingVertical: 20,
+    paddingHorizontal: 16,
     backgroundColor: "#499F4458",
   },
+
+  addTemplateButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: "#499F44",
+  },
+
+  addTemplateText: {
+    color: "white",
+    fontWeight: "700",
+    fontSize: 14,
+  },
+
+
   scannerArea: {
     flex: 1,
     justifyContent: "center",
