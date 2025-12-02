@@ -4,18 +4,14 @@ import static com.chavna.pantryproject.Database.FOOD_ITEMS_TABLE;
 import static com.chavna.pantryproject.Database.FOOD_ITEM_TEMPLATES_TABLE;
 
 import java.awt.image.BufferedImage;
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
-
-import javax.imageio.ImageIO;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -33,6 +29,8 @@ import lombok.AllArgsConstructor;
 
 @RestController
 public class MealController {
+    public static final String MEAL_PREFIX = "meal";
+
     public static class Ingredient {
         @NotNull
         public UUID templateId;
@@ -191,7 +189,7 @@ public class MealController {
         meal.ingredients = ingredients;
         meal.isFavorite = isFavorite != null && isFavorite;
 
-        String key = S3.getImageKey("meal", mealId);
+        String key = S3.getImageKey(MEAL_PREFIX, mealId);
         if (S3.imageExists(key))
             meal.mealPictureURL = S3.getImageURL(key);
 
@@ -247,17 +245,7 @@ public class MealController {
             BufferedImage image;
             // Attempt to decode the image
             try {
-                // I blatanly copy pasted this from Gemini
-
-                // Remove the "data:image/png;base64," prefix if present
-                if (requestBody.meal.mealPictureBase64.startsWith("data:image"))
-                    requestBody.meal.mealPictureBase64 = requestBody.meal.mealPictureBase64.substring(requestBody.meal.mealPictureBase64.indexOf(",") + 1);
-                
-                // Decode the Base64 string to a byte array
-                byte[] decodedBytes = Base64.getDecoder().decode(requestBody.meal.mealPictureBase64);
-                ByteArrayInputStream bytes = new ByteArrayInputStream(decodedBytes);
-
-                image = ImageIO.read(bytes);
+                image = S3.decodeBase64Image(requestBody.meal.mealPictureBase64);
             } catch (IllegalArgumentException ex) {
                 return Response.Error(HttpStatus.BAD_REQUEST, "Meal picture is not a valid base64 string.");
             } catch (IOException ex) {
@@ -267,11 +255,11 @@ public class MealController {
             if (image == null)
                 return Response.Error(HttpStatus.INTERNAL_SERVER_ERROR, "Unable to decode image.");
 
-            String mealKey = S3.getImageKey("meal", requestBody.mealId);
+            String mealKey = S3.getImageKey(MEAL_PREFIX, requestBody.mealId);
             try {
                 S3.uploadImage(image, mealKey);
             } catch (Exception ex) {
-                return Response.Error(HttpStatus.INTERNAL_SERVER_ERROR, "Unable to upload image.");
+                return Response.Fail("Unable to upload image.");
             }
         }
 
@@ -372,7 +360,7 @@ public class MealController {
                 meal.name = result.getString(2);
                 meal.isFavorite = result.getBoolean(3);
                 
-                String key = S3.getImageKey("meal", meal.mealId);
+                String key = S3.getImageKey(MEAL_PREFIX, meal.mealId);
                 if (S3.imageExists(key))
                     meal.mealPictureURL = S3.getImageURL(key);
 

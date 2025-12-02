@@ -11,8 +11,10 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import static com.chavna.pantryproject.Env.CHAVNA_URL;
 
 import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.Base64;
 import java.util.UUID;
 
 import javax.imageio.ImageIO;
@@ -80,5 +82,19 @@ public class S3 {
 
     public static String getImageURL(String key) {
         return CHAVNA_URL + "images/" + key;
+    }
+
+    public static BufferedImage decodeBase64Image(String image) throws IOException {
+        // I blatanly copy pasted this from Gemini
+
+        // Remove the "data:image/png;base64," prefix if present
+        if (image.startsWith("data:image"))
+            image = image.substring(image.indexOf(",") + 1);
+        
+        // Decode the Base64 string to a byte array
+        byte[] decodedBytes = Base64.getDecoder().decode(image);
+        ByteArrayInputStream bytes = new ByteArrayInputStream(decodedBytes);
+
+        return ImageIO.read(bytes);
     }
 }
