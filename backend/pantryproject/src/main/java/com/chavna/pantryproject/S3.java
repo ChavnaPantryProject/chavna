@@ -79,6 +79,6 @@ public class S3 {
     }
 
     public static String getImageURL(String key) {
-        return CHAVNA_URL + "/images/" + key;
+        return CHAVNA_URL + "images/" + key;
     }
 }

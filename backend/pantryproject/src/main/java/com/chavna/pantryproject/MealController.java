@@ -25,8 +25,6 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.chavna.pantryproject.Authorization.Login;
-import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.annotation.JsonInclude.Include;
 
 import jakarta.annotation.Nullable;
 import jakarta.validation.Valid;
@@ -139,7 +137,6 @@ public class MealController {
         public UUID mealId;
     }
 
-    @JsonInclude(Include.NON_NULL)
     public static class FlattenedMeal {
         public String name;
         public boolean isFavorite;
@@ -226,7 +223,7 @@ public class MealController {
         @Nullable
         public Boolean isFavorite;
         @Nullable
-        String mealPictureBase64;
+        public String mealPictureBase64;
     }
 
     public static class UpdateMealRequest {
@@ -266,6 +263,9 @@ public class MealController {
             } catch (IOException ex) {
                 return Response.Error(HttpStatus.INTERNAL_SERVER_ERROR, "Unable to decode image.", ex);
             }
+
+            if (image == null)
+                return Response.Error(HttpStatus.INTERNAL_SERVER_ERROR, "Unable to decode image.");
 
             String mealKey = S3.getImageKey("meal", requestBody.mealId);
             try {
@@ -335,7 +335,6 @@ public class MealController {
         return null;
     }
 
-    @JsonInclude(Include.NON_NULL)
     public static class MealResponse {
         public UUID mealId;
         public String name;
