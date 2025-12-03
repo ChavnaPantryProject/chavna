@@ -1,45 +1,166 @@
-// fix it so that when clicking the info button, it'll go to the respective page.
-
-import React from 'react'
-import { 
-  Text, 
-  View, 
-  StyleSheet, 
-  TextInput, 
-  Image, 
-  TouchableOpacity, 
+import React, { useCallback, useEffect, useState } from 'react'
+import {
+  Text,
+  View,
+  StyleSheet,
+  TextInput,
+  Image,
+  TouchableOpacity,
   FlatList,
   Modal,
+  ActivityIndicator,
+  Alert,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { Ionicons, MaterialIcons } from '@expo/vector-icons'
+import { API_URL, Response, retrieveValue } from '../util';
 
-// example meal card data used in our figma
-// replace this so thatt user has an option to delete it
-const initialMeals = [
-  {
-    id: "1",
-    name: "Fettuccine Alfredo Pasta",
-    calories: 1200,
-    cost: 3.0,
-    image: require('../../assets/images/FETTUCCINE_ALFREDO_HOMEPAGE.jpg')
-  },
-  {
-    id:"2",
-    name: "Chicken & Rice",
-    calories: 700,
-    cost: 3.45,
-    image: require('../../assets/images/CHICKEN_AND_RICE_HOMEPAGE.jpg')
-  }
-];
+// definitions
+interface Ingredient {
+  templateId: string;
+  name: string;
+  amount: number;
+  unit: string;
+}
 
-const MealScreen = () => {
+interface MealSummary {
+  mealId: string;
+  name: string;
+  mealPictureURL: string | null;
+  isFavorite: boolean;
+}
+
+interface Meal {
+  id: string;
+  name: string;
+  ingredients?: Ingredient[];
+  cost?: number;
+  image?: any;
+  isFavorite: boolean
+}
+
+export default function MealScreen() {
   const router = useRouter(); // nav controller
-  const [meals, setMeals] = React.useState(initialMeals);
-  const [showDeleteModal, setShowDeleteModal] = React.useState(false);
-  const [selectedMeal, setSelectedMeal] = React.useState<any>(null);
-  const [favorites, setFavorites] = React.useState<string[]>([]); // fav meal IDs
+  const [meals, setMeals] = useState<Meal[]>([]);
+  const [filteredMeals, setFilteredMeals] = useState<Meal[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [selectedMeal, setSelectedMeal] = useState<Meal | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [calculate, setCalculte] = useState(0);
+
+  // fetch all meals on component mount
+  
+  useFocusEffect(
+    useCallback(() => {
+      fetchAllMeals();
+    }, [])
+  );
+
+  // filter meals based on search query
+  useEffect(() => {
+    if (searchQuery.trim() === '') {
+      setFilteredMeals(meals);
+    } else {
+      const filtered = meals.filter(meal =>
+        meal.name.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      setFilteredMeals(filtered);
+    }
+  }, [searchQuery, meals]);
+
+  useEffect(() => {
+    for (const meal of meals) {
+      calculatePrice(meal);
+    }
+  }, [calculate]);
+
+  const calculatePrice = async (meal: Meal) => {
+      const loginToken = await retrieveValue('jwt');
+
+      if (!loginToken) {
+        Alert.alert('Error', 'Please log in to view meals');
+        setLoading(false);
+        return;
+      }
+
+      // GET request to /get-meals
+      const response = await fetch(`${API_URL}/calculate-meal-price`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${loginToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          mealId: meal.id
+        })
+      });
+
+      const body: Response<{price: number}> = await response.json();
+
+      if (!response.ok || body.success !== "success") {
+        console.log("calculate-meal-price failed", body);
+        return;
+      }
+
+      meal.cost = body.payload?.price;
+      const newMeals = [...meals];
+      setMeals(newMeals);
+  };
+
+  // fetch all meals from backend using /get-meals endpoint
+  const fetchAllMeals = async () => {
+    try {
+      setLoading(true);
+      const loginToken = await retrieveValue('jwt');
+
+      if (!loginToken) {
+        Alert.alert('Error', 'Please log in to view meals');
+        setLoading(false);
+        return;
+      }
+
+      // GET request to /get-meals
+      const response = await fetch(`${API_URL}/get-meals`, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${loginToken}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const body = await response.json();
+
+      if (!response.ok) {
+        throw new Error(body.message || 'Failed to fetch meals');
+      }
+
+      if (body.success !== 'success') {
+        throw new Error(body.message || 'Failed to fetch meals');
+      }
+
+      // transform the response to meal format
+      const mealSummaries: MealSummary[] = body.payload.meals;
+
+      const transformedMeals: Meal[] = mealSummaries.map(summary => ({
+        id: summary.mealId,
+        name: summary.name,
+        image: summary.mealPictureURL,
+        isFavorite: summary.isFavorite
+      }));
+
+      setMeals(transformedMeals);
+      setCalculte(c => c + 1);
+      console.log('Fetched meals:', transformedMeals);
+     
+    } catch (error) {
+      console.error('Error fetching meals:', error);
+      Alert.alert('Error', 'Failed to load meals. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // for the delete button to prompt when clicked
   const handleDelete = (meal: any) => {
@@ -47,114 +168,202 @@ const MealScreen = () => {
     setShowDeleteModal(true);
   };
 
-  // confirm deletion
-  const confirmDelete = () => {
-    if (selectedMeal) {
-      setMeals((prev) => prev.filter((m) => m.id !== selectedMeal.id));
-    }
-    setShowDeleteModal(false);
+  const handleFavorite = async (meal: Meal) => {
+    meal.isFavorite = !meal.isFavorite;
+
+    const newMeals = [...meals];
+    setMeals(newMeals);
+
+    const jwt = await retrieveValue('jwt');
+    if (jwt == null)
+      return;
+
+    fetch(`${API_URL}/update-meal`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${jwt}`,
+        },
+        body: JSON.stringify({
+            mealId: meal.id,
+            meal: {
+                isFavorite: meal.isFavorite
+            }
+        })
+    });
   };
 
-  // to allow users to favorite a meal
-  const handleFavorite = (meal: any) => {
-    setFavorites((prev) => 
-      prev.includes(meal.id)
-        ? prev.filter((id) => id !== meal.id)
-        : [...prev, meal.id]
-    );
+  // confirm deletion
+  const confirmDelete = async () => {
+    if (!selectedMeal) return;
+   
+    try {
+      const loginToken = await retrieveValue('jwt');
+
+      if (!loginToken) {
+        Alert.alert('Error', 'Please log in to delete meals');
+        return;
+      }
+
+      const response = await fetch(`${API_URL}/delete-meal`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${loginToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ mealId: selectedMeal.id }),
+      });
+
+      const body = await response.json();
+
+      if (!response.ok || body.success !== 'success') {
+        throw new Error(body.message || 'Failed to delete meal');
+      }
+
+      // remove from local state
+      setMeals(prev => prev.filter(m => m.id !== selectedMeal.id));
+
+      Alert.alert('Success', 'Meal deleted successfully');
+    } catch (error) {
+      console.error('Error deleting meal:', error);
+      Alert.alert('Error', 'Failed to delete meal.')
+    } finally {
+      setShowDeleteModal(false);
+      setSelectedMeal(null);
+    }
   };
 
   // navigate to meal info page (unique for each meal)
   const goToMealInfo = (mealId: string) => {
-    router.push(`/meals/meal_ingredient?id=${mealId}`);
+    router.push({
+      pathname: "/meals/meal_ingredient",
+      params: { id: mealId }
+    })
   };
 
   // rendering each meal card
-  const renderMeal = ({item}: {item: any}) => (
-  <View style={styles.card}>
+  const renderMeal = ({ item} : { item: Meal }) => (
+    <View style={styles.card}>
 
-    {/* Favorite Icon - top right corner */}
-    <View style={styles.favoriteIcon}>
-      <TouchableOpacity onPress={() => handleFavorite(item)}>
-        <Ionicons 
-          name={favorites.includes(item.id) ? "star" : "star-outline"}
-          size={22} 
-          color={favorites.includes(item.id) ? "#F89D5D" : "#5b5959ff"} 
-        />
-      </TouchableOpacity>
-    </View>
+      {/* Favorite Icon - top right corner */}
+      <View style={styles.favoriteIcon}>
+        <TouchableOpacity onPress={() => handleFavorite(item)}>
+          <Ionicons
+            name={item.isFavorite ? "star" : "star-outline"}
+            size={22}
+            color={item.isFavorite ? "#F89D5D" : "#5b5959ff"}
+          />
+        </TouchableOpacity>
+      </View>
 
-    {/* Title */}
-    <Text style={styles.title}>{item.name}</Text>
+      {/* Title */}
+      <Text style={styles.title}>{item.name}</Text>
 
-    {/* Divider */}
-    <View style={styles.divider} />
+      {/* Divider */}
+      <View style={styles.divider} />
 
-    {/* Row with image and info */}
-    <View style={styles.contentRow}>
-      {/* Meal Image */}
-      <Image source={item.image} style={styles.image} />
+      {/* Row with image and info */}
+      <View style={styles.contentRow}>
+        {/* Meal Image */}
+        {item.image ? (
+          <Image source={{uri: item.image}} style={styles.image} />
+        ) : (
+          <View style={[styles.image, styles.placeholderImage]}>
+            <Ionicons name="fast-food" size={40} color="#499F44" />
+          </View>
+        )}
 
-      {/* Meal Information */}
-      <View style={styles.info}>
-        <Text style={styles.subtitle}>{item.calories} Cals</Text>
-        <Text style={styles.subtitle}>Cost Per Serving: ${item.cost.toFixed(2)}</Text>
-    
-        {/* Action Buttons (Eat + Delete) */}
-        <View style={styles.buttons}>
+        {/* Meal Information */}
+        <View style={styles.info}>
+          {item.cost != null && (
+            <Text style={styles.subtitle}>
+              Cost Per Serving: ${item.cost.toFixed(2)}
+            </Text>
+          )}
+     
+          {/* Action Buttons (Info + Delete) */}
+          <View style={styles.buttons}>
 
-          {/* Eat Button */}
-          <TouchableOpacity 
-            style={styles.actionBtn} 
-            onPress={() => goToMealInfo(item.id)}
-          >
-            <Ionicons name="restaurant" size={20} color="white" />
-          </TouchableOpacity>
+            {/* Info Button - navigates to meal details */}
+            <TouchableOpacity
+              style={styles.actionBtn}
+              onPress={() => goToMealInfo(item.id)}
+            >
+              <Ionicons name="restaurant" size={20} color="white" />
+            </TouchableOpacity>
 
-          {/* Delete Button */}
-          <TouchableOpacity 
-            style={styles.actionBtn}
-            onPress={() => handleDelete(item)}
-          >
-            <MaterialIcons name="delete" size={20} color="white" />
-          </TouchableOpacity>
+            {/* Delete Button */}
+            <TouchableOpacity
+              style={styles.actionBtn}
+              onPress={() => handleDelete(item)}
+            >
+              <MaterialIcons name="delete" size={20} color="white" />
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     </View>
-  </View>
-);
+  );
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#499F44" />
+          <Text style={styles.loadingText}>Loading meals...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
       {/* Search Bar */}
       <View style={styles.searchContainer}>
-        <Ionicons 
-          name="search" 
-          size={22} 
-          color="#499F44" 
-          style={{ marginRight: 6}} 
+        <Ionicons
+          name="search"
+          size={22}
+          color="#499F44"
+          style={{ marginRight: 6}}
         />
-        <TextInput 
-          placeholder="Search" 
-          placeholderTextColor="#555" 
-          style={styles.searchInput} 
+        <TextInput
+          placeholder="Search"
+          placeholderTextColor="#555"
+          style={styles.searchInput}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
         />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity onPress={() => setSearchQuery('')}>
+            <Ionicons name="close-circle" size={20} color="#499F44" />
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* List of Meals */}
-      <FlatList
-        // data source
-        data={meals} // Not sure why this was data = {data} but put it to meals as a fix for now since the page wasn't loading - Brandon
-        // unique key for each mealunique key
-        keyExtractor={(item) => item.id}
-        // render each meal card
-        renderItem={renderMeal}
-        // add padding so last card isnt hidden by nav bar
-        contentContainerStyle={{ paddingBottom: 80 }}
-      />
+      {filteredMeals.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Ionicons name="restaurant-outline" size={60} color="#ccc" />
+          <Text style={styles.emptyText}>
+            {searchQuery ? 'No meals found' : 'No meals yet'}
+          </Text>
+          <Text style={styles.emptySubtext}>
+            {searchQuery ? 'Try a different search' : 'Tap + to add your first meal'}
+          </Text>
+        </View>
+      ) : (
+        <FlatList
+          data={filteredMeals}
+          keyExtractor={(item) => item.id}
+          renderItem={renderMeal}
+          contentContainerStyle={{ paddingBottom: 80 }}
+          refreshing={loading}
+          onRefresh={fetchAllMeals}
+        />
+      )}
 
       {/* Add Meal Button */}
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.addBtn}
         onPress={() => router.push("/meals/newmeal")}
       >
@@ -184,7 +393,7 @@ const MealScreen = () => {
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.modalBtn}
+              style={[styles.modalBtn, styles.cancelBtn]}
               onPress={() => setShowDeleteModal(false)}
             >
               <Text style={styles.modalBtnText}>Cancel</Text>
@@ -194,15 +403,46 @@ const MealScreen = () => {
       </Modal>
     </SafeAreaView>
   );
-};
-
-export default MealScreen;
+}
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 15,
     backgroundColor: "#fff",
+  },
+
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#666'
+  },
+
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+
+  emptyText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#666',
+    marginTop: 15,
+  },
+
+  emptySubtext: {
+    fontSize: 14,
+    color: '#999',
+    marginTop: 5,
+    textAlign: 'center',
   },
 
   searchContainer: {
@@ -220,17 +460,17 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 15,
-    color: "#333",  // darker color for text
+    color: "#333",
   },
 
   card: {
-    backgroundColor: "rgba(73,159,68,0.1)",   // light green background
+    backgroundColor: "rgba(73,159,68,0.1)",
     borderRadius: 18,
     borderWidth: 1,
     borderColor: "#499F44",
     marginBottom: 15,
     padding: 10,
-    overflow: "hidden",  // ensures rounded corners for image
+    overflow: "hidden",
   },
 
   image: {
@@ -240,8 +480,14 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
 
+  placeholderImage: {
+    backgroundColor: 'rgba(73, 159, 68, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
   info: {
-    flex: 1,     // text takes up remaining space
+    flex: 1,
   },
 
   title: {
@@ -280,7 +526,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     bottom: 25,
     alignSelf: "center",
-    backgroundColor: "transparent",   // no circle background, just transparent
+    backgroundColor: "transparent",
   },
 
   addText: {
@@ -301,7 +547,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
 
-  // for favorite meals
   favoriteIcon: {
     position: "absolute",
     top: 10,
@@ -309,7 +554,6 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
 
-  // Modal Styles
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.6)",
@@ -356,6 +600,10 @@ const styles = StyleSheet.create({
     marginVertical: 6,
     width: "60%",
     alignItems: "center",
+  },
+
+  cancelBtn: {
+    backgroundColor: "#999",
   },
 
   modalBtnText: {

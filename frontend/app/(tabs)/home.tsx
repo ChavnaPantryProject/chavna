@@ -23,6 +23,7 @@ import { Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { API_URL, retrieveValue } from '../util';
+import { checkAndSendExpirationNotification, scheduleExpirationNotifications } from '../notificationService';
 
 type ShoppingListItem = {
   name: string,
@@ -281,6 +282,36 @@ export default function HomeScreen() {
   );
 
 
+  // Check for expiring items and send notifications on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        await checkAndSendExpirationNotification();
+        await scheduleExpirationNotifications();
+      } catch (err) {
+        console.error('Failed to check expiration notifications', err);
+      }
+    })();
+  }, []);
+
+  // Check notifications when app comes to foreground
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', async (nextAppState) => {
+      if (nextAppState === 'active') {
+        try {
+          await checkAndSendExpirationNotification();
+          await scheduleExpirationNotifications();
+        } catch (err) {
+          console.error('Failed to check expiration notifications on app state change', err);
+        }
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
 
   useEffect(() => {
     if (updateItems) {
@@ -324,12 +355,24 @@ export default function HomeScreen() {
   // Auto scroll when adding to list
   const scrollRef = useRef<ScrollView | null>(null);
 
-  // List resets back to top when returning to page
+  // List resets back to top when returning to page and check notifications
   useFocusEffect(
     React.useCallback(() => {
       requestAnimationFrame(() => {
         scrollRef.current?.scrollTo({ y: 0, animated: false });
       });
+      // Check notifications when screen comes into focus
+      (async () => {
+        try {
+          await checkAndSendExpirationNotification();
+          await scheduleExpirationNotifications();
+          // Also refresh expiring items list
+          const soon = await getExpiringSoonItems();
+          setExpiringItems(soon);
+        } catch (err) {
+          console.error('Failed to check notifications on focus', err);
+        }
+      })();
       return undefined;
     }, [])
   );

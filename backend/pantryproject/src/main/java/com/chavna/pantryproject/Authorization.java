@@ -177,12 +177,12 @@ public class Authorization {
                 ResultSet result = query.executeQuery();
                 
                 if (!result.next())
-                    throw new ResponseException(Response.Error(HttpStatus.NOT_FOUND, "User does not exist."));
+                    return Response.Error(HttpStatus.NOT_FOUND, "User does not exist.");
                 
                 UUID loginState = (UUID) result.getObject(1);
 
                 if (!loginState.equals(((NormalLogin) login).loginState))
-                    throw new ResponseException(Response.Error(HttpStatus.UNAUTHORIZED, "Invalid login token."));
+                    return Response.Error(HttpStatus.UNAUTHORIZED, "Invalid login token.");
 
                 return null;
             })

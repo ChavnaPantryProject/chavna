@@ -89,11 +89,13 @@ public class Database {
          */
         @CheckReturnValue
         public ConnectionResult onSQLError(ConnectionErrorHandler errorHandler) {
-            Response response = errorHandler.handleError(ex);
+            if (ex != null) {
+                Response response = errorHandler.handleError(ex);
 
-            if (response != null)
-                throw new ResponseException(response);
-
+                if (response != null)
+                    throw new ResponseException(response);
+            }
+            
             return this;
         }
 
@@ -131,31 +133,31 @@ public class Database {
      */
 
     @CheckReturnValue
-    @SuppressWarnings("Finally")
+    // @SuppressWarnings("Finally")
     public static ConnectionResult openConnection(DatabaseConnection connection) {
         Connection con = null;
         ConnectionResult result = null;
         try {
-            con = dataSource.getConnection();
-            Response response = connection.connect(con);
-
-            // if (response != null)
-            //     throw new ResponseException(response);
-
-            result = new ConnectionResult(null, response);
-        } catch (SQLException ex) {
-            result = new ConnectionResult(ex, null);
-        } finally {
             try {
+                con = dataSource.getConnection();
+                Response response = connection.connect(con);
+
+                // if (response != null)
+                //     throw new ResponseException(response);
+
+                result = new ConnectionResult(null, response);
+            } catch (SQLException ex) {
+                result = new ConnectionResult(ex, null);
+            } finally {
                 if (con != null)
                     con.close();
-            } catch (SQLException ex) {
-                if (result != null) {
-                    result.ex.printStackTrace();
-                    throw new RuntimeException("Double SQLException.", ex);
-                } else {
-                    result = new ConnectionResult(ex, null);
-                }
+            }
+        }  catch (SQLException ex) {
+            if (result != null) {
+                result.ex.printStackTrace();
+                throw new RuntimeException("Double SQLException.", ex);
+            } else {
+                result = new ConnectionResult(ex, null);
             }
         }
 

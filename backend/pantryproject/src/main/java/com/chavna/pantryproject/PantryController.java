@@ -10,6 +10,8 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.web.bind.annotation.GetMapping;
@@ -43,6 +45,7 @@ public class PantryController {
     @PostMapping("/create-food-item-template")
     public Response createFoodItemTemplate(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody FoodItemTemplate requestBody) {
         Login login = Authorization.authorize(authorizationHeader);
+        UUID familyOwner = Authorization.getFamilyOwnerId(login);
 
         Database.openConnection((Connection con) -> {
             PreparedStatement statement = con.prepareStatement(String.format("""
@@ -52,7 +55,7 @@ public class PantryController {
             """, FOOD_ITEM_TEMPLATES_TABLE));
 
             statement.setString(1, requestBody.name);
-            statement.setObject(2, login.userId);
+            statement.setObject(2, familyOwner);
             statement.setDouble(3, requestBody.amount);
             statement.setString(4, requestBody.unit);
             statement.setInt(5, requestBody.shelfLifeDays);
@@ -208,6 +211,33 @@ public class PantryController {
 
             if (updated == 0)
                 return Response.Fail("No items added.");
+
+            // Update most recent unit price
+            String updateValues = "";
+
+            for (@SuppressWarnings("unused") var __ : requestBody.items)
+                updateValues += "(?, ?),";
+
+            updateValues = updateValues.substring(0, updateValues.length() - 1);
+
+            PreparedStatement updateQuery = con.prepareStatement(String.format("""
+                UPDATE %1$s
+                SET most_recent_unit_price = data.unit_price
+                FROM (VALUES
+                    %2$s
+                ) AS data (id, unit_price)
+                WHERE %1$s.id = data.id
+            """, FOOD_ITEM_TEMPLATES_TABLE, updateValues));
+
+            i = 1;
+            for (FoodItemFromTemplate item : requestBody.items) {
+                updateQuery.setObject(i, item.templateId);
+                i++;
+                updateQuery.setObject(i, item.unitPrice);
+                i++;
+            }
+
+            updateQuery.executeUpdate();
 
             return Response.Success("Items added: " + updated);
         })
@@ -437,5 +467,101 @@ public class PantryController {
 
         // This should be unreachable
         return null;
+    }
+
+    public static class GetScanKeyRequest {
+        @NotNull
+        public String[] keys;
+    }
+
+    @AllArgsConstructor
+    public static class GetScanKeyResponse {
+        public Map<String, UUID> templateIds;
+    }
+
+    @PostMapping("get-scan-keys")
+    public Response getScanKey(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody GetScanKeyRequest requestBody) {
+        Login login = Authorization.authorize(authorizationHeader);
+        UUID familyOwner = Authorization.getFamilyOwnerId(login);
+
+        if (requestBody.keys.length == 0)
+            return Response.Fail("No keys provided.");
+
+        HashMap<String, UUID> templateIds = new HashMap<>();
+        Database.openConnection((Connection con) -> {
+            String values = "";
+            for (@SuppressWarnings("unused") var __ : requestBody.keys)
+                values += "(?),";
+            values = values.substring(0, values.length() - 1);
+            PreparedStatement statement = con.prepareStatement(String.format("""
+                SELECT v.key, template_id FROM scan_items
+                INNER JOIN (
+                    VALUES %s
+                ) as v(key)
+                ON scan_items.scan_text = v.key AND owner = ?;
+            """, values));
+
+            int i = 1;
+            for (String key : requestBody.keys) {
+                statement.setString(i, key);
+                i++;
+            }
+            statement.setObject(i, familyOwner);
+
+            ResultSet result = statement.executeQuery();
+
+            while (result.next())
+                templateIds.put(result.getString(1), (UUID) result.getObject(2));
+
+            return null;
+        })
+        .throwIfError()
+        .ignoreResponse();
+
+        return Response.Success(new GetScanKeyResponse(templateIds));
+    }
+
+    public static class SetScanKeyRequest {
+        @NotNull
+        public String key;
+        @Nullable
+        public UUID templateId;
+    }
+
+    @PostMapping("/set-scan-key")
+    public Response setScanKey(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody SetScanKeyRequest requestBody) {
+        Login login = Authorization.authorize(authorizationHeader);
+        UUID familyOwner = Authorization.getFamilyOwnerId(login);
+
+        Database.openConnection((Connection con) -> {
+            PreparedStatement deleteStatement = con.prepareStatement("""
+                DELETE FROM scan_items
+                WHERE scan_text = ? AND owner = ?;
+            """);
+
+            deleteStatement.setString(1, requestBody.key);
+            deleteStatement.setObject(2, familyOwner);
+
+            deleteStatement.executeUpdate();
+
+            if (requestBody.templateId != null) {
+                PreparedStatement statement = con.prepareStatement("""
+                    INSERT INTO scan_items (scan_text, template_id, owner)
+                    VALUES (?, ?, ?)
+                """);
+
+                statement.setString(1, requestBody.key);
+                statement.setObject(2, requestBody.templateId);
+                statement.setObject(3, familyOwner);
+
+                statement.executeUpdate();
+            }
+
+            return null;
+        })
+        .throwIfError()
+        .throwResponse();
+
+        return Response.Success("Key added.");
     }
 }
