@@ -7,10 +7,12 @@ import {
   TouchableOpacity,
   StyleSheet,
   Pressable,
+  Alert,
 } from "react-native";
 import { router, useFocusEffect } from "expo-router";
 import { getSelectedTemplate, Template } from "./select-template";
 import { ConfirmationItem } from "./scannerConfirmation";
+import { API_URL, Response, retrieveValue } from "./util";
 
 interface DropdownOption {
   label: string;
@@ -70,6 +72,38 @@ const PopupMenu: React.FC<PopupMenuProps> = ({
     }
   });
 
+  const saveScanKey = async () => {
+    const jwt = await retrieveValue('jwt');
+
+    if (jwt == null) {
+      console.log("no jwt");
+      return;
+    }
+
+    const response = await fetch(`${API_URL}/set-scan-key`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${jwt}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        key: state.scanName,
+        templateId: state.template?.id
+      })
+    });
+
+    if (response === null)
+      return;
+
+    const body: Response<any> = await response.json();
+
+    if (body.success !== "success")
+      console.log("Failed to save", body);
+    else
+      console.log(body);
+
+  };
+
   const handleSave = () => {
     const data: ConfirmationItem = {
       displayName: state.displayName,
@@ -78,6 +112,11 @@ const PopupMenu: React.FC<PopupMenuProps> = ({
       price: Number(state.price),
       template: state.template
     };
+
+    Alert.alert("Confirmation", "Would you like to remember this scan?", [
+      { text: "No" },
+      { text: "Yes", onPress: saveScanKey }
+    ])
 
     onSave(data);
     close();

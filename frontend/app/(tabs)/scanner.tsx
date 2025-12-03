@@ -19,7 +19,17 @@ export default function ScannerScreen() {
       base64: true,
       quality: 0
     });
-    router.push("/scannerConfirmation");
+    router.navigate({
+      pathname: "/scannerConfirmation",
+      params: {
+        scanItems: JSON.stringify([
+          {displayName: null, scanName: "CHKN BRST", qty: 4, price: 10, template: null },
+          {displayName: null, scanName: "CHKN BRST1", qty: 4, price: 10, template: null },
+          {displayName: null, scanName: "CHKN BRST2", qty: 4, price: 10, template: null },
+          {displayName: null, scanName: "CHKN BRST3", qty: 4, price: 10, template: null }
+        ])
+      }
+    })
     return;
     console.log("take picture");
     if (photo?.base64) {

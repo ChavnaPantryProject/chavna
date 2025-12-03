@@ -2,9 +2,10 @@ import * as React from "react";
 import { useState, useEffect } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import { API_URL, retrieveValue } from "./util";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { API_URL, Response, retrieveValue } from "./util";
 import PopupForm, { PopupState } from "./PopupForm";
+import { getTemplates } from "./select-template";
 
 type GetCategoriesResponse = {
   categories: Array<string>
@@ -29,9 +30,7 @@ export type ConfirmationItem = {
 
 export default function ConfirmationScreen() {
   const router = useRouter();
-  const [items, setItems] = useState<ConfirmationItem[]>([
-    {displayName: null, scanName: "CHKN BRST", qty: 4, price: 10, template: null }
-  ]);
+  const [items, setItems] = useState<ConfirmationItem[]>([]);
 
   const [isPopupVisible, setIsPopupVisible] = useState(false);
   const [allValid, setAllValid] = useState(false);
@@ -46,6 +45,63 @@ export default function ConfirmationScreen() {
       scanName: "New Item",
       template: null
   });
+
+  const { scanItems } = useLocalSearchParams<{scanItems: string}>();
+
+  useEffect(() => {
+    (async () => {
+      const scannedItems: ConfirmationItem[] = scanItems? JSON.parse(scanItems) : [];
+
+      if (scannedItems.length == 0)
+        return;
+
+      const scanTexts = scannedItems.map(v => (v.scanName));
+
+      const templates: Map<string, Template> = new Map((await getTemplates()).map(t => [t.id, t]));
+
+      const jwt = await retrieveValue('jwt');
+  
+      if (jwt == null) {
+        console.log("no jwt");
+        return;
+      }
+
+      const response = await fetch(`${API_URL}/get-scan-keys`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${jwt}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          keys: scanTexts 
+        })
+      });
+
+      type GetScanKeyResponse = {
+        templateIds: any
+      }
+
+      const body: Response<GetScanKeyResponse> = await response.json();
+
+      if (!response.ok || body.success !== "success") {
+        console.log("get-scan-keys request failed: ", body);
+        return;
+      }
+
+      const ids: Map<string, string> = new Map(Object.entries(body.payload?.templateIds));
+      for (let item of scannedItems) {
+        if (ids.has(item.scanName)) {
+          const id = ids.get(item.scanName);
+          const template = templates.get(id!);
+
+          item.displayName = template!.name;
+          item.template = template!;
+        }
+      }
+
+      setItems(scannedItems);
+    })();
+  }, [scanItems])
 
   useEffect(() => {
     let noTemplate = false;

@@ -36,7 +36,7 @@ export function setSelectedTemplate(template: Template) {
     selectedTemplate = template;
 }
 
-async function getTemplates(): Promise<Template[]> {
+export async function getTemplates(): Promise<Template[]> {
     const jwt = await retrieveValue('jwt');
     const request = {
         method: 'POST',
