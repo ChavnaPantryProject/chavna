@@ -3,14 +3,18 @@ import React, { useState, useEffect } from "react";
 import { Modal, View, Text, Pressable, StyleSheet, ScrollView, StyleSheet as RNStyleSheet } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Entypo } from "@expo/vector-icons";
+import { router } from "expo-router";
 import { API_URL, retrieveValue } from "../util";
 import FoodRows from "./foodRows";
+import AddFoodButton from "./addFoodButton";
+import PopupMenu from "../PopupForm";
 
 type Props = {
     visible: boolean;
     onClose: () => void;
     title?: string;
     children?: React.ReactNode;
+    foodCategories: string[];
 };
 
 type BackendFoodItem = {
@@ -33,10 +37,11 @@ type FoodItem = {
     expDate: string;
 };
 
-export default function ModalFoodCategory({ visible, onClose, title }: Props) {
+export default function ModalFoodCategory({ visible, onClose, title, foodCategories }: Props) {
     const [arrOfFood, setArrOfFood] = useState<FoodItem[]>([]);
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState<boolean>(false);
     const [displayArr, setDisplayArr] = useState<FoodItem[]>([]);
+    const [popupVisible, setPopupVisible] = useState<boolean>(false);
 
     // States for sorting direction arrow
     // ALL ARROWS WITH TRUE ARE THE DEFAULT, TRUE POINTS ARROW DOWN, FALSE POINTS ARROW UP
@@ -362,12 +367,16 @@ const deleteFoodItem = async (id: string) => {
                                     onDelete={handleDeleteFood}
                                 />
                             </ScrollView>
+                            {/* use focus effect
+                            get selcted template */}
                         </View>
 
                         {/* plus icon to add another category (hook up later) */}
-                        <Pressable onPress={() => {}}>
-                            <Text style={style.addButton}>+</Text>
-                        </Pressable>
+                        <AddFoodButton onPress={() =>{
+                            router.push("/select-template");
+                            onClose();
+                        }}/>
+
                     </View>
                 </View>
             </GestureHandlerRootView>
@@ -440,11 +449,5 @@ const style = StyleSheet.create({
         fontSize: 17,
         fontWeight: "500",
         marginRight: 4,
-    },
-
-    addButton: {
-        fontSize: 40,
-        color: "rgba(138, 141, 138, 1)",
-        marginTop: 6,
     },
 });

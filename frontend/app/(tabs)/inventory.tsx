@@ -134,6 +134,7 @@ const InventoryScreen = () => {
                 visible={modalCategoryVisible}
                 onClose={closeCategory}
                 title={foodCategoryTitle ?? undefined}
+                foodCategories={foodCategories}
             />
 
             {/* create category button */}
