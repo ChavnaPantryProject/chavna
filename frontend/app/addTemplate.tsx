@@ -38,9 +38,13 @@ export default function AddTemplateScreen() {
     // Item-only fields
     const [shelfLifeDays, setShelfLifeDays] = useState(""); // in days
     const [unitPrice, setUnitPrice] = useState("");
+    const [totalPrice, setTotalPrice] = useState("");
 
     const [categories, setCategories] = useState<string[]>([]);
     const [loading, setLoading] = useState(false);
+
+    // Focus tracking for green highlight
+    const [focusedField, setFocusedField] = useState<string | null>(null);
 
     // All templates from backend (loaded once)
     const [templates, setTemplates] = useState<Template[]>([]);
@@ -70,7 +74,11 @@ export default function AddTemplateScreen() {
                     const catBody = await catRes.json();
                     console.log("get-categories body:", catBody);
                     if (catBody && Array.isArray(catBody.categories)) {
-                        setCategories(catBody.categories);
+                        // Normalize categories: trim for consistent comparison
+                        const normalized = catBody.categories
+                            .filter((c: any) => typeof c === "string")
+                            .map((c: string) => c.trim());
+                        setCategories(normalized);
                     }
                 } else {
                     console.log("get-categories status:", catRes.status);
@@ -201,8 +209,9 @@ export default function AddTemplateScreen() {
         const trimmed = categoryName.trim();
         if (!trimmed) return;
 
-        // If we already know about it locally, don't call the API
-        if (categories.includes(trimmed)) {
+        // If we already know about it locally (case + space insensitive), don't call the API
+        const normalizedList = categories.map((c) => c.trim().toLowerCase());
+        if (normalizedList.includes(trimmed.toLowerCase())) {
             return;
         }
 
@@ -255,21 +264,22 @@ export default function AddTemplateScreen() {
                     );
                 }
 
-                // Important: DO NOT throw – let onSave continue and let the template API decide
                 return;
             }
 
-            // Success or "already exists": update local list so we don't call again
-            setCategories((prev) =>
-                prev.includes(trimmed) ? prev : [...prev, trimmed]
-            );
+            setCategories((prev) => {
+                const normalizedPrev = prev.map((c) => c.trim().toLowerCase());
+                const key = trimmed.toLowerCase();
+
+                if (normalizedPrev.includes(key)) {
+                    return prev;
+                }
+                return [...prev, trimmed];
+            });
         } catch (err) {
             console.error("ensureCategoryExists error:", err);
-            // Don't rethrow; we don't want to kill the save flow on a noisy backend
-            // The later create-food-item-template call will surface any real problems.
         }
     };
-
 
     const onSave = async () => {
         // Basic validation
@@ -285,10 +295,35 @@ export default function AddTemplateScreen() {
             Alert.alert("Missing category", "Please enter a category.");
             return;
         }
-        if (!unitPrice || isNaN(Number(unitPrice))) {
-            Alert.alert("Invalid price", "Unit price must be a number.");
+
+        // Require either unit price OR total price
+        const hasUnitPrice =
+            unitPrice.trim() !== "" && !isNaN(Number(unitPrice.trim()));
+        const hasTotalPrice =
+            totalPrice.trim() !== "" && !isNaN(Number(totalPrice.trim()));
+
+        if (!hasUnitPrice && !hasTotalPrice) {
+            Alert.alert(
+                "Missing price",
+                "Please enter either a unit price or the total product price."
+            );
             return;
         }
+        if (unitPrice.trim() !== "" && !hasUnitPrice) {
+            Alert.alert(
+                "Invalid unit price",
+                "Unit price must be a valid number."
+            );
+            return;
+        }
+        if (totalPrice.trim() !== "" && !hasTotalPrice) {
+            Alert.alert(
+                "Invalid total price",
+                "Total price must be a valid number."
+            );
+            return;
+        }
+
         if (
             shelfLifeDays.trim() !== "" &&
             isNaN(Number(shelfLifeDays.trim()))
@@ -381,7 +416,22 @@ export default function AddTemplateScreen() {
 
             console.log("Using templateId:", templateId);
 
-            // Add item to inventory (no expiration now)
+            // Decide final unit price to send
+            let unitPriceToSend: number;
+
+            if (unitPrice.trim() !== "") {
+                unitPriceToSend = Number(unitPrice.trim());
+            } else {
+                // Only totalPrice provided; compute unit price
+                const amountNum = Number(amount);
+                const totalPriceNum = Number(totalPrice.trim());
+
+                // Guard against 0 to avoid division by zero
+                const safeAmount = amountNum === 0 ? 1 : amountNum;
+                unitPriceToSend = totalPriceNum / safeAmount;
+            }
+
+            // Add item to inventory
             const addRes = await fetch(`${API_URL}/add-food-items`, {
                 method: "POST",
                 headers: {
@@ -393,7 +443,7 @@ export default function AddTemplateScreen() {
                         {
                             templateId,
                             amount: Number(amount),
-                            unitPrice: Number(unitPrice),
+                            unitPrice: unitPriceToSend,
                         },
                     ],
                 }),
@@ -444,18 +494,26 @@ export default function AddTemplateScreen() {
                 <View style={{ width: 24 }} />
             </View>
 
-
             <ScrollView
-                contentContainerStyle={styles.container}
+                style={{ flex: 1 }}
+                contentContainerStyle={styles.scrollContent}
                 keyboardShouldPersistTaps="handled"
+                bounces={false}
+                overScrollMode="never"
             >
+
                 {/* Top section: template info */}
                 <Text style={styles.label}>Item Name</Text>
                 <View style={{ position: "relative" }}>
                     <TextInput
-                        style={styles.input}
+                        style={[
+                            styles.input,
+                            focusedField === "name" && styles.inputFocused,
+                        ]}
                         value={name}
                         onChangeText={handleNameChange}
+                        onFocus={() => setFocusedField("name")}
+                        onBlur={() => setFocusedField(null)}
                         placeholder="Chicken Breast"
                     />
 
@@ -485,26 +543,41 @@ export default function AddTemplateScreen() {
 
                 <Text style={styles.label}>Default Amount</Text>
                 <TextInput
-                    style={styles.input}
+                    style={[
+                        styles.input,
+                        focusedField === "amount" && styles.inputFocused,
+                    ]}
                     value={amount}
                     onChangeText={setAmount}
+                    onFocus={() => setFocusedField("amount")}
+                    onBlur={() => setFocusedField(null)}
                     keyboardType="numeric"
                     placeholder="1"
                 />
 
                 <Text style={styles.label}>Unit</Text>
                 <TextInput
-                    style={styles.input}
+                    style={[
+                        styles.input,
+                        focusedField === "unit" && styles.inputFocused,
+                    ]}
                     value={unit}
                     onChangeText={setUnit}
+                    onFocus={() => setFocusedField("unit")}
+                    onBlur={() => setFocusedField(null)}
                     placeholder="lb, pack, oz"
                 />
 
                 <Text style={styles.label}>Category</Text>
                 <TextInput
-                    style={styles.input}
+                    style={[
+                        styles.input,
+                        focusedField === "category" && styles.inputFocused,
+                    ]}
                     value={category}
                     onChangeText={setCategory}
+                    onFocus={() => setFocusedField("category")}
+                    onBlur={() => setFocusedField(null)}
                     placeholder="Protein, Vegetables"
                 />
                 {categories.length > 0 && (
@@ -520,21 +593,50 @@ export default function AddTemplateScreen() {
 
                 <Text style={styles.label}>Shelf Life (days)</Text>
                 <TextInput
-                    style={styles.input}
+                    style={[
+                        styles.input,
+                        focusedField === "shelfLife" && styles.inputFocused,
+                    ]}
                     value={shelfLifeDays}
                     onChangeText={setShelfLifeDays}
+                    onFocus={() => setFocusedField("shelfLife")}
+                    onBlur={() => setFocusedField(null)}
                     keyboardType="number-pad"
                     placeholder="7"
                 />
 
                 <Text style={styles.label}>Unit Price</Text>
                 <TextInput
-                    style={styles.input}
+                    style={[
+                        styles.input,
+                        focusedField === "unitPrice" && styles.inputFocused,
+                    ]}
                     value={unitPrice}
                     onChangeText={setUnitPrice}
+                    onFocus={() => setFocusedField("unitPrice")}
+                    onBlur={() => setFocusedField(null)}
                     keyboardType="decimal-pad"
                     placeholder="4.99"
                 />
+
+                <Text style={styles.label}>Total Price (optional)</Text>
+                <TextInput
+                    style={[
+                        styles.input,
+                        focusedField === "totalPrice" && styles.inputFocused,
+                    ]}
+                    value={totalPrice}
+                    onChangeText={setTotalPrice}
+                    onFocus={() => setFocusedField("totalPrice")}
+                    onBlur={() => setFocusedField(null)}
+                    keyboardType="decimal-pad"
+                    placeholder="9.99"
+                />
+                <Text style={styles.helpText}>
+                    If you only know the full package cost, enter it here and we
+                    will calculate the price per unit based on the Default
+                    Amount above.
+                </Text>
 
                 <Pressable
                     style={({ pressed }) => [
@@ -586,10 +688,9 @@ const styles = StyleSheet.create({
         fontWeight: "700",
         textAlign: "center",
     },
-    container: {
+    scrollContent: {
         padding: 16,
         paddingBottom: 32,
-        gap: 10,
     },
     sectionTitle: {
         fontSize: 18,
@@ -609,6 +710,11 @@ const styles = StyleSheet.create({
         paddingVertical: 8,
         fontSize: 16,
         backgroundColor: "#FFFFFF",
+    },
+    // Green highlight when field is focused
+    inputFocused: {
+        borderColor: "#4CAF50",
+        borderWidth: 2,
     },
     helpText: {
         fontSize: 12,

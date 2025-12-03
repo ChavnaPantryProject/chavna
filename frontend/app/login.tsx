@@ -424,39 +424,11 @@ export default function AuthScreen() {
                     {/* Social Buttons */}
                     <View style={styles.socialList}>
                         <SocialButton
-                            icon={<Ionicons name="logo-apple" size={18} />}
-                            label={mode === 'login' ? 'Login With Apple' : 'Continue With Apple'}
-                        />
-                        <SocialButton
                             icon={<Ionicons name="logo-google" size={18} color="#DB4437" />}
                             label={mode === 'login' ? 'Login With Google' : 'Continue With Google'}
                             onPress={googleLogin}
                         />
-                        <SocialButton
-                            icon={<Ionicons name="logo-facebook" size={18} color="#1877F2" />}
-                            label={mode === 'login' ? 'Login With Facebook' : 'Continue With Facebook'}
-                        />
-                        <SocialButton
-                            icon={<Ionicons name="person" size={18} />}
-                            label={mode === 'login' ? 'Login As Guest' : 'Continue As Guest'}
-                        />
                     </View>
-
-                    {/* Bottom dev buttons (only on login) */}
-                    {mode === 'login' && (
-                        <View style={styles.devBtns}>
-                            <Pressable style={styles.devBtn} onPress={goToSplash}>
-                                <Text style={styles.devBtnText}>Go to Splash</Text>
-                            </Pressable>
-
-                            <Pressable
-                                style={[styles.devBtn, { marginTop: 12 }]}
-                                onPress={() => router.replace('/(tabs)/home')}
-                            >
-                                <Text style={styles.devBtnText}>Go to Home</Text>
-                            </Pressable>
-                        </View>
-                    )}
                 </View>
             </KeyboardAvoidingView>
         </SafeAreaView>
