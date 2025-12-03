@@ -1,11 +1,17 @@
+// pantry/foodRows.tsx
 import React from "react";
-import { View, Text, StyleSheet, ActivityIndicator, Pressable } from "react-native";
-import { Swipeable } from "react-native-gesture-handler";
+import {
+    View,
+    Text,
+    StyleSheet,
+    ActivityIndicator,
+    Pressable,
+} from "react-native";
+import Swipeable from "react-native-gesture-handler/ReanimatedSwipeable";
 
 type FoodItem = {
     id: string;
     name: string;
-    weight: number;
     qty: number;
     expDate: string;
 };
@@ -50,16 +56,38 @@ const FoodRows = ({ loading, displayArr, onDelete }: Props) => {
                     )}
                 >
                     <View style={styles.entryOfFood}>
-                        <Text style={[styles.specficFoodEntryColumn, styles.flex1]}>
+                        {/* Name – left aligned, most space */}
+                        <Text
+                            style={[
+                                styles.baseText,
+                                styles.nameText,
+                                styles.flexName,
+                            ]}
+                            numberOfLines={1}
+                            ellipsizeMode="tail"
+                        >
                             {foodItem.name}
                         </Text>
-                        <Text style={[styles.specficFoodEntryColumn, styles.flex1]}>
-                            {foodItem.weight}
-                        </Text>
-                        <Text style={[styles.specficFoodEntryColumn, styles.flex1]}>
+
+                        {/* Qty – centered */}
+                        <Text
+                            style={[
+                                styles.baseText,
+                                styles.qtyText,
+                                styles.flexQty,
+                            ]}
+                        >
                             {foodItem.qty}
                         </Text>
-                        <Text style={[styles.specficFoodEntryColumn, styles.flex2]}>
+
+                        {/* Exp Date – right aligned, more room & inset a bit */}
+                        <Text
+                            style={[
+                                styles.baseText,
+                                styles.dateText,
+                                styles.flexDate,
+                            ]}
+                        >
                             {foodItem.expDate}
                         </Text>
                     </View>
@@ -72,7 +100,6 @@ const FoodRows = ({ loading, displayArr, onDelete }: Props) => {
 const styles = StyleSheet.create({
     listContainer: {
         width: "100%",
-        paddingHorizontal: 10,
         paddingBottom: 24,
     },
 
@@ -89,27 +116,49 @@ const styles = StyleSheet.create({
         color: "gray",
     },
 
-    specficFoodEntryColumn: {
-        textAlign: "center",
+    baseText: {
         fontSize: 17,
     },
 
-    flex1: {
-        flex: 1,
+    nameText: {
+        textAlign: "left",
+        paddingLeft: 8,
     },
 
-    flex2: {
-        flex: 2,
+    qtyText: {
+        textAlign: "center",
+    },
+
+    dateText: {
+        textAlign: "right",
+        paddingRight: 4, // small inset so it doesn’t touch the border
+    },
+
+    // Name gets the most space
+    flexName: {
+        flex: 1.7,
+    },
+
+    // Qty is smaller in the middle
+    flexQty: {
+        flex: 0.9,
+    },
+
+    // Exp date gets more space than before so it fits nicely
+    flexDate: {
+        flex: 1.6,
     },
 
     entryOfFood: {
-        width: "100%",
+        width: "96%",                     // slight inset from the green border
+        alignSelf: "center",
         borderWidth: 2,
         borderColor: "rgba(73,159,68,1)",
         borderRadius: 5,
         backgroundColor: "white",
         marginTop: 5,
-        padding: 6,
+        paddingVertical: 6,
+        paddingHorizontal: 6,
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "center",

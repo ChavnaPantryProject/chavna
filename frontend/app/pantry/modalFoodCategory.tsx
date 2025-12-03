@@ -1,5 +1,9 @@
 // pantry/ModalFoodCategory.tsx
-import React, { useState, useEffect, useCallback } from "react";
+import React, {
+    useState,
+    useEffect,
+    useCallback,
+} from "react";
 import {
     Modal,
     View,
@@ -12,10 +16,14 @@ import {
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Entypo } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
-import { API_URL, retrieveValue, Response } from "../util";
+
+import { API_URL, retrieveValue } from "../util";
 import FoodRows from "./foodRows";
 import AddFoodButton from "./addFoodButton";
-import { getSelectedTemplate } from "../select-template";
+import {
+    getSelectedTemplate,
+    Template,
+} from "../select-template";
 
 type Props = {
     visible: boolean;
@@ -40,100 +48,45 @@ type BackendFoodItem = {
 type FoodItem = {
     id: string;
     name: string;
-    weight: number;
     qty: number;
     expDate: string;
 };
 
-export default function ModalFoodCategory({ visible, onClose, title, foodCategories }: Props) {
+export default function ModalFoodCategory({
+    visible,
+    onClose,
+    title,
+}: Props) {
     const [arrOfFood, setArrOfFood] = useState<FoodItem[]>([]);
     const [loading, setLoading] = useState<boolean>(false);
     const [displayArr, setDisplayArr] = useState<FoodItem[]>([]);
-    const [popupVisible, setPopupVisible] = useState<boolean>(false);
 
     // States for sorting direction arrow
-    // ALL ARROWS WITH TRUE ARE THE DEFAULT, TRUE POINTS ARROW DOWN, FALSE POINTS ARROW UP
+    //            ALL ARROWS WITH TRUE ARE THE DEFAULT, TRUE POINTS ARROW DOWN, FALSE POINTS ARROW UP
     const [nameArrow, setNameArrow] = useState<boolean>(true);
-    const [weightArrow, setWeightArrow] = useState<boolean>(true);
     const [qtyArrow, setQtyArrow] = useState<boolean>(true);
     const [expDateArrow, setExpDateArrow] = useState<boolean>(true);
 
-    // color scheme for active and non active filters
-    const ACTIVEFILTERCOLOR = "rgba(73,159,68,1)"; // green
+    //color scheme for active an dnon active filters
+    const ACTIVEFILTERCOLOR = "rgba(73,159,68,1)"; //green
     const NONACTIVEFILTERCOLOR = "gray";
 
-    // state for the active filter
+    //state for the active filter
     const [activeFilter, setActiveFilter] = useState<string>("");
 
-    // function to reset all arrows to default
+    //function to reset all arrrows to defualt
     function resetAllArrows() {
         setNameArrow(true);
-        setWeightArrow(true);
         setQtyArrow(true);
         setExpDateArrow(true);
     }
 
-    // function to clear all states for when modal closes
+    //function to clear all states for when modal closes
     function resetState() {
         resetAllArrows();
         setActiveFilter("");
         setDisplayArr([...arrOfFood]);
     }
-
-    useFocusEffect(
-        useCallback(() => {
-        const template = getSelectedTemplate();
-
-        if (!template) {
-            return;
-        }
-
-        console.log("Template returned to modal:", template);
-
-        (async () => {
-            try {
-                const token = await retrieveValue("jwt");
-                if (!token) {
-                    console.error("No authentication token found");
-                    return;
-                }
-
-                // Call /add-food-items with the template
-                const response = await fetch(`${API_URL}/add-food-items`, {
-                    method: "POST",
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({
-                        items: [
-                            {
-                                templateId: template.id,
-                                amount: template.amount, // how much to add (from template)
-                                unitPrice: 0,          //default to 0 for now
-                            },
-                        ],
-                    }),
-                });
-
-                const data: Response<unknown> = await response.json();
-
-                if (response.ok && data.success === "success") {
-                    console.log("Food item added from template");
-                    // Refresh the list so the new item shows up
-                    fetchFoodItems();
-                } else {
-                    console.error(
-                        "Failed to add food item:",
-                        data.message || data
-                    );
-                }
-            } catch (err) {
-                console.error("Error adding food item:", err);
-            }
-        })();
-    }, [])
-);
 
     // Fetch food items from backend when modal opens and title changes
     useEffect(() => {
@@ -143,6 +96,7 @@ export default function ModalFoodCategory({ visible, onClose, title, foodCategor
             // Reset state when modal closes
             resetState();
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [visible, title]);
 
     const fetchFoodItems = async () => {
@@ -169,21 +123,29 @@ export default function ModalFoodCategory({ visible, onClose, title, foodCategor
             const data = await response.json();
 
             if (response.ok && data.success === "success") {
-                const backendItems: BackendFoodItem[] = data.payload?.items || [];
+                const backendItems: BackendFoodItem[] =
+                    data.payload?.items || [];
+
                 // Map backend items to frontend format
-                const mappedItems: FoodItem[] = backendItems.map((item) => ({
-                    id: item.id,
-                    name: item.name,
-                    weight: 0,
-                    qty: item.amount,
-                    expDate: item.expiration
-                        ? new Date(item.expiration).toISOString().split("T")[0]
-                        : "",
-                }));
+                const mappedItems: FoodItem[] = backendItems.map(
+                    (item) => ({
+                        id: item.id,
+                        name: item.name,
+                        qty: item.amount,
+                        expDate: item.expiration
+                            ? new Date(item.expiration)
+                                  .toISOString()
+                                  .split("T")[0]
+                            : "",
+                    })
+                );
                 setArrOfFood(mappedItems);
                 setDisplayArr([...mappedItems]);
             } else {
-                console.error("Failed to fetch food items:", data.message || data);
+                console.error(
+                    "Failed to fetch food items:",
+                    data.message || data
+                );
                 setArrOfFood([]);
                 setDisplayArr([]);
             }
@@ -196,7 +158,7 @@ export default function ModalFoodCategory({ visible, onClose, title, foodCategor
         }
     };
 
-    const deleteFoodItem = async (id: string) => {
+    const deleteFoodItemOnServer = async (id: string) => {
         try {
             const token = await retrieveValue("jwt");
             if (!token) {
@@ -228,47 +190,45 @@ export default function ModalFoodCategory({ visible, onClose, title, foodCategor
         }
     };
 
-    //----------------------- Functions for sorting -----------------------
-    // name ascending
+    // delete food by id
+    const handleDeleteFood = (id: string) => {
+        setArrOfFood((prev) => prev.filter((item) => item.id !== id));
+        setDisplayArr((prev) => prev.filter((item) => item.id !== id));
+        deleteFoodItemOnServer(id);
+    };
+
+    // ----------------------- Functions for sorting -----------------------
+    //name ascending
     function sortAscName() {
         resetAllArrows();
         setActiveFilter("name");
-        return [...arrOfFood].sort((a, b) => a.name.localeCompare(b.name));
+        return [...arrOfFood].sort((a, b) =>
+            a.name.localeCompare(b.name)
+        );
     }
-    // name descending
+    //name descending
     function sortDescName() {
         resetAllArrows();
         setActiveFilter("name");
-        setNameArrow(false); // make arrow point up
-        return [...arrOfFood].sort((a, b) => b.name.localeCompare(a.name));
+        setNameArrow(false); //make arrow point up
+        return [...arrOfFood].sort((a, b) =>
+            b.name.localeCompare(a.name)
+        );
     }
-    // weight ascending
-    function sortAscWeight() {
-        resetAllArrows();
-        setActiveFilter("weight");
-        return [...arrOfFood].sort((a, b) => a.weight - b.weight);
-    }
-    // weight descending
-    function sortDescWeight() {
-        resetAllArrows();
-        setActiveFilter("weight");
-        setWeightArrow(false); // make arrow point up
-        return [...arrOfFood].sort((a, b) => b.weight - a.weight);
-    }
-    // qty ascending
+    //qty ascending
     function sortAscQty() {
         resetAllArrows();
         setActiveFilter("qty");
         return [...arrOfFood].sort((a, b) => a.qty - b.qty);
     }
-    // qty descending
+    //qty descending
     function sortDescQty() {
         resetAllArrows();
         setActiveFilter("qty");
-        setQtyArrow(false); // make arrow point up
+        setQtyArrow(false); //make arrow point up
         return [...arrOfFood].sort((a, b) => b.qty - a.qty);
     }
-    // exp date ascending
+    //exp date ascending
     function sortAscExpDate() {
         resetAllArrows();
         setActiveFilter("expDate");
@@ -278,11 +238,11 @@ export default function ModalFoodCategory({ visible, onClose, title, foodCategor
                 new Date(b.expDate as string).getTime()
         );
     }
-    // exp date descending
+    //exp date descending
     function sortDescExpDate() {
         resetAllArrows();
         setActiveFilter("expDate");
-        setExpDateArrow(false); // make arrow point up
+        setExpDateArrow(false); //make arrow point up
         return [...arrOfFood].sort(
             (a, b) =>
                 new Date(b.expDate as string).getTime() -
@@ -291,12 +251,69 @@ export default function ModalFoodCategory({ visible, onClose, title, foodCategor
     }
     // --------------------------End of sorting functions ----------------------------------------
 
-    // delete food by id
-    const handleDeleteFood = (id: string) => {
-        setArrOfFood((prev) => prev.filter((item) => item.id !== id));
-        setDisplayArr((prev) => prev.filter((item) => item.id !== id));
-        deleteFoodItem(id);
-    };
+    // add new food item to pantry using template
+    const addFoodItemToPantry = useCallback(
+        async (template: Template) => {
+            try {
+                const token = await retrieveValue("jwt");
+                if (!token) {
+                    console.error("No authentication token found");
+                    return;
+                }
+
+                const response = await fetch(`${API_URL}/add-food-items`, {
+                    method: "POST",
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        items: [
+                            {
+                                templateId: template.id,
+                                amount: template.amount ?? 1,
+                                unitPrice: 0,
+                            },
+                        ],
+                    }),
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success === "success") {
+                    console.log("Food item added from template:", template);
+                    // refresh the list so the new item appears
+                    fetchFoodItems();
+                } else {
+                    console.error(
+                        "Failed to add food items:",
+                        data.message || data
+                    );
+                }
+            } catch (error) {
+                console.error("Error adding food items:", error);
+            }
+        },
+        [title]
+    );
+
+    // use focus effect
+    useFocusEffect(
+        useCallback(() => {
+            const template = getSelectedTemplate();
+
+            if (!template) {
+                return;
+            }
+
+            console.log(
+                "Template received from select-template:",
+                template
+            );
+
+            addFoodItemToPantry(template);
+        }, [addFoodItemToPantry])
+    );
 
     return (
         <Modal
@@ -320,22 +337,36 @@ export default function ModalFoodCategory({ visible, onClose, title, foodCategor
                     {/* Sheet content (not inside the Pressable) */}
                     <View style={style.sheet}>
                         {/* category name header with an underline */}
-                        {title ? <Text style={style.title}>{title}</Text> : null}
+                        {title ? (
+                            <Text style={style.title}>{title}</Text>
+                        ) : null}
 
                         {/* column headers with the filter icon */}
                         <View style={style.columnFilters}>
-                            <View style={[style.specificFilterColumn, { flex: 1 }]}>
+                            {/* Name – more space */}
+                            <View
+                                style={[
+                                    style.specificFilterColumn,
+                                    { flex: 1.7 },
+                                ]}
+                            >
                                 <Text style={style.filterText}>Name</Text>
 
                                 <Pressable
                                     onPress={() =>
                                         setDisplayArr(
-                                            nameArrow ? sortDescName() : sortAscName()
+                                            nameArrow
+                                                ? sortDescName()
+                                                : sortAscName()
                                         )
                                     }
                                 >
                                     <Entypo
-                                        name={nameArrow ? "triangle-down" : "triangle-up"}
+                                        name={
+                                            nameArrow
+                                                ? "triangle-down"
+                                                : "triangle-up"
+                                        }
                                         size={15}
                                         color={
                                             activeFilter == "name"
@@ -346,40 +377,30 @@ export default function ModalFoodCategory({ visible, onClose, title, foodCategor
                                 </Pressable>
                             </View>
 
-                            <View style={[style.specificFilterColumn, { flex: 1.1 }]}>
-                                <Text style={style.filterText}>Weight</Text>
-
-                                <Pressable
-                                    onPress={() =>
-                                        setDisplayArr(
-                                            weightArrow ? sortDescWeight() : sortAscWeight()
-                                        )
-                                    }
-                                >
-                                    <Entypo
-                                        name={weightArrow ? "triangle-down" : "triangle-up"}
-                                        size={15}
-                                        color={
-                                            activeFilter == "weight"
-                                                ? ACTIVEFILTERCOLOR
-                                                : NONACTIVEFILTERCOLOR
-                                        }
-                                    />
-                                </Pressable>
-                            </View>
-
-                            <View style={[style.specificFilterColumn, { flex: 1 }]}>
+                            {/* Qty */}
+                            <View
+                                style={[
+                                    style.specificFilterColumn,
+                                    { flex: 0.9 },
+                                ]}
+                            >
                                 <Text style={style.filterText}>Qty</Text>
 
                                 <Pressable
                                     onPress={() =>
                                         setDisplayArr(
-                                            qtyArrow ? sortDescQty() : sortAscQty()
+                                            qtyArrow
+                                                ? sortDescQty()
+                                                : sortAscQty()
                                         )
                                     }
                                 >
                                     <Entypo
-                                        name={qtyArrow ? "triangle-down" : "triangle-up"}
+                                        name={
+                                            qtyArrow
+                                                ? "triangle-down"
+                                                : "triangle-up"
+                                        }
                                         size={15}
                                         color={
                                             activeFilter == "qty"
@@ -390,8 +411,16 @@ export default function ModalFoodCategory({ visible, onClose, title, foodCategor
                                 </Pressable>
                             </View>
 
-                            <View style={[style.specificFilterColumn, { flex: 1.2 }]}>
-                                <Text style={style.filterText}>Exp Date</Text>
+                            {/* Exp Date – more space */}
+                            <View
+                                style={[
+                                    style.specificFilterColumn,
+                                    { flex: 1.4 },
+                                ]}
+                            >
+                                <Text style={style.filterText}>
+                                    Exp Date
+                                </Text>
                                 <Pressable
                                     onPress={() =>
                                         setDisplayArr(
@@ -402,7 +431,11 @@ export default function ModalFoodCategory({ visible, onClose, title, foodCategor
                                     }
                                 >
                                     <Entypo
-                                        name={expDateArrow ? "triangle-down" : "triangle-up"}
+                                        name={
+                                            expDateArrow
+                                                ? "triangle-down"
+                                                : "triangle-up"
+                                        }
                                         size={15}
                                         color={
                                             activeFilter == "expDate"
@@ -418,7 +451,9 @@ export default function ModalFoodCategory({ visible, onClose, title, foodCategor
                         <View style={style.rowsArea}>
                             <ScrollView
                                 style={{ flex: 1, alignSelf: "stretch" }}
-                                contentContainerStyle={{ paddingBottom: 24 }}
+                                contentContainerStyle={{
+                                    paddingBottom: 24,
+                                }}
                                 showsVerticalScrollIndicator={false}
                                 keyboardShouldPersistTaps="handled"
                             >
@@ -461,7 +496,7 @@ const style = StyleSheet.create({
         marginTop: 6,
     },
 
-    // modal container
+    //modal container
     sheet: {
         width: "100%",
         maxWidth: 420,
@@ -485,7 +520,7 @@ const style = StyleSheet.create({
         paddingBottom: 10,
     },
 
-    // the filter row
+    //the filter row
     columnFilters: {
         borderBottomWidth: 1,
         borderColor: "rgba(73,159,68,1)",
@@ -499,7 +534,7 @@ const style = StyleSheet.create({
         paddingLeft: 10,
     },
 
-    // each individual filter column
+    //each individual filter column
     specificFilterColumn: {
         flexDirection: "row",
         alignItems: "center",
