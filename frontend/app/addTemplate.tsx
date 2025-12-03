@@ -16,18 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { API_URL, retrieveValue, Response } from "./util";
 import { Picker } from "@react-native-picker/picker";
-
-type Template = {
-    templateId?: string;
-    id?: string;
-    name: string;
-    amount: number;
-    unit: string;
-    shelfLifeDays?: number;
-    category: string;
-};
-
-type Suggestion = Template & { localKey: string };
+import { setSelectedTemplate, Template } from "./select-template";
 
 export default function AddTemplateScreen() {
     // Template fields
@@ -168,6 +157,11 @@ export default function AddTemplateScreen() {
             return;
         }
 
+        if (!shelfLifeDays || isNaN(Number(shelfLifeDays))) {
+            Alert.alert("Invalid shelf life", "Amount must be a number.");
+            return;
+        }
+
         const trimmedCategory = category.trim();
 
         try {
@@ -177,8 +171,6 @@ export default function AddTemplateScreen() {
                 Alert.alert("Not logged in", "Please log in again.");
                 return;
             }
-
-            console.log("No template selected, creating new template");
 
             // 1) Make sure the category exists (auto-create if needed)
             await ensureCategoryExists(trimmedCategory, jwt);
@@ -202,11 +194,20 @@ export default function AddTemplateScreen() {
                 }
             );
 
-            const createBody: Response<any> = await createRes.json();
-            console.log(
-                "create-food-item-template response:",
-                JSON.stringify(createBody, null, 2)
-            );
+            type ResponseTemplate = {
+                name: string,
+                amount: number, // Default amount for a given food item. This is only for the front end to auto populate an amount field if necessary.
+                unit: string,
+                shelfLifeDays: number, // Shelf life in days (should be an integer)
+                category: string // Must match a user category. Will not add if the category has not been added first.
+            };
+
+            type RegisteredTemplate = {
+                templateId: string,
+                template: ResponseTemplate
+            };
+
+            const createBody: Response<RegisteredTemplate> = await createRes.json();
 
             if (!createRes.ok || createBody.success !== "success") {
                 const msg =
@@ -224,9 +225,14 @@ export default function AddTemplateScreen() {
                 );
                 return;
             }
-            
 
-            console.log("Using templateId:", templateId);
+            const template: Template = {
+                id: createBody.payload!.templateId,
+                ...createBody.payload!.template
+            }
+            
+            setSelectedTemplate(template);
+            router.back();
         } catch (err: any) {
             console.error("Error saving template & item:", err);
             Alert.alert(

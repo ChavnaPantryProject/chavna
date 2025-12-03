@@ -5,16 +5,15 @@ import {
     TextInput,
     StyleSheet,
     ScrollView,
-    Pressable,
-    Alert,
+    Pressable
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Stack, router } from "expo-router";
+import { Stack, router, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
-import { API_URL, retrieveValue, Response, goBackWithParams } from "./util";
+import { API_URL, retrieveValue, Response } from "./util";
 
-type Template = {
+export type Template = {
     id: string,
     name: string,
     amount: number, // Default amount for a given food item. This is only for the front end to auto populate an amount field if necessary.
@@ -22,6 +21,20 @@ type Template = {
     shelfLifeDays: number, // Shelf life in days (should be an integer)
     category: string // Must match a user category. Will not add if the category has not been added first.
 };
+
+// This is bad, but I can't figure out a better way
+let selectedTemplate: Template | null = null;
+
+export function getSelectedTemplate(): Template | null {
+    let temp = selectedTemplate;
+    selectedTemplate = null;
+
+    return temp;
+}
+
+export function setSelectedTemplate(template: Template) {
+    selectedTemplate = template;
+}
 
 async function getTemplates(): Promise<Template[]> {
     const jwt = await retrieveValue('jwt');
@@ -63,11 +76,7 @@ async function getTemplates(): Promise<Template[]> {
     const templates: Template[] = body.payload!.map(v => {
         return {
             id: v.templateId,
-            name: v.template.name,
-            amount: v.template.amount,
-            unit: v.template.unit,
-            shelfLifeDays: v.template.shelfLifeDays,
-            category: v.template.category
+            ...v.template
         };
     });
 
@@ -92,11 +101,17 @@ export default function main() {
     const [filteredTemplates, setFilteredTemplates] = useState<Template[]>([]);
     const [filter, setFilter] = useState<string>("");
 
-    const selectTemplate = (templateId: string) => {
-        goBackWithParams(router, {
-            selectedTemplate: templateId
-        });
+    const selectTemplate = (template: Template) => {
+        setSelectedTemplate(template);
+        router.back();
     }
+
+    useFocusEffect(() => {
+        const template = getSelectedTemplate();
+
+        if (template != null)
+            selectTemplate(template);
+    })
 
     useEffect(() => {
         setFilteredTemplates(filterTemplates(filter, templates));
@@ -150,7 +165,7 @@ export default function main() {
                 {filteredTemplates.map((template, i) => (
                     <Pressable 
                         key={template.id}
-                        onPress={() => selectTemplate(template.id)}
+                        onPress={() => selectTemplate(template)}
                     >
                         <Text style={
                             [styles.templateOption, i == 0 && {borderTopWidth: 0}]

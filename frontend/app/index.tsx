@@ -5,7 +5,7 @@ import { router, type Href } from 'expo-router';
 import { retrieveValue, storeValue, API_URL, Response } from './util';
 import { jwtDecode } from 'jwt-decode';
 
-const TIMEOUT_DURATION = 1200;
+const TIMEOUT_DURATION = 10000;
 
 async function checkLogin(): Promise<boolean> {
     const jwt: string | null = await retrieveValue('jwt');
@@ -21,8 +21,10 @@ async function checkLogin(): Promise<boolean> {
     const jwtAge = now - decodedJwt.iat!;
 
     if (jwtAge > duration / 2) {
-        if (jwtAge > duration)
+        if (jwtAge > duration) {
+            console.log("jwt expired");
             return false;
+        }
 
         // Get a new token if the current jwt age is more than half of its lifetime.
         let response = await fetch(`${API_URL}/refresh-token`, {
@@ -69,6 +71,9 @@ async function checkLogin(): Promise<boolean> {
             console.log("no body on verify");
             return false;
         }
+
+        if (body.success !== "success")
+            console.log("unsuccessful verification: ", body);
 
         return body.success === 'success';
     }

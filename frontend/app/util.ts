@@ -1,4 +1,4 @@
-import { Router } from 'expo-router';
+import { Router, UnknownInputParams } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 
 export async function storeValue(key: string, value: string) {
@@ -42,9 +42,4 @@ export type Response<T> = {
   status: number, // status code (200 unless otherwise specified)
   message?: string,
   payload?: T // JSON object containng response payload
-}
-
-export function goBackWithParams(router: Router, params: any) {
-    router.back();
-    router.setParams(params);
 }

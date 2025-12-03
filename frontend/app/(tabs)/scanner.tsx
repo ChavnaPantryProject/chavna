@@ -1,10 +1,9 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 import {Text, View, StyleSheet, TouchableOpacity, Button,} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { CameraView, CameraType, useCameraPermissions } from "expo-camera";
 import { API_URL, Response } from "../util";
-import { useGlobalSearchParams } from "expo-router/build/hooks";
 
 export default function ScannerScreen() {
   const router = useRouter();
@@ -12,41 +11,47 @@ export default function ScannerScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const ref = useRef<CameraView>(null);
   const [image, setImage] = useState<string>("");
-  const { selectedTemplate } = useGlobalSearchParams<{selectedTemplate: string}>();
-
-  useEffect(() => {
-    console.log(selectedTemplate);
-  }, [selectedTemplate])
 
   const takePicture = async () => {
+
     const photo = await ref.current?.takePictureAsync({
       pictureRef: false,
-      base64: true
+      base64: true,
+      quality: 0
     });
+    router.push("/scannerConfirmation");
+    return;
     console.log("take picture");
     if (photo?.base64) {
       console.log("process photo");
-      setImage(photo.base64);
+      setImage(photo?.base64!);
 
       const response = await fetch(`${API_URL}/scan-receipt`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          base64Image: photo.base64
+          base64Image: photo?.base64
         })
       });
 
-
-      if (response === null)
+      if (response === null || !response.ok)
         return;
 
-      const body: Response<any> = await response.json();
+      type Word = {
+        originalPolygon: {x: number, y: number}[] // Point 
+        text: string
+      }
+
+      type Line = {
+        words: Word[]
+      };
+      const body: Response<Line[]> = await response.json();
 
       if (body === null)
         return;
 
       if (body.success === "success") {
-        const lines: any[] = body.payload;
+        const lines = body.payload!;
         for (const line of lines) {
           let s = "";
 
@@ -56,11 +61,10 @@ export default function ScannerScreen() {
 
           console.log(s);
         }
+      } else {
+        console.log(body); 
       }
     }
-
-
-    // router.push("/scannerConfirmation")
   };
 
   if (!permission) {
@@ -89,12 +93,6 @@ export default function ScannerScreen() {
           onPress={() => router.push('/select-template')}
         >
           <Text style={styles.addTemplateText}>Manually Add Item</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.addTemplateButton}
-          onPress={() => console.log(selectedTemplate)}
-        >
-          <Text style={styles.addTemplateText}>Print params</Text>
         </TouchableOpacity>
       </View>
 
