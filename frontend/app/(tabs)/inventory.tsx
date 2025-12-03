@@ -716,7 +716,6 @@ const style = StyleSheet.create({
         },
         shadowOpacity: 0.1,
         shadowRadius: 3,
-        elevation: 3,
     },
 
     // text + underline inside each card
@@ -756,7 +755,6 @@ const style = StyleSheet.create({
         },
         shadowOpacity: 0.05,
         shadowRadius: 2,
-        elevation: 2,
     },
 
     searchResultsTitleContainer: {
@@ -811,7 +809,6 @@ const style = StyleSheet.create({
         },
         shadowOpacity: 0.05,
         shadowRadius: 2,
-        elevation: 2,
     },
 
     searchResultContent: {
