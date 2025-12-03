@@ -1,13 +1,21 @@
 // pantry/ModalFoodCategory.tsx
-import React, { useState, useEffect } from "react";
-import { Modal, View, Text, Pressable, StyleSheet, ScrollView, StyleSheet as RNStyleSheet } from "react-native";
+import React, { useState, useEffect, useCallback } from "react";
+import {
+    Modal,
+    View,
+    Text,
+    Pressable,
+    StyleSheet,
+    ScrollView,
+    StyleSheet as RNStyleSheet,
+} from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Entypo } from "@expo/vector-icons";
-import { router } from "expo-router";
-import { API_URL, retrieveValue } from "../util";
+import { router, useFocusEffect } from "expo-router";
+import { API_URL, retrieveValue, Response } from "../util";
 import FoodRows from "./foodRows";
 import AddFoodButton from "./addFoodButton";
-import PopupMenu from "../PopupForm";
+import { getSelectedTemplate } from "../select-template";
 
 type Props = {
     visible: boolean;
@@ -72,6 +80,61 @@ export default function ModalFoodCategory({ visible, onClose, title, foodCategor
         setDisplayArr([...arrOfFood]);
     }
 
+    useFocusEffect(
+        useCallback(() => {
+        const template = getSelectedTemplate();
+
+        if (!template) {
+            return;
+        }
+
+        console.log("Template returned to modal:", template);
+
+        (async () => {
+            try {
+                const token = await retrieveValue("jwt");
+                if (!token) {
+                    console.error("No authentication token found");
+                    return;
+                }
+
+                // Call /add-food-items with the template
+                const response = await fetch(`${API_URL}/add-food-items`, {
+                    method: "POST",
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        items: [
+                            {
+                                templateId: template.id,
+                                amount: template.amount, // how much to add (from template)
+                                unitPrice: 0,          //default to 0 for now
+                            },
+                        ],
+                    }),
+                });
+
+                const data: Response<unknown> = await response.json();
+
+                if (response.ok && data.success === "success") {
+                    console.log("Food item added from template");
+                    // Refresh the list so the new item shows up
+                    fetchFoodItems();
+                } else {
+                    console.error(
+                        "Failed to add food item:",
+                        data.message || data
+                    );
+                }
+            } catch (err) {
+                console.error("Error adding food item:", err);
+            }
+        })();
+    }, [])
+);
+
     // Fetch food items from backend when modal opens and title changes
     useEffect(() => {
         if (visible && title) {
@@ -80,7 +143,6 @@ export default function ModalFoodCategory({ visible, onClose, title, foodCategor
             // Reset state when modal closes
             resetState();
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [visible, title]);
 
     const fetchFoodItems = async () => {
@@ -134,38 +196,37 @@ export default function ModalFoodCategory({ visible, onClose, title, foodCategor
         }
     };
 
-const deleteFoodItem = async (id: string) => {
-    try {
-        const token = await retrieveValue("jwt");
-        if (!token) {
-            console.error("No authentication token found");
-            return;
+    const deleteFoodItem = async (id: string) => {
+        try {
+            const token = await retrieveValue("jwt");
+            if (!token) {
+                console.error("No authentication token found");
+                return;
+            }
+
+            const response = await fetch(`${API_URL}/update-food-item`, {
+                method: "POST",
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    foodItemId: id,
+                    newAmount: 0, // backend interprets this as delete
+                }),
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data.success === "success") {
+                console.log("Item deleted!");
+            } else {
+                console.error("Delete failed:", data.message || data);
+            }
+        } catch (error) {
+            console.error("Error deleting food item:", error);
         }
-
-        const response = await fetch(`${API_URL}/update-food-item`, {
-            method: "POST",
-            headers: {
-                "Authorization": `Bearer ${token}`,
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                foodItemId: id,
-                newAmount: 0     // backend interprets this as delete
-            })
-        });
-
-        const data = await response.json();
-
-        if (response.ok && data.success === "success") {
-            console.log("Item deleted!");
-        } else {
-            console.error("Delete failed:", data.message || data);
-        }
-
-    } catch (error) {
-        console.error("Error deleting food item:", error);
-    }
-};
+    };
 
     //----------------------- Functions for sorting -----------------------
     // name ascending
@@ -367,16 +428,15 @@ const deleteFoodItem = async (id: string) => {
                                     onDelete={handleDeleteFood}
                                 />
                             </ScrollView>
-                            {/* use focus effect
-                            get selcted template */}
                         </View>
 
                         {/* plus icon to add another category (hook up later) */}
-                        <AddFoodButton onPress={() =>{
-                            router.push("/select-template");
-                            onClose();
-                        }}/>
-
+                        <AddFoodButton
+                            onPress={() => {
+                                onClose();
+                                router.push("/select-template");
+                            }}
+                        />
                     </View>
                 </View>
             </GestureHandlerRootView>
