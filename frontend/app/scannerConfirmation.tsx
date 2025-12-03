@@ -6,6 +6,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { API_URL, Response, retrieveValue } from "./util";
 import PopupForm, { PopupState } from "./PopupForm";
 import { getTemplates } from "./select-template";
+import { ScrollView } from "react-native-gesture-handler";
 
 type GetCategoriesResponse = {
   categories: Array<string>
@@ -232,7 +233,7 @@ export default function ConfirmationScreen() {
       </View>
 
       {/* Middle Section (Soft Green) */}
-      <View style={styles.content}>
+      <ScrollView style={styles.content}>
         <View style={styles.tableHeader}>
           <Text style={styles.headerCell}>Name</Text>
           <Text style={styles.headerCell}>Qty</Text>
@@ -273,18 +274,17 @@ export default function ConfirmationScreen() {
           }}>
           <Text style={styles.plusSign}>＋</Text>
         </TouchableOpacity>
-
-        {/* Save Button */}
-        <TouchableOpacity style={[styles.saveButton, (!allValid || items.length == 0) && {opacity: .5}]}
-        disabled={!allValid || items.length == 0}
-        onPress={() => {
-          saveItems();
-          router.push("/(tabs)/home");
-        }}
-        >
-          <Text style={styles.saveText}>Save</Text>
-        </TouchableOpacity>
-      </View>
+      </ScrollView>
+      {/* Save Button */}
+      <TouchableOpacity style={[styles.saveButton, (!allValid || items.length == 0) && {opacity: .5}]}
+      disabled={!allValid || items.length == 0}
+      onPress={() => {
+        saveItems();
+        router.push("/(tabs)/home");
+      }}
+      >
+        <Text style={styles.saveText}>Save</Text>
+      </TouchableOpacity>
 
       {/* Bottom White Section */}
       <View style={styles.bottomWhite} />
@@ -292,6 +292,15 @@ export default function ConfirmationScreen() {
         visible={isPopupVisible}
         onClose={() => setIsPopupVisible(false)}
         onSave={handleAddItem} 
+        onDelete={() => {
+          setIsPopupVisible(false);
+          
+          if (updateIndex < 0)
+            return;
+
+          const newItems = items.filter((_, i) => i != updateIndex);
+          setItems(newItems);
+        }}
         /*
         onSubmit={(data) => {
           handleAddItem(data);      // add the returned data to the table
@@ -300,6 +309,7 @@ export default function ConfirmationScreen() {
           */
          state={popupState}
          setState={setPopupState}
+         updateIndex={updateIndex}
         //title="Add Item"
       />
     </View>
@@ -378,6 +388,7 @@ const styles = StyleSheet.create({
     fontSize: 26,
     color: "#2E4E3F",
     marginVertical: 12,
+    marginBottom: 40
   },
   saveButton: {
     alignSelf: "center",

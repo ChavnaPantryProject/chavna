@@ -23,8 +23,10 @@ interface PopupMenuProps {
   visible: boolean;
   onClose: () => void;
   onSave: (data: ConfirmationItem) => void;
+  onDelete: () => void;
   state: PopupState;
   setState: Dispatch<SetStateAction<PopupState>>;
+  updateIndex: number;
 }
 
 export type PopupState = {
@@ -43,8 +45,10 @@ const PopupMenu: React.FC<PopupMenuProps> = ({
   visible,
   onClose,
   onSave,
+  onDelete,
   state,
-  setState
+  setState,
+  updateIndex
 }) => {
   const setQuantity = (quantity: string) => {
     const newState = { ...state };
@@ -179,6 +183,11 @@ const PopupMenu: React.FC<PopupMenuProps> = ({
               <Text style={styles.saveText}>Save</Text>
             </TouchableOpacity>
           </View>
+          {updateIndex >= 0 && (<View style={styles.buttonRow}>
+            <TouchableOpacity style={styles.deleteButton} onPress={onDelete}>
+              <Text style={styles.cancelText}>Delete Item</Text>
+            </TouchableOpacity>
+          </View>)}
         </View>
       </View>
     </Modal>
@@ -260,6 +269,13 @@ const styles = StyleSheet.create({
     backgroundColor: "#cde7c0",
     flex: 1,
     marginRight: 10,
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: "center",
+  },
+  deleteButton: {
+    backgroundColor: "#cde7c0",
+    flex: 1,
     borderRadius: 10,
     paddingVertical: 10,
     alignItems: "center",
