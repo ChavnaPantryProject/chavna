@@ -326,7 +326,7 @@ export default function AddTemplateScreen() {
                 >
                     <View style={styles.saveContent}>
                         <Text style={styles.saveText}>
-                            {loading ? "Adding Item..." : "Add Item"}
+                            {loading ? "Adding Item..." : "Add New Item"}
                         </Text>
                     </View>
                 </Pressable>
