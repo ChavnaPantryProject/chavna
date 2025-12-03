@@ -13,34 +13,45 @@ export default function ScannerScreen() {
   const [image, setImage] = useState<string>("");
 
   const takePicture = async () => {
+
     const photo = await ref.current?.takePictureAsync({
       pictureRef: false,
-      base64: true
+      base64: true,
+      quality: 0
     });
+    router.push("/scannerConfirmation");
+    return;
     console.log("take picture");
     if (photo?.base64) {
       console.log("process photo");
-      setImage(photo.base64);
+      setImage(photo?.base64!);
 
       const response = await fetch(`${API_URL}/scan-receipt`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          base64Image: photo.base64
+          base64Image: photo?.base64
         })
       });
 
-
-      if (response === null)
+      if (response === null || !response.ok)
         return;
 
-      const body: Response = await response.json();
+      type Word = {
+        originalPolygon: {x: number, y: number}[] // Point 
+        text: string
+      }
+
+      type Line = {
+        words: Word[]
+      };
+      const body: Response<Line[]> = await response.json();
 
       if (body === null)
         return;
 
       if (body.success === "success") {
-        const lines: any[] = body.payload;
+        const lines = body.payload!;
         for (const line of lines) {
           let s = "";
 
@@ -50,11 +61,10 @@ export default function ScannerScreen() {
 
           console.log(s);
         }
+      } else {
+        console.log(body); 
       }
     }
-
-
-    // router.push("/scannerConfirmation")
   };
 
   if (!permission) {
@@ -80,7 +90,7 @@ export default function ScannerScreen() {
       <View style={styles.topBar}>
         <TouchableOpacity
           style={styles.addTemplateButton}
-          onPress={() => router.push("/addTemplate")}
+          onPress={() => router.push('/select-template')}
         >
           <Text style={styles.addTemplateText}>Manually Add Item</Text>
         </TouchableOpacity>

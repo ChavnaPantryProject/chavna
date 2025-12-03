@@ -1,30 +1,4 @@
-/*
-import this
-import PopupForm from "./PopupForm";
-
-Add for the button
-<TouchableOpacity onPress={() => setPopupVisible(true)}>
-  <Text style={{ fontSize: 26, color: "#2E4E3F", textAlign: "center" }}>＋</Text>
-</TouchableOpacity>
-
-possible usage:
-<PopupMenu
-  visible={popupVisible}
-  onClose={() => setPopupVisible(false)}
-  onSave={(data) => {
-    console.log("Saved data:", data);
-    setPopupVisible(false);
-  }}
-  dropdownOptions={[
-    { label: "Chicken Breast", value: "chicken" },
-    { label: "Beef", value: "beef" },
-    { label: "Fish", value: "fish" },
-    { label: "Vegetable", value: "vegetable" },
-  ]}
-/>
-*/
-
-import React, { useState } from "react";
+import React, { Dispatch, SetStateAction} from "react";
 import {
   Modal,
   View,
@@ -32,10 +6,11 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  Platform,
+  Pressable,
 } from "react-native";
-import { Picker } from "@react-native-picker/picker";
-import DateTimePicker from "@react-native-community/datetimepicker";
+import { router, useFocusEffect } from "expo-router";
+import { getSelectedTemplate, Template } from "./select-template";
+import { ConfirmationItem } from "./scannerConfirmation";
 
 interface DropdownOption {
   label: string;
@@ -45,35 +20,80 @@ interface DropdownOption {
 interface PopupMenuProps {
   visible: boolean;
   onClose: () => void;
-  onSave: (data: any) => void;
-  dropdownOptions: DropdownOption[];
+  onSave: (data: ConfirmationItem) => void;
+  state: PopupState;
+  setState: Dispatch<SetStateAction<PopupState>>;
+}
+
+export type PopupState = {
+  quantity: string,
+  price: string,
+  displayName: string | null,
+  scanName: string,
+  template: Template | null
+}
+
+function isValidState(state: PopupState): boolean {
+  return state.quantity !== "" && Number(state.quantity) > 0 && state.price !== "" && Number(state.price) >= 0 && state.displayName != null && state.template != null;
 }
 
 const PopupMenu: React.FC<PopupMenuProps> = ({
   visible,
   onClose,
   onSave,
-  dropdownOptions,
+  state,
+  setState
 }) => {
-  const [selectedOption, setSelectedOption] = useState<string>(
-    dropdownOptions[0]?.value || ""
-  );
-  const [textValue, setTextValue] = useState("");
-  const [number1, setNumber1] = useState("");
-  const [number2, setNumber2] = useState("");
-  const [date, setDate] = useState(new Date());
-  const [showDatePicker, setShowDatePicker] = useState(false);
+  const setQuantity = (quantity: string) => {
+    const newState = { ...state };
+    newState.quantity = quantity;
+
+    setState(newState);
+  };
+
+  const setPrice = (price: string) => {
+    const newState = { ...state };
+    newState.price = price;
+
+    setState(newState);
+  }
+
+  useFocusEffect(() => {
+    const template = getSelectedTemplate();
+    if (template != null) {
+      const newState = {...state};
+      newState.displayName = template.name;
+      newState.template = template;
+      newState.quantity = state.quantity;
+
+      setState(newState);
+    }
+  });
 
   const handleSave = () => {
-    onSave({
-      dropdown: selectedOption,
-      text: textValue,
-      number1: number1,
-      number2: number2,
-      date: date,
-    });
-    onClose();
+    const data: ConfirmationItem = {
+      displayName: state.displayName,
+      scanName: state.scanName,
+      qty: Number(state.quantity),
+      price: Number(state.price),
+      template: state.template
+    };
+
+    onSave(data);
+    close();
   };
+
+  const close = () => {
+    setState({
+      quantity:"",
+      price: "",
+      displayName: null,
+      scanName: "New Item",
+      template: null
+    })
+
+    onClose();
+  }
 
   return (
     <Modal visible={visible} transparent animationType="fade">
@@ -81,76 +101,42 @@ const PopupMenu: React.FC<PopupMenuProps> = ({
         <View style={styles.container}>
           <Text style={styles.title}>Add Item</Text>
 
-          {/* Dropdown */}
-          <View style={styles.row}>
-            <Picker
-              selectedValue={selectedOption}
-              onValueChange={(itemValue) => setSelectedOption(itemValue)}
-              style={styles.dropdown}
-            >
-              {dropdownOptions.map((option, index) => (
-                <Picker.Item key={index} label={option.label} value={option.value} />
-              ))}
-            </Picker>
-          </View>
+          {/* Item Selection */}
+          <Pressable
+            style={styles.itemPicker}
+            onPress={() => router.push('/select-template')}
+          >
+            <Text style={state.template == null && {color: "#AAAAAA"}}>{state.displayName? state.displayName : state.scanName}</Text>
+          </Pressable>
 
-          {/* Textbox */}
-          <TextInput
-            style={styles.input}
-            placeholder="Name"
-            value={textValue}
-            onChangeText={setTextValue}
-          />
-
-          {/* Number 1 */}
-          <TextInput
-            style={styles.input}
-            placeholder="Weight"
-            keyboardType="numeric"
-            value={number1}
-            onChangeText={setNumber1}
-          />
-
-          {/* Number 2 */}
+          {/* Quantity */}
           <TextInput
             style={styles.input}
             placeholder="Quantity"
             keyboardType="numeric"
-            value={number2}
-            onChangeText={setNumber2}
+            value={state.quantity}
+            onChangeText={setQuantity}
           />
 
-          {/* Expiration Date Title */}
-          <Text style={styles.sectionTitle}>Expiration Date</Text>
-
-          {/* Date */}
-          <TouchableOpacity
-            style={styles.dateButton}
-            onPress={() => setShowDatePicker(true)}
-          >
-            <Text style={styles.dateText}>
-              {date.toLocaleDateString("en-US")}
-            </Text>
-          </TouchableOpacity>
-
-          {showDatePicker && (
-            <DateTimePicker
-              value={date}
-              mode="date"
-              display={Platform.OS === "ios" ? "spinner" : "default"}
-              onChange={(event, selectedDate) => {
-                setShowDatePicker(false);
-                if (selectedDate) setDate(selectedDate);
-              }}
-            />
-          )}
+          {/* Price */}
+          <TextInput
+            style={styles.input}
+            placeholder="Price"
+            keyboardType="numeric"
+            value={state.price}
+            onChangeText={setPrice}
+          />
 
           {/* Buttons */}
           <View style={styles.buttonRow}>
-            <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
+            <TouchableOpacity style={styles.cancelButton} onPress={close}>
               <Text style={styles.cancelText}>Cancel</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
+            <TouchableOpacity
+              style={[styles.saveButton, !isValidState(state) && {opacity: 0.5}]}
+              disabled={!isValidState(state)}
+              onPress={handleSave}
+            >
               <Text style={styles.saveText}>Save</Text>
             </TouchableOpacity>
           </View>
@@ -203,6 +189,15 @@ const styles = StyleSheet.create({
     padding: 10,
     width: "100%",
     marginBottom: 12,
+  },
+  itemPicker: {
+    backgroundColor: "#ffffff",
+    borderRadius: 10,
+    padding: 10,
+    width: "100%",
+    marginBottom: 12,
+    fontSize: 18,
+    textAlign: "center"
   },
   dateButton: {
     backgroundColor: "#a8d5a0",

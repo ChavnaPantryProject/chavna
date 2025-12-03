@@ -1,10 +1,10 @@
 import * as React from "react";
 import { useState, useEffect } from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import PopupForm from "./PopupForm";
 import { API_URL, retrieveValue } from "./util";
+import PopupForm, { PopupState } from "./PopupForm";
 
 type GetCategoriesResponse = {
   categories: Array<string>
@@ -19,16 +19,45 @@ type Template = {
   category: string
 };
 
+export type ConfirmationItem = {
+  displayName: string | null,
+  scanName: string,
+  qty: number | null,
+  price: number | null,
+  template: Template | null
+};
+
 export default function ConfirmationScreen() {
   const router = useRouter();
-  const [items, setItems] = useState<Array<{name: string, weight: string, qty: number, exp: Date, category: string}>>([
-    { name: "Chicken Breast", weight: "300g", qty: 3, exp: new Date(), category: "Protein" },
+  const [items, setItems] = useState<ConfirmationItem[]>([
+    {displayName: null, scanName: "CHKN BRST", qty: 4, price: 10, template: null }
   ]);
 
   const [isPopupVisible, setIsPopupVisible] = useState(false);
-  const [dropdownOptions, setDropdownOptions] = useState<Array<{label: string, value: string}>>([]);
+  const [allValid, setAllValid] = useState(false);
+
+  const [updateIndex, setUpdateIndex] = useState(-1);
 
   const [templates, setTemplates] = useState<Array<Template>>([])
+  const [popupState, setPopupState] = useState<PopupState>({
+      quantity:"",
+      price: "",
+      displayName: null,
+      scanName: "New Item",
+      template: null
+  });
+
+  useEffect(() => {
+    let noTemplate = false;
+
+    for (const item of items) {
+      if (item.template === null)
+        noTemplate = true;
+    }
+
+    setAllValid(!noTemplate);
+  }, [items]);
+
   const updateTemplates = async () => {
     type TemplatesResponse = {
       success: "success",
@@ -77,35 +106,7 @@ export default function ConfirmationScreen() {
 
   useEffect(() => {
     updateTemplates();
-  }, [])
-
-  const updateDropdownOptions = async () => {
-    const token = await retrieveValue("jwt")
-    if (!token) {
-      console.error("No authentication token found")
-      return
-    }
-
-    const response = await fetch(`${API_URL}/get-categories`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    const body = await response.json();
-
-    if (response.ok && body.success === "success") {
-      const payload: GetCategoriesResponse = body.payload;
-      setDropdownOptions(
-        payload.categories.map(v => ({
-          label: v,
-          value: v
-        }))
-      );
-    }
-  };
+  }, []);
 
   const saveItems = async () => {
     const token = await retrieveValue("jwt")
@@ -114,45 +115,19 @@ export default function ConfirmationScreen() {
       return
     }
 
-    let addItems: Array<{ templateId: string, amount: number, unitPrice: number}> = [];
-
-    outer: for (const item of items) {
-      for (const template of templates) {
-        if (item.name === template.name) {
-          addItems.push({templateId: template.id, amount: item.qty, unitPrice: 0});
-          continue outer;
-        }
-      }
-
-      const ms = item.exp.getTime() - new Date().getTime(); 
-
-      // Add template
-      const newTemplate = {
-        name: item.name,
-        amount: item.qty,
-        unit: "None",
-        shelfLifeDays: Math.trunc(ms / 1000),
-        category: item.category
-      }
-
-      const response = await fetch(`${API_URL}/create-food-item-template`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(newTemplate)
-      });
-
-      const body = await response.json();
-
-      if (!response.ok || body.success === "fail") {
-        console.error(body);
-        break;
-      }
-
-      addItems.push({templateId: body.payload.templateId, amount: item.qty, unitPrice: 0});
+    type Item = {
+      templateId: string,
+      amount: number,
+      unitPrice: number
     }
+    let addItems: Item[] = items.map((item) => {
+      const actualAmount = item.template!.amount * item.qty!;
+      return {
+        templateId: item.template!.id,
+        amount: actualAmount,
+        unitPrice: actualAmount / item.qty!
+      }
+    });
 
     const response = await fetch(`${API_URL}/add-food-items`, {
       method: 'POST',
@@ -169,36 +144,22 @@ export default function ConfirmationScreen() {
 
     if (!response.ok || body.success === "fail")
       throw body;
-  }
+  };
 
-  useEffect(() => {
-    updateDropdownOptions();
-  }, []);
+  const handleAddItem = (data: ConfirmationItem) => {
+    if (updateIndex === -1)
+      setItems((prev) => [...prev, data]);
+    else {
+      const nextItems = items.map((item, i) => {
+        if (i === updateIndex) {
+          return data;
+        } else {
+          return item;
+        }
+      });
 
-  const handleAddItem = (data: {
-    dropdown: string | string;
-    text: string;
-    number1: number;
-    number2: number;
-    date?: Date | null;
-  }) => {
-    const newItem = {
-      name: data.text || (data.dropdown ? String(data.dropdown) : "New Item"),
-      weight: data.number1 ? `${data.number1}g` : "-",
-      qty: data.number2 ? data.number2 : 0,
-      exp: data.date ? data.date! : new Date(),
-      category: data.dropdown
-    };
-    setItems((prev) => [...prev, newItem]);
-
-/*
-  const addItem = () => {
-    // Add a blank new row when "+" is pressed
-    setItems([
-      ...items,
-      { name: "New Item", weight: "-", qty: "-", exp: "-" },
-    ]);
-*/
+      setItems(nextItems);
+    }
   };
 
   return (
@@ -218,31 +179,48 @@ export default function ConfirmationScreen() {
       <View style={styles.content}>
         <View style={styles.tableHeader}>
           <Text style={styles.headerCell}>Name</Text>
-          <Text style={styles.headerCell}>Weight</Text>
           <Text style={styles.headerCell}>Qty</Text>
-          <Text style={styles.headerCell}>Exp Date</Text>
+          <Text style={styles.headerCell}>Price</Text>
         </View>
 
         {items.map((item, index) => (
-          <View key={index} style={styles.tableRow}>
-            <Text style={styles.tableCell}>{item.name}</Text>
-            <Text style={styles.tableCell}>{item.weight}</Text>
-            <Text style={styles.tableCell}>{item.qty}</Text>
-            <Text style={styles.tableCell}>{item.exp ? item.exp.toLocaleDateString() : ""}</Text>
-          </View>
+          <Pressable
+            key={index}
+            onPress={() => {
+              setUpdateIndex(index);
+              setPopupState({
+                quantity: item.qty? String(item.qty) : "",
+                price: item.price? String(item.price) : "",
+                displayName: item.displayName,
+                scanName: item.scanName,
+                template: item.template
+              })
+              setIsPopupVisible(true);
+            }}
+          >
+            <View style={styles.tableRow}>
+              <Text style={[styles.tableCell, item.template === null && {color: "#AAAAAA"}]}>{item.displayName ? item.displayName : item.scanName }</Text>
+              <Text style={styles.tableCell}>{item.qty? item.qty : "-"}</Text>
+              <Text style={styles.tableCell}>{item.price? item.price.toLocaleString('en-US', {
+                style: 'currency',
+                currency: 'USD'
+              }) : "-"}</Text>
+            </View>
+          </Pressable>
         ))}
 
         {/* + Button */}
-        <TouchableOpacity onPress={() =>
-          //() => router.push("/PopupForm")
-          setIsPopupVisible(true)
-      
-          }>
+        <TouchableOpacity
+          onPress={() => {
+            setUpdateIndex(-1);
+            setIsPopupVisible(true);
+          }}>
           <Text style={styles.plusSign}>＋</Text>
         </TouchableOpacity>
 
         {/* Save Button */}
-        <TouchableOpacity style={styles.saveButton}
+        <TouchableOpacity style={[styles.saveButton, (!allValid || items.length == 0) && {opacity: .5}]}
+        disabled={!allValid || items.length == 0}
         onPress={() => {
           saveItems();
           router.push("/(tabs)/home");
@@ -257,14 +235,15 @@ export default function ConfirmationScreen() {
       <PopupForm
         visible={isPopupVisible}
         onClose={() => setIsPopupVisible(false)}
-        onSave={(data) => handleAddItem(data)}
+        onSave={handleAddItem} 
         /*
         onSubmit={(data) => {
           handleAddItem(data);      // add the returned data to the table
           setIsPopupVisible(false); // close the popup
         }}
           */
-        dropdownOptions={dropdownOptions}
+         state={popupState}
+         setState={setPopupState}
         //title="Add Item"
       />
     </View>
