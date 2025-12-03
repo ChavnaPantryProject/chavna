@@ -125,7 +125,7 @@ export default function ConfirmationScreen() {
       return {
         templateId: item.template!.id,
         amount: actualAmount,
-        unitPrice: actualAmount / item.qty!
+        unitPrice: item.price! / actualAmount
       }
     });
 

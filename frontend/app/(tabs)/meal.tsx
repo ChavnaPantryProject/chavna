@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import {
   Text,
   View,
@@ -12,10 +12,9 @@ import {
   Alert,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { Ionicons, MaterialIcons } from '@expo/vector-icons'
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API_URL, retrieveValue } from '../util';
+import { API_URL, Response, retrieveValue } from '../util';
 
 // definitions
 interface Ingredient {
@@ -28,32 +27,36 @@ interface Ingredient {
 interface MealSummary {
   mealId: string;
   name: string;
+  mealPictureURL: string | null;
+  isFavorite: boolean;
 }
 
 interface Meal {
   id: string;
   name: string;
   ingredients?: Ingredient[];
-  calories?: number;
   cost?: number;
   image?: any;
+  isFavorite: boolean
 }
 
-const MealScreen = () => {
+export default function MealScreen() {
   const router = useRouter(); // nav controller
   const [meals, setMeals] = useState<Meal[]>([]);
   const [filteredMeals, setFilteredMeals] = useState<Meal[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedMeal, setSelectedMeal] = useState<Meal | null>(null);
-  const [favorites, setFavorites] = useState<string[]>([]); // fav meal IDs
   const [loading, setLoading] = useState(true);
+  const [calculate, setCalculte] = useState(0);
 
   // fetch all meals on component mount
-  useEffect(() => {
-    fetchAllMeals();
-    loadFavorites();
-  }, []);
+  
+  useFocusEffect(
+    useCallback(() => {
+      fetchAllMeals();
+    }, [])
+  );
 
   // filter meals based on search query
   useEffect(() => {
@@ -67,25 +70,43 @@ const MealScreen = () => {
     }
   }, [searchQuery, meals]);
 
-  // load favorites from AsyncStorage
-  const loadFavorites = async() => {
-    try {
-      const savedFavorites = await AsyncStorage.getItem('favorites');
-      if (savedFavorites) {
-        setFavorites(JSON.parse(savedFavorites));
-      }
-    } catch (error) {
-      console.error('Error loading favorites:', error);
+  useEffect(() => {
+    for (const meal of meals) {
+      calculatePrice(meal);
     }
-  };
+  }, [calculate]);
 
-  // save favorites to AsyncStorage
-  const saveFavorites = async (newFavorites: string[]) => {
-    try {
-      await AsyncStorage.setItem('favorites', JSON.stringify(newFavorites));
-    } catch (error) {
-      console.error('Error saving favorites:', error);
-    }
+  const calculatePrice = async (meal: Meal) => {
+      const loginToken = await retrieveValue('jwt');
+
+      if (!loginToken) {
+        Alert.alert('Error', 'Please log in to view meals');
+        setLoading(false);
+        return;
+      }
+
+      // GET request to /get-meals
+      const response = await fetch(`${API_URL}/calculate-meal-price`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${loginToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          mealId: meal.id
+        })
+      });
+
+      const body: Response<{price: number}> = await response.json();
+
+      if (!response.ok || body.success !== "success") {
+        console.log("calculate-meal-price failed", body);
+        return;
+      }
+
+      meal.cost = body.payload?.price;
+      const newMeals = [...meals];
+      setMeals(newMeals);
   };
 
   // fetch all meals from backend using /get-meals endpoint
@@ -125,9 +146,12 @@ const MealScreen = () => {
       const transformedMeals: Meal[] = mealSummaries.map(summary => ({
         id: summary.mealId,
         name: summary.name,
+        image: summary.mealPictureURL,
+        isFavorite: summary.isFavorite
       }));
 
       setMeals(transformedMeals);
+      setCalculte(c => c + 1);
       console.log('Fetched meals:', transformedMeals);
      
     } catch (error) {
@@ -142,6 +166,31 @@ const MealScreen = () => {
   const handleDelete = (meal: any) => {
     setSelectedMeal(meal);
     setShowDeleteModal(true);
+  };
+
+  const handleFavorite = async (meal: Meal) => {
+    meal.isFavorite = !meal.isFavorite;
+
+    const newMeals = [...meals];
+    setMeals(newMeals);
+
+    const jwt = await retrieveValue('jwt');
+    if (jwt == null)
+      return;
+
+    fetch(`${API_URL}/update-meal`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${jwt}`,
+        },
+        body: JSON.stringify({
+            mealId: meal.id,
+            meal: {
+                isFavorite: meal.isFavorite
+            }
+        })
+    });
   };
 
   // confirm deletion
@@ -184,16 +233,6 @@ const MealScreen = () => {
     }
   };
 
-  // to allow users to favorite a meal
-  const handleFavorite = (meal: Meal) => {
-    const newFavorites = favorites.includes(meal.id)
-      ? favorites.filter(id => id !== meal.id)
-      : [...favorites, meal.id];
-
-    setFavorites(newFavorites);
-    saveFavorites(newFavorites);
-  };
-
   // navigate to meal info page (unique for each meal)
   const goToMealInfo = (mealId: string) => {
     router.push({
@@ -210,9 +249,9 @@ const MealScreen = () => {
       <View style={styles.favoriteIcon}>
         <TouchableOpacity onPress={() => handleFavorite(item)}>
           <Ionicons
-            name={favorites.includes(item.id) ? "star" : "star-outline"}
+            name={item.isFavorite ? "star" : "star-outline"}
             size={22}
-            color={favorites.includes(item.id) ? "#F89D5D" : "#5b5959ff"}
+            color={item.isFavorite ? "#F89D5D" : "#5b5959ff"}
           />
         </TouchableOpacity>
       </View>
@@ -227,7 +266,7 @@ const MealScreen = () => {
       <View style={styles.contentRow}>
         {/* Meal Image */}
         {item.image ? (
-          <Image source={item.image} style={styles.image} />
+          <Image source={{uri: item.image}} style={styles.image} />
         ) : (
           <View style={[styles.image, styles.placeholderImage]}>
             <Ionicons name="fast-food" size={40} color="#499F44" />
@@ -236,10 +275,7 @@ const MealScreen = () => {
 
         {/* Meal Information */}
         <View style={styles.info}>
-          <Text style={styles.subtitle}>
-            {item.calories ? `${item.calories}` : 'Cals'}
-          </Text>
-          {item.cost !== undefined && (
+          {item.cost != null && (
             <Text style={styles.subtitle}>
               Cost Per Serving: ${item.cost.toFixed(2)}
             </Text>
@@ -367,9 +403,7 @@ const MealScreen = () => {
       </Modal>
     </SafeAreaView>
   );
-};
-
-export default MealScreen;
+}
 
 const styles = StyleSheet.create({
   container: {

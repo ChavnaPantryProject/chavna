@@ -1,7 +1,7 @@
 // normal layout when displaying meal ingredients (not in edit mode)
 // "go to nutrition info" at the bottom right corner.
 
-import React, {useState} from "react";
+import React, {useEffect, useState} from "react";
 import { 
     View, 
     Text, 
@@ -17,6 +17,7 @@ import {
 import { useRouter } from "expo-router";
 import { useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { API_URL, Response, retrieveValue } from "../util";
 
 export default function MealIngredientScreen() {
     const router = useRouter();
@@ -26,14 +27,74 @@ export default function MealIngredientScreen() {
     console.log("Meal ID:", id);
 
     // ingredient list data
-    const ingredients = [
-        { name: "Dry Fettuccine Pasta", amount: "680g" },
-        { name: "Butter", amount: "240g" },
-        { name: "Heavy Cream", amount: "360g" },
-        { name: "Garlic Salt", amount: ".5g" },
-        { name: "Romano Cheese", amount: "75g" },
-        { name: "Parmesan Cheese", amount: "45g" },
-    ];
+    // const ingredients = [
+    //     { name: "Dry Fettuccine Pasta", amount: "680g" },
+    //     { name: "Butter", amount: "240g" },
+    //     { name: "Heavy Cream", amount: "360g" },
+    //     { name: "Garlic Salt", amount: ".5g" },
+    //     { name: "Romano Cheese", amount: "75g" },
+    //     { name: "Parmesan Cheese", amount: "45g" },
+    // ];
+    const [ingredients, setIngredients] = useState<{name: string, amount: string}[]>([])
+    const [imageURL, setImageURL] = useState<string | null>(null);
+    const [mealName, setMealName] = useState<string>("");
+
+    useEffect(() => {
+        (async () => {
+            try {
+                const loginToken = await retrieveValue('jwt');
+        
+                if (!loginToken) {
+                    Alert.alert('Error', 'Please log in to view meals');
+                    return;
+                }
+        
+                // GET request to /get-meals
+                const response = await fetch(`${API_URL}/get-meal`, {
+                    method: 'POST',
+                    headers: {
+                        Authorization: `Bearer ${loginToken}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        mealId: id
+                    })
+                });
+
+                type MealResponse = {
+                    meal: {
+                        name: string,
+                        mealPictureURL: string,
+                        ingredients: [{
+                            name: string,
+                            amount: number,
+                            unit: string
+                        }]
+                    }
+                }
+        
+                const body: Response<MealResponse> = await response.json();
+        
+                if (!response.ok) {
+                throw new Error(body.message || 'Failed to fetch meals');
+                }
+        
+                if (body.success !== 'success') {
+                    throw new Error(body.message || 'Failed to fetch meals');
+                }
+
+                setIngredients(body.payload!.meal.ingredients.map(ingredient => ({
+                    name: ingredient.name,
+                    amount: String(ingredient.amount) + " " + ingredient.unit.trim()
+                })));
+                setImageURL(body.payload!.meal.mealPictureURL);
+                setMealName(body.payload!.meal.name);
+            } catch (error) {
+                console.error('Error fetching meals:', error);
+                Alert.alert('Error', 'Failed to load meals. Please try again.');
+            }
+        })();
+    }, [id]);
 
     const handleDeleteMeal = () => {
         setMenuVisible(false);
@@ -116,12 +177,12 @@ export default function MealIngredientScreen() {
             {/* Main content */}
             <View style={styles.fixedSection}>
                 <View style={styles.mealHeader}>
-                    <Text style={styles.mealTitle}>Fettuccine Alfredo</Text>
+                    <Text style={styles.mealTitle}>{mealName}</Text>
                 </View>
 
                 {/* Image */}
                 <Image
-                    source={require('../../assets/images/FETTUCCINE_ALFREDO_HOMEPAGE.jpg')}
+                    source={{uri: imageURL? imageURL : ""}}
                     style={styles.mealImage}
                 />
             </View>
