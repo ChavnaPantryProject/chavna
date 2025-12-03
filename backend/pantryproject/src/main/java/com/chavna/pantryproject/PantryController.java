@@ -10,6 +10,8 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.web.bind.annotation.GetMapping;
@@ -469,40 +471,54 @@ public class PantryController {
 
     public static class GetScanKeyRequest {
         @NotNull
-        public String key;
+        public String[] keys;
     }
 
     @AllArgsConstructor
     public static class GetScanKeyResponse {
-        public UUID templateId;
+        public Map<String, UUID> templateIds;
     }
 
-    @PostMapping("get-scan-key")
+    @PostMapping("get-scan-keys")
     public Response getScanKey(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody GetScanKeyRequest requestBody) {
         Login login = Authorization.authorize(authorizationHeader);
         UUID familyOwner = Authorization.getFamilyOwnerId(login);
 
-        UUID[] templateId = {null};
-        Database.openConnection((Connection con) -> {
-            PreparedStatement statement = con.prepareStatement("""
-                SELECT template_id FROM scan_items
-                WHERE scan_text = ? AND owner = ?;
-            """);
+        if (requestBody.keys.length == 0)
+            return Response.Fail("No keys provided.");
 
-            statement.setString(1, requestBody.key);
-            statement.setObject(2, familyOwner);
+        HashMap<String, UUID> templateIds = new HashMap<>();
+        Database.openConnection((Connection con) -> {
+            String values = "";
+            for (@SuppressWarnings("unused") var __ : requestBody.keys)
+                values += "(?),";
+            values = values.substring(0, values.length() - 1);
+            PreparedStatement statement = con.prepareStatement(String.format("""
+                SELECT v.key, template_id FROM scan_items
+                INNER JOIN (
+                    VALUES %s
+                ) as v(key)
+                ON scan_items.scan_text = v.key AND owner = ?;
+            """, values));
+
+            int i = 1;
+            for (String key : requestBody.keys) {
+                statement.setString(i, key);
+                i++;
+            }
+            statement.setObject(i, familyOwner);
 
             ResultSet result = statement.executeQuery();
 
-            if (result.next())
-                templateId[0] = (UUID) result.getObject(1);
+            while (result.next())
+                templateIds.put(result.getString(1), (UUID) result.getObject(2));
 
             return null;
         })
         .throwIfError()
         .ignoreResponse();
 
-        return Response.Success(new GetScanKeyResponse(templateId[0]));
+        return Response.Success(new GetScanKeyResponse(templateIds));
     }
 
     public static class SetScanKeyRequest {
