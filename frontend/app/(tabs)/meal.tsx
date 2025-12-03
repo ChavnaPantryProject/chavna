@@ -213,7 +213,7 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     paddingHorizontal: 12,
     marginBottom: 20,
-    height: 45, // slightly bigger search bar
+    height: 50, // slightly bigger search bar
     backgroundColor: "rgba(73, 159,68,0.1",
   },
 
