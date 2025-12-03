@@ -19,6 +19,7 @@ export default function ScannerScreen() {
     const photo = await ref.current?.takePictureAsync({
       pictureRef: false,
       base64: false, //generate Base64 after compression
+      skipProcessing: true,
     });
 
     if (!photo?.uri) return;
