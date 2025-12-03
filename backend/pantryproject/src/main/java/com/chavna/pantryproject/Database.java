@@ -1,49 +1,143 @@
 package com.chavna.pantryproject;
 
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.UUID;
 
+import org.apache.commons.dbcp2.BasicDataSource;
+
 import org.springframework.http.HttpStatus;
+
+import lombok.AllArgsConstructor;
 
 public class Database {
     public static final String FAMILY_TABLE = "family";
     public static final String FAMILY_MEMBER_TABLE = "family_member";
     public static final String FOOD_ITEM_TEMPLATES_TABLE = "food_item_templates";
     public static final String FOOD_ITEMS_TABLE = "food_items";
+    public static final String MEAL_INGREDIENTS_TABLE = "meal_ingredients";
+    public static final String MEALS_TABLE = "meals";
     public static final String PERSONAL_INFO_TABLE = "personal_info";
     public static final String SCAN_ITEMS_TABLE = "scan_items";
     public static final String SHOPPING_LIST_TABLE = "shopping_list";
     public static final String USERS_TABLE = "users";
     public static final String CATEGORIES_TABLE = "user_categories";
 
-    public static Connection getRemoteConnection() {
+    private static final String jdbcUrl = getConnectionUrl();
+    private static final BasicDataSource dataSource = getDataSource();
+
+    private static BasicDataSource getDataSource() {
         try {
-            Class.forName("org.postgresql.Driver");
-            String use = System.getenv("USE_NEON_DATABASE");
-            if (use != null && use.equals("1")) {
-                String jdbcUrl = "jdbc:" + Env.getenvNotNull("DATABASE_URL");
-                return DriverManager.getConnection(jdbcUrl);
-            }
-                
-            String hostname = Env.getenvNotNull("RDS_HOSTNAME");
-            String dbName = Env.getenvNotNull("RDS_DB_NAME");
-            String userName = Env.getenvNotNull("RDS_USERNAME");
-            String password = Env.getenvNotNull("RDS_PASSWORD");
-            String port = Env.getenvNotNull("RDS_PORT");
-            String jdbcUrl = "jdbc:postgresql://" + hostname + ":" + port + "/" + dbName + "?user=" + userName + "&password=" + password;
-            return DriverManager.getConnection(jdbcUrl);
+            BasicDataSource dataSource = new BasicDataSource();
+            dataSource.setDriverClassName("org.postgresql.Driver");
+            dataSource.setUrl(jdbcUrl);
+
+            dataSource.setInitialSize(10);
+            dataSource.setMaxTotal(100);
+            dataSource.setMaxIdle(20);
+            dataSource.setMinIdle(10);
+            dataSource.setMaxWait(Duration.ofSeconds(10));
+            dataSource.setMaxConn(Duration.ofSeconds(10)); // This appears to not work, but i'm leaving it here just in case it starts working one day.
+            dataSource.setDurationBetweenEvictionRuns(Duration.ofMinutes(30));
+
+            return dataSource;
         }
         // Rethrow exceptions as RuntimeExceptions since spring boot is going to automatically catch them anyway.
         // I'd rather not be forced to explicitly deal with them if they arent going to crash the whole server.
         // Probably bad practice, but idc.
         catch (RuntimeException ex) { throw ex; }
         catch (Exception ex) { throw new RuntimeException(ex); }
+    }
+
+    private static String getConnectionUrl() {
+        String use = System.getenv("USE_NEON_DATABASE");
+        if (use != null && use.equals("1")) {
+            String jdbcUrl = "jdbc:" + Env.getenvNotNull("DATABASE_URL");
+            return jdbcUrl;
+        }
+            
+        String hostname = Env.getenvNotNull("RDS_HOSTNAME");
+        String dbName = Env.getenvNotNull("RDS_DB_NAME");
+        String userName = Env.getenvNotNull("RDS_USERNAME");
+        String password = Env.getenvNotNull("RDS_PASSWORD");
+        String port = Env.getenvNotNull("RDS_PORT");
+        String jdbcUrl = "jdbc:postgresql://" + hostname + ":" + port + "/" + dbName + "?user=" + userName + "&password=" + password;
+
+        return jdbcUrl;
+    }
+    public static interface ConnectionErrorHandler {
+        Response handleError(SQLException ex);
+    }
+
+    @AllArgsConstructor
+    public static class ConnectionResult {
+        SQLException ex;
+
+        /***
+         * If the result is an error, call this function to manually process it.
+         * @param errorHandler - function for handling error.
+         * @return itself
+         */
+        public ConnectionResult onSQLError(ConnectionErrorHandler errorHandler) {
+            Response response = errorHandler.handleError(ex);
+
+            if (response != null)
+                throw new ResponseException(response);
+
+            return this;
+        }
+
+        /***
+         * If the result is an error, throw an ResponseException
+         */
+        public void throwIfError() {
+            if (ex != null)
+                throw getSQLErrorHTTPResponseException(ex);
+        }
+    }
+
+    public static interface DatabaseConnection {
+        Response connect(Connection con) throws SQLException;
+    }
+
+    /***
+     * 
+     * @param connection - Function to use connection. Return null to continue execution, or return a Response object to throw a ResponseException (if you want your outer function to return early).
+     * @return Result type to manually handle the error or throw it.
+     */
+    public static ConnectionResult openDatabaseConnection(DatabaseConnection connection) {
+        Connection con = null;
+        ConnectionResult result = null;
+        try {
+            con = dataSource.getConnection();
+            Response response = connection.connect(con);
+
+            if (response != null)
+                throw new ResponseException(response);
+
+            result = new ConnectionResult(null);
+        } catch (SQLException ex) {
+            result = new ConnectionResult(ex);
+        } finally {
+            try {
+                if (con != null)
+                    con.close();
+            } catch (SQLException ex) {
+                if (result != null) {
+                    result.ex.printStackTrace();
+                    throw new RuntimeException("Double SQLException.", ex);
+                } else {
+                    result = new ConnectionResult(ex);
+                }
+            }
+        }
+
+        return result;
     }
 
     public static HashMap<String, Object> objectFromResultSet(ResultSet resultSet) throws SQLException {
@@ -128,11 +222,10 @@ public class Database {
         return result.getString(1);
     }
 
-    public static Response getSQLErrorHTTPResponse() {
-        return Response.Error(HttpStatus.INTERNAL_SERVER_ERROR, "SQL Error.");
-    }
+    private static ResponseException getSQLErrorHTTPResponseException(SQLException ex) {
+        System.err.println("SQL State: " + ex.getSQLState());
+        ex.printStackTrace();
 
-    public static ResponseException getSQLErrorHTTPResponseException() {
         return new ResponseException(Response.Error(HttpStatus.INTERNAL_SERVER_ERROR, "SQL Error."));
     }
 }

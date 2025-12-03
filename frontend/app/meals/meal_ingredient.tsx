@@ -156,7 +156,7 @@ export default function MealIngredientScreen() {
                 {/* Navigation Button to Nutrition Info */}
                 <TouchableOpacity
                     style={styles.linkContainer}
-                    onPress={() => router.push('/meals/mealinfo')}
+                    onPress={() => router.replace('/meals/mealinfo')}
                 >
                     <Text style={styles.linkText}>Go to Nutrition {'>'}</Text>
                 </TouchableOpacity>

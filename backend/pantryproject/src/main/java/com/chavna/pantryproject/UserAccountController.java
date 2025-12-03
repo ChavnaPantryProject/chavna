@@ -70,28 +70,30 @@ public class UserAccountController {
     }
 
     @PostMapping("/login")
-    public Response login(@Valid @RequestBody LoginRequest request, Errors errors) throws SQLException {
+    public Response login(@Valid @RequestBody LoginRequest request, Errors errors) {
         if (errors.hasErrors())
            return Response.Error(HttpStatus.BAD_REQUEST, errors.getAllErrors().get(0).toString());
         
-        Connection con = Database.getRemoteConnection();
+        Database.openDatabaseConnection((Connection con) -> {
+            PreparedStatement statement = con.prepareStatement("SELECT password_hash, id, login_state FROM " + USERS_TABLE + " where email = ?");
+            statement.setString(1, request.email);
+            ResultSet results = statement.executeQuery();
 
-        PreparedStatement statement = con.prepareStatement("SELECT password_hash, id, login_state FROM " + USERS_TABLE + " where email = ?");
-        statement.setString(1, request.email);
-        ResultSet results = statement.executeQuery();
+            if (results.next()) {
+                byte[] hash = results.getBytes(1);
+                UUID id = (UUID) results.getObject(2);
+                UUID loginState = (UUID) results.getObject(3);
 
-        if (results.next()) {
-            byte[] hash = results.getBytes(1);
-            UUID id = (UUID) results.getObject(2);
-            UUID loginState = (UUID) results.getObject(3);
-
-            BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(BCryptVersion.$2B, 8);
-            if (encoder.matches(request.password, new String(hash, StandardCharsets.UTF_8))) {
-                String jws = Authorization.createLoginToken(id, loginState);
-                        
-                return Response.Success("Succesful login.", new LoginResponse(jws));
+                BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(BCryptVersion.$2B, 8);
+                if (encoder.matches(request.password, new String(hash, StandardCharsets.UTF_8))) {
+                    String jws = Authorization.createLoginToken(id, loginState);
+                            
+                    return Response.Success("Succesful login.", new LoginResponse(jws));
+                }
             }
-        }
+
+            return null;
+        }).throwIfError();
 
         return Response.Fail("Invalid login credentials");
     }
@@ -129,13 +131,10 @@ public class UserAccountController {
 
     @GetMapping("/google-login")
     public ResponseEntity<String> googleLogin(@RequestParam Map<String, String> params) {
-        for (String param : params.keySet()) {
-            System.out.println(param + ": " + params.get(param));
-        }
-
-        String authHTML;
+        // Use single element array to be able to modify it in the lambda expression.
+        String[] authHTML = new String[1];
         if (params.size() == 0) {
-            authHTML = """
+            authHTML[0] = """
                 <!DOCTYPE html>
                 <html>
                 <head>
@@ -158,13 +157,9 @@ public class UserAccountController {
             """;
         } else {
             String clientId = Env.getenvNotNull("GOOGLE_CLIENT_ID");
-            System.out.println();
-            System.out.println(GsonFactory.getDefaultInstance());
             GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(new NetHttpTransport(), GsonFactory.getDefaultInstance())
                 .setAudience(Arrays.asList(clientId))
                 .build();
-
-            System.out.println(verifier);
 
             String accessToken = params.get("id_token");
 
@@ -177,13 +172,9 @@ public class UserAccountController {
             }
 
             String email = googleIdToken.getPayload().getEmail();
-            System.out.println(email);
-            String loginToken;
 
             // Check if account exists
-            try {
-                Connection con = Database.getRemoteConnection();
-
+            Database.openDatabaseConnection((Connection con) -> {
                 PreparedStatement emailStatement = con.prepareStatement(String.format("""
                     SELECT id, password_hash FROM %s
                     WHERE email = ?
@@ -211,32 +202,33 @@ public class UserAccountController {
                 if (!Arrays.equals(passwordHash, GOOGLE_PASSWORD_HASH)) {
                     String html = String.format(GOOGLE_AUTH_FAIL, params.get("state"), "Non Google account with given email already exists.");
 
-                    return ResponseEntity.ok(html);
+                    return Response.Success(html);
                 }
 
-                loginToken = Authorization.createGmailLoginToken(userId, accessToken);
-            } catch (SQLException ex) {
-                ex.printStackTrace();
-                throw Database.getSQLErrorHTTPResponseException();
-            }
+                String loginToken = Authorization.createGmailLoginToken(userId, accessToken);
 
-            authHTML = String.format("""
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <meta charset="UTF-8">
-                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                    <title>Redirect</title>
-                </head>
-                <body>
-                    <script>
-                        window.location.replace("%s")
-                    </script>
-                </body>
-                </html>
-            """, params.get("state") + "?success=true&token=" + loginToken);
+                authHTML[0] = String.format("""
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <meta charset="UTF-8">
+                        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                        <title>Redirect</title>
+                    </head>
+                    <body>
+                        <script>
+                            window.location.replace("%s")
+                        </script>
+                    </body>
+                    </html>
+                """, params.get("state") + "?success=true&token=" + loginToken);
+
+                return null;
+            }).throwIfError();
+
         }
-        return ResponseEntity.ok(authHTML);
+ 
+        return ResponseEntity.ok(authHTML[0]);
     }
     
     public static class UserExistsRequest {
@@ -250,18 +242,20 @@ public class UserAccountController {
     }
 
     @PostMapping("/user-exists")
-    public Response userExists(@Valid @RequestBody UserExistsRequest request, Errors errors) throws SQLException {
+    public Response userExists(@Valid @RequestBody UserExistsRequest request, Errors errors) {
         if (errors.hasErrors())
             return Response.Error(HttpStatus.BAD_REQUEST, errors.getAllErrors().get(0).toString());
 
-        Connection con = Database.getRemoteConnection();
+        Database.openDatabaseConnection((Connection con) -> {
+            PreparedStatement statement = con.prepareStatement("SELECT 1 FROM " + USERS_TABLE + " where email = ?");
+            statement.setString(1, request.email);
+            ResultSet results = statement.executeQuery();
 
-        PreparedStatement statement = con.prepareStatement("SELECT 1 FROM " + USERS_TABLE + " where email = ?");
-        statement.setString(1, request.email);
-        ResultSet results = statement.executeQuery();
+            if (results.next())
+                return Response.Success(new UserExistsResponse(results.getInt(1) == 1));
 
-        if (results.next())
-            return Response.Success(new UserExistsResponse(results.getInt(1) == 1));
+            return null;
+        }).throwIfError();
 
         return Response.Success(false);
     }
@@ -281,19 +275,16 @@ public class UserAccountController {
         if (!emailValidation.matcher(request.email).matches())
             return Response.Fail("Invalid email address.");
 
-        try {
-            Connection con = Database.getRemoteConnection();
-
+        Database.openDatabaseConnection((Connection con) -> {
             PreparedStatement statement = con.prepareStatement("SELECT 1 FROM " + USERS_TABLE + " where email = ?");
             statement.setString(1, request.email);
             ResultSet results = statement.executeQuery();
 
             if (results.next())
                 return Response.Error(HttpStatus.CONFLICT, "User with email already exists.");
-        } catch (SQLException ex) {
-            ex.printStackTrace();
-            return Database.getSQLErrorHTTPResponse();
-        }
+
+            return null;
+        }).throwIfError();
         
         String token = Authorization.createSingupToken(request.email, request.password);
 
@@ -354,12 +345,10 @@ public class UserAccountController {
 
         CreateAccountRequest request = parsed.accept(visitor);
 
-        Connection con = Database.getRemoteConnection();
-
-        BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(BCryptVersion.$2B, 8);
-        String hash = encoder.encode(request.password);
-
-        try {
+        Database.openDatabaseConnection((Connection con) -> {
+            BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(BCryptVersion.$2B, 8);
+            String hash = encoder.encode(request.password);
+            
             PreparedStatement statement = con.prepareStatement(String.format(
             """
                 INSERT INTO %s (email, password_hash)
@@ -368,14 +357,14 @@ public class UserAccountController {
             statement.setString(1, request.email);
             statement.setBytes(2, hash.getBytes());
             statement.executeUpdate();
-        }
-        catch (SQLException ex) {
-            ex.printStackTrace();
-            if (ex.getSQLState().equals("23505"))
-                throw new ResponseException(Response.Error(HttpStatus.INTERNAL_SERVER_ERROR, "User with email already exists."));
 
-            throw Database.getSQLErrorHTTPResponseException();
-        }
+            return null;
+        }).onSQLError((SQLException ex) -> {
+            if (ex.getSQLState().equals("23505"))
+                return Response.Fail("User with email already exists.");
+
+            return null;
+        }).throwIfError();
 
         return ResponseEntity.ok("Account succesfully created.");
     }
@@ -397,23 +386,17 @@ public class UserAccountController {
         return Response.Success("Authorized.", new LoginResponse(newToken));
     }
 
+    @GetMapping("/validate-login")
+    public Response validateLogin(@RequestHeader("Authorization") String authorizationHeader) {
+        Authorization.authorize(authorizationHeader);
+
+        return Response.Success();
+    }
+
     @GetMapping("/verify")
     public ResponseEntity<String> sendVerificationEmail(@RequestParam("email") String email) {
         Email.verifyEmailAddress(email);
 
         return ResponseEntity.ok("Verification email sent.");
-    }
-
-    public static class FoodItemTemplate {
-        @NotNull
-        public String name;
-        @NotNull
-        public Double amount;
-        @NotNull
-        public String unit;
-        @NotNull
-        public Integer shelfLifeDays;
-        @NotNull
-        public String category;
     }
 }

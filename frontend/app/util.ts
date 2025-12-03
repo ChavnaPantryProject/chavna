@@ -35,3 +35,10 @@ export const API_URL = (process.env.EXPO_PUBLIC_API_URL || 'https://api.chavnapa
     /\/+$/,
     ''
 );
+
+export type Response = {
+  success: 'success' | 'fail' | 'error', // Currently errors still return 'fail'. Expect this to be changed in the future.
+  status: number, // status code (200 unless otherwise specified)
+  message?: string,
+  payload?: any // JSON object containng response payload
+}

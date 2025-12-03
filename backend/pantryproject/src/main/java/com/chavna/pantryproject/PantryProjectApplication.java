@@ -2,13 +2,16 @@ package com.chavna.pantryproject;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
-@SpringBootApplication
+@SpringBootApplication(exclude = {DataSourceAutoConfiguration.class})
 public class PantryProjectApplication {
 	public static void main(String[] args) {
+        // Initialize the connection pool.
+        Database.openDatabaseConnection((var) -> {return null;});
 		SpringApplication.run(PantryProjectApplication.class, args);
 	}
 

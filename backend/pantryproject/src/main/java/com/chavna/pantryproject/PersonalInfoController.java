@@ -6,7 +6,6 @@ import static com.chavna.pantryproject.Database.USERS_TABLE;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.UUID;
@@ -39,16 +38,14 @@ public class PersonalInfoController {
         else if (requestBody.email != null && requestBody.userId != null)
             return Response.Error(HttpStatus.BAD_REQUEST, "Request body may only contain email or user id, not both.");
 
-        Connection con = Database.getRemoteConnection();
-
         UUID authorizedUser;
         if (authorizationHeader != null)
             authorizedUser = Authorization.authorize(authorizationHeader).userId;
         else
             authorizedUser = null;
         
-        UUID requestedUser;
-        try {
+        Database.openDatabaseConnection((Connection con) -> {
+            UUID requestedUser;
             if (requestBody.email != null) {
                 // Check if user exists
                 PreparedStatement idFromEmailStatement = con.prepareStatement(String.format("""
@@ -85,10 +82,10 @@ public class PersonalInfoController {
             }
 
             return Response.Success(jsonObject);
-        } catch (SQLException ex) {
-            ex.printStackTrace();
-            return Database.getSQLErrorHTTPResponse();
-        }
+        }).throwIfError();
+
+        // This should be unreachable
+        return null;
     }
 
     private static String shortenString(String string, int amount) {
@@ -97,14 +94,13 @@ public class PersonalInfoController {
 
     @PostMapping("/set-personal-info")
     public Response setPersonalInfo(@RequestHeader("Authorization") String authorizationHeader, @RequestBody HashMap<String, Object> requestBody) {
-        Connection con = Database.getRemoteConnection();
         UUID user = Authorization.authorize(authorizationHeader).userId;
         if (requestBody.containsKey("user_id"))
             return Response.Error(HttpStatus.BAD_REQUEST, "Invalid column: \"user_id\"");
         
         requestBody.put("user_id", user);
 
-        try {
+        Database.openDatabaseConnection((Connection con) -> {
             HashMap<String, Object> defaultInfo = Database.getDefaultTableEntry(con, PERSONAL_INFO_TABLE);
             String valuesString = "(";
             String columnsString = "(";
@@ -132,7 +128,6 @@ public class PersonalInfoController {
                 ON CONFLICT (user_id) DO UPDATE SET
                 """ + updateString, PERSONAL_INFO_TABLE, columnsString, valuesString);
 
-            System.out.println(statementString);
             PreparedStatement statement = con.prepareStatement(statementString);
 
             for (int i = 1; i <= columns.size(); i++) {
@@ -143,9 +138,9 @@ public class PersonalInfoController {
             }
 
             statement.executeUpdate();
-        } catch (SQLException ex) {
 
-        }
+            return null;
+        }).throwIfError();
 
         return Response.Success();
     }

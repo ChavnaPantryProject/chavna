@@ -5,7 +5,6 @@ import static com.chavna.pantryproject.Database.SHOPPING_LIST_TABLE;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.util.ArrayList;
 
 import org.springframework.web.bind.annotation.PostMapping;
@@ -38,9 +37,7 @@ public class ShoppingListController {
     public Response updateShoppingList(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody ShoppingList requestBody) {
         Login login = Authorization.authorize(authorizationHeader);
 
-        try {
-            Connection con = Database.getRemoteConnection();
-
+        Database.openDatabaseConnection((Connection con) -> {
             PreparedStatement delete = con.prepareStatement(String.format("""
                 DELETE FROM %s
                 WHERE user_id = ?
@@ -78,10 +75,9 @@ public class ShoppingListController {
             }
 
             insert.executeUpdate();
-        } catch (SQLException ex) {
-            ex.printStackTrace();
-            return Database.getSQLErrorHTTPResponse();
-        }
+
+            return null;
+        }).throwIfError();
 
         return Response.Success();
     }
@@ -90,9 +86,7 @@ public class ShoppingListController {
     public Response getShoppingList(@RequestHeader("Authorization") String authorizationHeader) {
         Login login = Authorization.authorize(authorizationHeader);
 
-        try {
-            Connection con = Database.getRemoteConnection();
-
+        Database.openDatabaseConnection((Connection con) -> {
             PreparedStatement statement = con.prepareStatement(String.format("""
                 SELECT item_name, buy_item FROM %s
                 WHERE user_id = ?
@@ -111,9 +105,9 @@ public class ShoppingListController {
             }
 
             return Response.Success(list);
-        } catch (SQLException ex) {
-            ex.printStackTrace();
-            return Database.getSQLErrorHTTPResponse();
-        }
+        }).throwIfError();
+
+        // This should be unreachable
+        return null;
     }
 }
