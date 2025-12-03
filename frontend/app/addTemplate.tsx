@@ -15,48 +15,23 @@ import { Stack, router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
 import { API_URL, retrieveValue, Response } from "./util";
-
-type Template = {
-    templateId?: string;
-    id?: string;
-    name: string;
-    amount: number;
-    unit: string;
-    shelfLifeDays?: number;
-    category: string;
-};
-
-type Suggestion = Template & { localKey: string };
+import { Picker } from "@react-native-picker/picker";
+import { setSelectedTemplate, Template } from "./select-template";
 
 export default function AddTemplateScreen() {
     // Template fields
     const [name, setName] = useState("");
     const [amount, setAmount] = useState("");
     const [unit, setUnit] = useState("");
+    const [shelfLifeDays, setShelfLifeDays] = useState("");
     const [category, setCategory] = useState("");
-
-    // Item-only fields
-    const [shelfLifeDays, setShelfLifeDays] = useState(""); // in days
-    const [unitPrice, setUnitPrice] = useState("");
-    const [totalPrice, setTotalPrice] = useState("");
-
-    const [categories, setCategories] = useState<string[]>([]);
     const [loading, setLoading] = useState(false);
 
-    // Focus tracking for green highlight
-    const [focusedField, setFocusedField] = useState<string | null>(null);
-
-    // All templates from backend (loaded once)
-    const [templates, setTemplates] = useState<Template[]>([]);
-    // Filtered suggestions for the dropdown
-    const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
-    const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(
-        null
-    );
+    const [categories, setCategories] = useState<string[]>([]);
 
     // Load categories + templates once
     useEffect(() => {
-        const load = async () => {
+        (async () => {
             try {
                 const jwt = await retrieveValue("jwt");
                 if (!jwt) {
@@ -71,131 +46,19 @@ export default function AddTemplateScreen() {
                 });
 
                 if (catRes.ok) {
-                    const catBody = await catRes.json();
-                    console.log("get-categories body:", catBody);
-                    if (catBody && Array.isArray(catBody.categories)) {
-                        // Normalize categories: trim for consistent comparison
-                        const normalized = catBody.categories
-                            .filter((c: any) => typeof c === "string")
-                            .map((c: string) => c.trim());
-                        setCategories(normalized);
-                    }
+                    const catBody: Response<{categories: string[]}> = await catRes.json();
+                    if (catBody.success === 'success')
+                        setCategories(catBody.payload!.categories.sort());
                 } else {
                     console.log("get-categories status:", catRes.status);
                 }
 
-                // 2) Templates (no search -> all templates for this user)
-                const tplRes = await fetch(
-                    `${API_URL}/get-food-item-templates`,
-                    {
-                        method: "POST",
-                        headers: {
-                            Authorization: `Bearer ${jwt}`,
-                            "Content-Type": "application/json",
-                        },
-                        body: JSON.stringify({}), // omit search
-                    }
-                );
-
-                console.log("get-food-item-templates status:", tplRes.status);
-
-                const tplBody = await tplRes.json();
-                console.log(
-                    "get-food-item-templates body:",
-                    JSON.stringify(tplBody, null, 2)
-                );
-
-                if (!tplRes.ok) {
-                    return;
-                }
-
-                // Actual shape:
-                // payload: [
-                //   { templateId, template: { name, amount, unit, shelfLifeDays, category } }
-                // ]
-                let rawTemplates: any[] = [];
-
-                if (Array.isArray(tplBody?.payload)) {
-                    rawTemplates = tplBody.payload;
-                } else if (Array.isArray(tplBody?.payload?.templates)) {
-                    rawTemplates = tplBody.payload.templates;
-                } else if (Array.isArray(tplBody?.templates)) {
-                    rawTemplates = tplBody.templates;
-                }
-
-                console.log(
-                    "rawTemplates length (initial load):",
-                    rawTemplates.length
-                );
-
-                const mapped: Template[] = rawTemplates.map((t: any) => {
-                    const inner = t.template ?? {};
-                    return {
-                        templateId: t.templateId ?? t.id,
-                        id: t.id,
-                        name: inner.name,
-                        amount: inner.amount,
-                        unit: (inner.unit ?? "").trim(),
-                        shelfLifeDays: inner.shelfLifeDays,
-                        category: inner.category,
-                    };
-                });
-
-                setTemplates(mapped);
-                console.log("mapped templates:", mapped);
+                console.log(categories);
             } catch (err) {
                 console.error("Error loading initial data:", err);
             }
-        };
-
-        load();
+        })();
     }, []);
-
-    // Called when user types in the Item Name field
-    const handleNameChange = (text: string) => {
-        console.log("handleNameChange text:", text);
-        setName(text);
-        setSelectedTemplate(null);
-
-        const query = text.trim().toLowerCase();
-        console.log("templates length at type:", templates.length);
-
-        if (query.length < 2) {
-            console.log("Query too short, clearing suggestions");
-            setSuggestions([]);
-            return;
-        }
-
-        // Filter locally from the templates we already loaded
-        const filtered = templates.filter(
-            (t) =>
-                typeof t.name === "string" &&
-                t.name.toLowerCase().startsWith(query)
-        );
-
-        const mapped: Suggestion[] = filtered.map((t, idx) => ({
-            ...t,
-            localKey: `${t.templateId || t.id || t.name}-${idx}`,
-        }));
-
-        console.log("filtered suggestions length:", mapped.length);
-        setSuggestions(mapped);
-    };
-
-    const handleSelectSuggestion = (tpl: Suggestion) => {
-        console.log("handleSelectSuggestion:", tpl.name);
-        setName(tpl.name);
-        setAmount(String(tpl.amount ?? ""));
-        setUnit(tpl.unit ?? "");
-        setCategory(tpl.category ?? "");
-        setShelfLifeDays(
-            tpl.shelfLifeDays !== undefined && tpl.shelfLifeDays !== null
-                ? String(tpl.shelfLifeDays)
-                : ""
-        );
-        setSelectedTemplate(tpl);
-        setSuggestions([]); // hide dropdown once chosen
-    };
 
     /**
      * Ensure the given category exists for this user.
@@ -209,9 +72,8 @@ export default function AddTemplateScreen() {
         const trimmed = categoryName.trim();
         if (!trimmed) return;
 
-        // If we already know about it locally (case + space insensitive), don't call the API
-        const normalizedList = categories.map((c) => c.trim().toLowerCase());
-        if (normalizedList.includes(trimmed.toLowerCase())) {
+        // If we already know about it locally, don't call the API
+        if (categories.includes(trimmed)) {
             return;
         }
 
@@ -264,22 +126,21 @@ export default function AddTemplateScreen() {
                     );
                 }
 
+                // Important: DO NOT throw – let onSave continue and let the template API decide
                 return;
             }
 
-            setCategories((prev) => {
-                const normalizedPrev = prev.map((c) => c.trim().toLowerCase());
-                const key = trimmed.toLowerCase();
-
-                if (normalizedPrev.includes(key)) {
-                    return prev;
-                }
-                return [...prev, trimmed];
-            });
+            // Success or "already exists": update local list so we don't call again
+            setCategories((prev) =>
+                prev.includes(trimmed) ? prev : [...prev, trimmed]
+            );
         } catch (err) {
             console.error("ensureCategoryExists error:", err);
+            // Don't rethrow; we don't want to kill the save flow on a noisy backend
+            // The later create-food-item-template call will surface any real problems.
         }
     };
+
 
     const onSave = async () => {
         // Basic validation
@@ -296,47 +157,11 @@ export default function AddTemplateScreen() {
             return;
         }
 
-        // Require either unit price OR total price
-        const hasUnitPrice =
-            unitPrice.trim() !== "" && !isNaN(Number(unitPrice.trim()));
-        const hasTotalPrice =
-            totalPrice.trim() !== "" && !isNaN(Number(totalPrice.trim()));
-
-        if (!hasUnitPrice && !hasTotalPrice) {
-            Alert.alert(
-                "Missing price",
-                "Please enter either a unit price or the total product price."
-            );
-            return;
-        }
-        if (unitPrice.trim() !== "" && !hasUnitPrice) {
-            Alert.alert(
-                "Invalid unit price",
-                "Unit price must be a valid number."
-            );
-            return;
-        }
-        if (totalPrice.trim() !== "" && !hasTotalPrice) {
-            Alert.alert(
-                "Invalid total price",
-                "Total price must be a valid number."
-            );
+        if (!shelfLifeDays || isNaN(Number(shelfLifeDays))) {
+            Alert.alert("Invalid shelf life", "Amount must be a number.");
             return;
         }
 
-        if (
-            shelfLifeDays.trim() !== "" &&
-            isNaN(Number(shelfLifeDays.trim()))
-        ) {
-            Alert.alert(
-                "Invalid shelf life",
-                "Shelf life must be a number of days."
-            );
-            return;
-        }
-
-        const shelfLifeValue =
-            shelfLifeDays.trim() === "" ? 0 : Number(shelfLifeDays.trim());
         const trimmedCategory = category.trim();
 
         try {
@@ -347,125 +172,67 @@ export default function AddTemplateScreen() {
                 return;
             }
 
-            // Try to reuse templateId if selected
-            let templateId: string | undefined =
-                selectedTemplate?.templateId || selectedTemplate?.id;
+            // 1) Make sure the category exists (auto-create if needed)
+            await ensureCategoryExists(trimmedCategory, jwt);
 
-            // If no usable id, create a new template
-            if (!templateId) {
-                console.log("No template selected, creating new template");
-
-                // 1) Make sure the category exists (auto-create if needed)
-                await ensureCategoryExists(trimmedCategory, jwt);
-
-                // 2) Now create the template
-                const createRes = await fetch(
-                    `${API_URL}/create-food-item-template`,
-                    {
-                        method: "POST",
-                        headers: {
-                            Authorization: `Bearer ${jwt}`,
-                            "Content-Type": "application/json",
-                        },
-                        body: JSON.stringify({
-                            name: name.trim(),
-                            amount: Number(amount),
-                            unit: unit.trim(),
-                            shelfLifeDays: shelfLifeValue,
-                            category: trimmedCategory,
-                        }),
-                    }
-                );
-
-                const createBody: Response = await createRes.json();
-                console.log(
-                    "create-food-item-template response:",
-                    JSON.stringify(createBody, null, 2)
-                );
-
-                if (!createRes.ok || createBody.success !== "success") {
-                    const msg =
-                        createBody?.message ||
-                        "Template could not be created. It may already exist.";
-                    Alert.alert("Error creating template", msg);
-                    return;
+            // 2) Now create the template
+            const createRes = await fetch(
+                `${API_URL}/create-food-item-template`,
+                {
+                    method: "POST",
+                    headers: {
+                        Authorization: `Bearer ${jwt}`,
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        name: name.trim(),
+                        amount: Number(amount),
+                        unit: unit.trim(),
+                        shelfLifeDays: Number(shelfLifeDays),
+                        category: trimmedCategory,
+                    }),
                 }
-
-                templateId = createBody.payload?.templateId;
-                if (!templateId) {
-                    Alert.alert(
-                        "Error",
-                        "Template created but no templateId was returned."
-                    );
-                    return;
-                }
-
-                // Also push new template into local list so it appears next time
-                const tplInner = (createBody as any).payload?.template ?? {};
-                const newTemplate: Template = {
-                    templateId,
-                    name: tplInner.name ?? name.trim(),
-                    amount: tplInner.amount ?? Number(amount),
-                    unit: (tplInner.unit ?? unit).trim(),
-                    shelfLifeDays:
-                        tplInner.shelfLifeDays ?? shelfLifeValue ?? 0,
-                    category: tplInner.category ?? trimmedCategory,
-                };
-                setTemplates((prev) => [...prev, newTemplate]);
-            }
-
-            console.log("Using templateId:", templateId);
-
-            // Decide final unit price to send
-            let unitPriceToSend: number;
-
-            if (unitPrice.trim() !== "") {
-                unitPriceToSend = Number(unitPrice.trim());
-            } else {
-                // Only totalPrice provided; compute unit price
-                const amountNum = Number(amount);
-                const totalPriceNum = Number(totalPrice.trim());
-
-                // Guard against 0 to avoid division by zero
-                const safeAmount = amountNum === 0 ? 1 : amountNum;
-                unitPriceToSend = totalPriceNum / safeAmount;
-            }
-
-            // Add item to inventory
-            const addRes = await fetch(`${API_URL}/add-food-items`, {
-                method: "POST",
-                headers: {
-                    Authorization: `Bearer ${jwt}`,
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    items: [
-                        {
-                            templateId,
-                            amount: Number(amount),
-                            unitPrice: unitPriceToSend,
-                        },
-                    ],
-                }),
-            });
-
-            const addBody: Response = await addRes.json();
-            console.log(
-                "add-food-items response:",
-                JSON.stringify(addBody, null, 2)
             );
 
-            if (!addRes.ok || addBody.success !== "success") {
+            type ResponseTemplate = {
+                name: string,
+                amount: number, // Default amount for a given food item. This is only for the front end to auto populate an amount field if necessary.
+                unit: string,
+                shelfLifeDays: number, // Shelf life in days (should be an integer)
+                category: string // Must match a user category. Will not add if the category has not been added first.
+            };
+
+            type RegisteredTemplate = {
+                templateId: string,
+                template: ResponseTemplate
+            };
+
+            const createBody: Response<RegisteredTemplate> = await createRes.json();
+
+            if (!createRes.ok || createBody.success !== "success") {
                 const msg =
-                    addBody?.message ||
-                    "The template was saved, but the item could not be added to inventory.";
-                Alert.alert("Error adding item", msg);
+                    createBody?.message ||
+                    "Template could not be created. It may already exist.";
+                Alert.alert("Error creating template", msg);
                 return;
             }
 
-            Alert.alert("Item added", "The item was added to your inventory.", [
-                { text: "OK", onPress: () => router.back() },
-            ]);
+            const templateId = createBody.payload?.templateId;
+            if (!templateId) {
+                Alert.alert(
+                    "Error",
+                    "Template created but no templateId was returned."
+                );
+                return;
+            }
+
+            const template: Template = {
+                id: createBody.payload!.templateId,
+                ...createBody.payload!.template
+            }
+            
+            setSelectedTemplate(template);
+            router.back();
         } catch (err: any) {
             console.error("Error saving template & item:", err);
             Alert.alert(
@@ -488,156 +255,67 @@ export default function AddTemplateScreen() {
                     <Ionicons name="arrow-back" size={24} color="black" />
                 </Pressable>
 
-                <Text style={styles.customHeaderTitle}>Add Item</Text>
+                <Text style={styles.customHeaderTitle}>New Item</Text>
 
                 {/* Spacer so title stays visually centered */}
                 <View style={{ width: 24 }} />
             </View>
 
-            <ScrollView
-                style={{ flex: 1 }}
-                contentContainerStyle={styles.scrollContent}
-                keyboardShouldPersistTaps="handled"
-                bounces={false}
-                overScrollMode="never"
-            >
 
+            <ScrollView
+                contentContainerStyle={styles.container}
+                keyboardShouldPersistTaps="handled"
+            >
                 {/* Top section: template info */}
                 <Text style={styles.label}>Item Name</Text>
                 <View style={{ position: "relative" }}>
                     <TextInput
-                        style={[
-                            styles.input,
-                            focusedField === "name" && styles.inputFocused,
-                        ]}
+                        style={styles.input}
                         value={name}
-                        onChangeText={handleNameChange}
-                        onFocus={() => setFocusedField("name")}
-                        onBlur={() => setFocusedField(null)}
+                        onChangeText={setName}
                         placeholder="Chicken Breast"
                     />
-
-                    {/* Suggestions dropdown */}
-                    {suggestions.length > 0 && (
-                        <View style={styles.suggestionsBox}>
-                            {suggestions.map((tpl) => (
-                                <Pressable
-                                    key={tpl.localKey}
-                                    onPress={() => handleSelectSuggestion(tpl)}
-                                    style={({ pressed }) => [
-                                        styles.suggestionRow,
-                                        pressed && { backgroundColor: "#F1F1F1" },
-                                    ]}
-                                >
-                                    <Text style={styles.suggestionName}>
-                                        {tpl.name}
-                                    </Text>
-                                    <Text style={styles.suggestionMeta}>
-                                        {tpl.category} · {tpl.amount} {tpl.unit}
-                                    </Text>
-                                </Pressable>
-                            ))}
-                        </View>
-                    )}
                 </View>
 
                 <Text style={styles.label}>Default Amount</Text>
                 <TextInput
-                    style={[
-                        styles.input,
-                        focusedField === "amount" && styles.inputFocused,
-                    ]}
+                    style={styles.input}
                     value={amount}
                     onChangeText={setAmount}
-                    onFocus={() => setFocusedField("amount")}
-                    onBlur={() => setFocusedField(null)}
                     keyboardType="numeric"
                     placeholder="1"
                 />
 
                 <Text style={styles.label}>Unit</Text>
                 <TextInput
-                    style={[
-                        styles.input,
-                        focusedField === "unit" && styles.inputFocused,
-                    ]}
+                    style={styles.input}
                     value={unit}
                     onChangeText={setUnit}
-                    onFocus={() => setFocusedField("unit")}
-                    onBlur={() => setFocusedField(null)}
                     placeholder="lb, pack, oz"
                 />
 
-                <Text style={styles.label}>Category</Text>
+                <Text style={styles.label}>Shelf Life (Days)</Text>
                 <TextInput
-                    style={[
-                        styles.input,
-                        focusedField === "category" && styles.inputFocused,
-                    ]}
-                    value={category}
-                    onChangeText={setCategory}
-                    onFocus={() => setFocusedField("category")}
-                    onBlur={() => setFocusedField(null)}
-                    placeholder="Protein, Vegetables"
-                />
-                {categories.length > 0 && (
-                    <Text style={styles.helpText}>
-                        Existing categories: {categories.join(", ")}
-                    </Text>
-                )}
-
-                <View style={styles.divider} />
-
-                {/* Second section: shelf life + price */}
-                <Text style={styles.sectionTitle}>Item Details</Text>
-
-                <Text style={styles.label}>Shelf Life (days)</Text>
-                <TextInput
-                    style={[
-                        styles.input,
-                        focusedField === "shelfLife" && styles.inputFocused,
-                    ]}
+                    style={styles.input}
                     value={shelfLifeDays}
                     onChangeText={setShelfLifeDays}
-                    onFocus={() => setFocusedField("shelfLife")}
-                    onBlur={() => setFocusedField(null)}
-                    keyboardType="number-pad"
-                    placeholder="7"
+                    keyboardType="numeric"
+                    placeholder="12"
                 />
 
-                <Text style={styles.label}>Unit Price</Text>
-                <TextInput
-                    style={[
-                        styles.input,
-                        focusedField === "unitPrice" && styles.inputFocused,
-                    ]}
-                    value={unitPrice}
-                    onChangeText={setUnitPrice}
-                    onFocus={() => setFocusedField("unitPrice")}
-                    onBlur={() => setFocusedField(null)}
-                    keyboardType="decimal-pad"
-                    placeholder="4.99"
-                />
+                <Text style={styles.label}>Category</Text>
+                <View style={styles.picker}>
+                    <Picker<string>
+                        selectedValue={categories[0]}
+                        onValueChange={(value) => setCategory(value)}
+                    >
+                        {categories.map(category => (
+                            <Picker.Item label={category} value={category}/>
+                        ))}
+                    </Picker>
+                </View>
 
-                <Text style={styles.label}>Total Price (optional)</Text>
-                <TextInput
-                    style={[
-                        styles.input,
-                        focusedField === "totalPrice" && styles.inputFocused,
-                    ]}
-                    value={totalPrice}
-                    onChangeText={setTotalPrice}
-                    onFocus={() => setFocusedField("totalPrice")}
-                    onBlur={() => setFocusedField(null)}
-                    keyboardType="decimal-pad"
-                    placeholder="9.99"
-                />
-                <Text style={styles.helpText}>
-                    If you only know the full package cost, enter it here and we
-                    will calculate the price per unit based on the Default
-                    Amount above.
-                </Text>
-
+                <View style={styles.divider} />
                 <Pressable
                     style={({ pressed }) => [
                         styles.saveButton,
@@ -648,15 +326,8 @@ export default function AddTemplateScreen() {
                 >
                     <View style={styles.saveContent}>
                         <Text style={styles.saveText}>
-                            {loading ? "Saving…" : "Add Item"}
+                            {loading ? "Adding Item..." : "Add Item"}
                         </Text>
-                        {!loading && (
-                            <Ionicons
-                                name="arrow-forward-outline"
-                                size={18}
-                                color="#5c3b14"
-                            />
-                        )}
                     </View>
                 </Pressable>
             </ScrollView>
@@ -688,9 +359,10 @@ const styles = StyleSheet.create({
         fontWeight: "700",
         textAlign: "center",
     },
-    scrollContent: {
+    container: {
         padding: 16,
         paddingBottom: 32,
+        gap: 10,
     },
     sectionTitle: {
         fontSize: 18,
@@ -711,10 +383,14 @@ const styles = StyleSheet.create({
         fontSize: 16,
         backgroundColor: "#FFFFFF",
     },
-    // Green highlight when field is focused
-    inputFocused: {
-        borderColor: "#4CAF50",
-        borderWidth: 2,
+    picker: {
+        borderWidth: 1,
+        borderColor: "#CCCCCC",
+        borderRadius: 8,
+        // paddingHorizontal: 10,
+        // paddingVertical: 8,
+        fontSize: 16,
+        backgroundColor: "#FFFFFF",
     },
     helpText: {
         fontSize: 12,
