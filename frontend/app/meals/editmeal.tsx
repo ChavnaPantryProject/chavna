@@ -1,6 +1,4 @@
 // meal ingredients editing screen
-// add popup for add ingredient, amount, and dropdown for measurement units.
-// measurement units popup after you add ingredient, "--", click that to trigger popup.
 
 import React, { useState } from "react";
 import { 
