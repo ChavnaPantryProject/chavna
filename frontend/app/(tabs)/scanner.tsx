@@ -93,7 +93,7 @@ export default function ScannerScreen() {
           key += line.words[i].text + " ";
         }
 
-        if (key !== "") {
+        if (key !== "") { 
           scans.push({
             displayName: null,
             scanName: key,
