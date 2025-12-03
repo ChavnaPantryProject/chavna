@@ -6,7 +6,7 @@ plugins {
 }
 
 group = 'com.chavna'
-version = '0.0.23'
+version = '0.0.24'
 description = 'REST API for pantry project backend'
 
 java {

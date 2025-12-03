@@ -123,6 +123,39 @@ public class MealController {
         return null;
     }
 
+    public static class DeleteMealRequest {
+        @NotNull
+        public UUID mealId;
+    }
+
+    @PostMapping("delete-meal")
+    public Response deleteMeal(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody DeleteMealRequest requestBody) {
+        Login login = Authorization.authorize(authorizationHeader);
+        
+        UUID familyOwner = Authorization.getFamilyOwnerId(login);
+
+        Database.openConnection((Connection con) -> {
+            PreparedStatement statement = con.prepareStatement(String.format("""
+                DELETE FROM %s
+                WHERE owner = ? AND id = ?
+            """, Database.MEALS_TABLE));
+
+            statement.setObject(1, familyOwner);
+            statement.setObject(2, requestBody.mealId);
+
+            int result = statement.executeUpdate();
+
+            if (result == 0)
+                return Response.Fail("Failed to delete meal.");
+
+            return Response.Success("Meal deleted.");
+        })
+        .throwIfError()
+        .throwResponse();
+
+        return null;
+    }
+
     public static class FlattenedIngredient {
         public UUID templateId;
         public String name;
