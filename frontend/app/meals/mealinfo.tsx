@@ -1,9 +1,5 @@
 // meal nutrition facts screen
 
-// the nurtirion will update depending on what ingredients were inputted
-// must fix back button to navigate to the meal screen instead of the order sequence it was selected in
-// work on delete meal logic
-
 import React, {useState} from "react";
 import { 
     View, 
