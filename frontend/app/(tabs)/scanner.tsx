@@ -110,6 +110,7 @@ export default function ScannerScreen() {
         if (count !== undefined) {
           let scan = scans[i];
           scan.qty = count;
+          scan.price! /= count;
         }
       }
 
