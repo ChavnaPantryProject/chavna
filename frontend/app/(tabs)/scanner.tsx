@@ -13,42 +13,58 @@ export default function ScannerScreen() {
   const [image, setImage] = useState<string>("");
 
   const takePicture = async () => {
+
     const photo = await ref.current?.takePictureAsync({
       pictureRef: false,
-      base64: true
+      base64: true,
+      quality: 0
     });
+    router.push("/scannerConfirmation");
+    return;
     console.log("take picture");
     if (photo?.base64) {
       console.log("process photo");
-      setImage(photo.base64);
+      setImage(photo?.base64!);
 
       const response = await fetch(`${API_URL}/scan-receipt`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          base64Image: photo.base64
+          base64Image: photo?.base64
         })
       });
 
-
-      if (response === null)
+      if (response === null || !response.ok)
         return;
 
-      const body: Response = await response.json();
+      type Word = {
+        originalPolygon: {x: number, y: number}[] // Point 
+        text: string
+      }
+
+      type Line = {
+        words: Word[]
+      };
+      const body: Response<Line[]> = await response.json();
 
       if (body === null)
         return;
 
       if (body.success === "success") {
-        const lines = body.payload as Array<string>;
-        for (const s of lines) {
+        const lines = body.payload!;
+        for (const line of lines) {
+          let s = "";
+
+          for (const word of line.words) {
+            s += word.text + '\t';
+          }
+
           console.log(s);
         }
+      } else {
+        console.log(body); 
       }
     }
-
-
-    // router.push("/scannerConfirmation")
   };
 
   if (!permission) {
@@ -71,7 +87,15 @@ export default function ScannerScreen() {
   return (
     <View style={styles.container}>
       {/* Top Bar */}
-      <View style={styles.topBar}></View>
+      <View style={styles.topBar}>
+        <TouchableOpacity
+          style={styles.addTemplateButton}
+          onPress={() => router.push('/select-template')}
+        >
+          <Text style={styles.addTemplateText}>Manually Add Item</Text>
+        </TouchableOpacity>
+      </View>
+
 
       {/* Scanner Area with Live Camera */}
       <View style={styles.scannerArea}>
@@ -118,12 +142,28 @@ const styles = StyleSheet.create({
   },
   topBar: {
     flexDirection: "row",
-    justifyContent: "space-around",
+    justifyContent: "flex-end",
     alignItems: "center",
     height: 70,
     paddingVertical: 20,
+    paddingHorizontal: 16,
     backgroundColor: "#499F4458",
   },
+
+  addTemplateButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: "#499F44",
+  },
+
+  addTemplateText: {
+    color: "white",
+    fontWeight: "700",
+    fontSize: 14,
+  },
+
+
   scannerArea: {
     flex: 1,
     justifyContent: "center",

@@ -20,12 +20,14 @@ import DropDownPicker from "react-native-dropdown-picker";
 import * as ImagePicker from "expo-image-picker";
 import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
+import { API_URL, retrieveValue } from "../util";
 
 export default function NewMeal() {
     const [mealName, setMealName] = useState("");
     const [mealImage, setMealImage] = useState<string | null>(null);
     const [ingredients, setIngredients] = useState<
-        { name: string; amount: string; unit: string }[]
+        { templateId: string; name: string; amount: number; unit: string }[]
     >([]);
     
     const [modalVisible, setModalVisible] = useState(false);
@@ -51,9 +53,14 @@ export default function NewMeal() {
 
     const addIngredient = () => {
         if (newIngredient && newAmount && newUnit) {
-            setIngredients([
-                ...ingredients,
-                { name: newIngredient, amount: newAmount, unit: newUnit },
+            setIngredients(prev => [
+                ...prev,
+                { 
+                    templateId: newIngredient,
+                    name: newIngredient, 
+                    amount: parseFloat(newAmount), 
+                    unit: newUnit 
+                },
             ]);
             setNewIngredient("");
             setNewAmount("");
@@ -67,7 +74,9 @@ export default function NewMeal() {
         setIngredients(updatedIngredients);
     };
 
-    const saveMeal = () => {
+    const saveMeal = async () => {
+        console.log("SAVE BUTTON CLICKED");
+
         if (!mealName.trim()) {
             Alert.alert("Missing Information", "Please enter a meal name.");
             return;
@@ -78,25 +87,48 @@ export default function NewMeal() {
             return;
         }
 
-        // backend/database info
-        const mealData = {
+        // Convert ingredient objects to backend format
+        const formattedIngredients = ingredients.map((ing) => ({
+            templateId: ing.templateId, // MUST be a UUID
+            amount: ing.amount, // MUST be a number
+        }));
+
+        const token = await retrieveValue("jwt");
+
+        const requestBody = {
             name: mealName,
-            image: mealImage,
-            ingredients: ingredients,
+            ingredients: formattedIngredients,
         };
 
-        console.log("Saving meal:", mealData);
+        console.log("SENDING BODY:", requestBody);
 
-        Alert.alert(
-            "Meal Saved!",
-            '${mealName} has been saved successfully.',
-            [
+        try {
+            const response = await fetch(`${API_URL}/create-meal`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify(requestBody),
+            });
+
+            const text = await response.text();
+            console.log("RESPONSE:", text);
+
+            if (!response.ok) {
+                throw new Error(text);
+            }
+
+            Alert.alert("Meal Saved!", `${mealName} has been saved successfully.`, [
                 {
                     text: "OK",
                     onPress: () => navigation.goBack(),
-                }
-            ]
-        );
+                },
+            ]);
+        } catch (error) {
+            console.error("ERROR SAVING MEAL:", error);
+            Alert.alert("Error", "Could not save meal.");
+        }
     };
 
     return (

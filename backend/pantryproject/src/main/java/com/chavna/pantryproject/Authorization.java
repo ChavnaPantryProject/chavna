@@ -1,5 +1,8 @@
 package com.chavna.pantryproject;
 
+import static com.chavna.pantryproject.Database.FAMILY_MEMBER_TABLE;
+import static com.chavna.pantryproject.Database.USERS_TABLE;
+
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.sql.Connection;
@@ -9,6 +12,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.List;
 import java.util.UUID;
 
 import javax.crypto.SecretKey;
@@ -28,6 +32,7 @@ import io.jsonwebtoken.security.Keys;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
+import com.google.common.base.Splitter;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 
 public class Authorization {
@@ -109,12 +114,12 @@ public class Authorization {
     * @return      the user id assocciated with the token.
     */
     public static Login authorize(String authorizationHeader) {
-        String[] split = authorizationHeader.split(" ");
+        List<String> split = Splitter.on(" ").splitToList(authorizationHeader);
 
-        if (split.length != 2 || !split[0].equals("Bearer"))
+        if (split.size() != 2 || !split.get(0).equals("Bearer"))
             throw new ResponseException(Response.Error(HttpStatus.BAD_REQUEST, "Invalid authorization header."));
 
-        String token = split[1];
+        String token = split.get(1);
 
         JwtParser parser = Jwts.parser()
             .verifyWith(jwtKey)
@@ -162,7 +167,7 @@ public class Authorization {
 
         if (login instanceof NormalLogin) {
             // Get current login state
-            Database.openDatabaseConnection((Connection con) -> {
+            Database.openConnection((Connection con) -> {
                 PreparedStatement query = con.prepareStatement(String.format(
                     """
                     SELECT login_state FROM %s
@@ -172,15 +177,17 @@ public class Authorization {
                 ResultSet result = query.executeQuery();
                 
                 if (!result.next())
-                    throw new ResponseException(Response.Error(HttpStatus.NOT_FOUND, "User does not exist."));
+                    return Response.Error(HttpStatus.NOT_FOUND, "User does not exist.");
                 
                 UUID loginState = (UUID) result.getObject(1);
 
                 if (!loginState.equals(((NormalLogin) login).loginState))
-                    throw new ResponseException(Response.Error(HttpStatus.UNAUTHORIZED, "Invalid login token."));
+                    return Response.Error(HttpStatus.UNAUTHORIZED, "Invalid login token.");
 
                 return null;
-            }).throwIfError();
+            })
+            .throwIfError()
+            .throwResponse();
         } else {
             GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(new NetHttpTransport(), GsonFactory.getDefaultInstance())
                 .setAudience(Arrays.asList(Env.getenvNotNull("GOOGLE_CLIENT_ID")))
@@ -199,5 +206,41 @@ public class Authorization {
         }
 
         return login;
+    }
+
+    public static UUID getFamilyOwnerId(Login userLogin) {
+        // Default to current logged in user
+        UUID[] id = {userLogin.userId};
+
+        Database.openConnection((Connection con) -> {
+            PreparedStatement statement = con.prepareStatement(String.format("""
+                WITH m AS (
+                    SELECT id, family_id, role FROM %s
+                    INNER JOIN %s
+                    ON family_membership = member_id
+                )
+
+                SELECT id FROM m
+                WHERE family_id = (
+                    SELECT family_id FROM m
+                    WHERE id = ?
+                ) AND role = 1
+                LIMIT 1
+            """, FAMILY_MEMBER_TABLE, USERS_TABLE));
+
+            statement.setObject(1, userLogin.userId);
+
+            ResultSet result = statement.executeQuery();
+
+
+            if (result.next())
+                id[0] = (UUID) result.getObject(1);
+            
+            return null;
+        })
+        .throwIfError()
+        .ignoreResponse();
+
+        return id[0];
     }
 }

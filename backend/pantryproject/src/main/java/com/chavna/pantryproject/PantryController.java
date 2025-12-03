@@ -43,8 +43,9 @@ public class PantryController {
     @PostMapping("/create-food-item-template")
     public Response createFoodItemTemplate(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody FoodItemTemplate requestBody) {
         Login login = Authorization.authorize(authorizationHeader);
+        UUID familyOwner = Authorization.getFamilyOwnerId(login);
 
-        Database.openDatabaseConnection((Connection con) -> {
+        Database.openConnection((Connection con) -> {
             PreparedStatement statement = con.prepareStatement(String.format("""
                 INSERT INTO %s (name, owner, amount, unit, shelf_life_days, category)
                 VALUES (?, ?, ?, ?, ?, ?)
@@ -52,7 +53,7 @@ public class PantryController {
             """, FOOD_ITEM_TEMPLATES_TABLE));
 
             statement.setString(1, requestBody.name);
-            statement.setObject(2, login.userId);
+            statement.setObject(2, familyOwner);
             statement.setDouble(3, requestBody.amount);
             statement.setString(4, requestBody.unit);
             statement.setInt(5, requestBody.shelfLifeDays);
@@ -73,7 +74,9 @@ public class PantryController {
                 return Response.Fail("Category does not exist.");
             
             return null;
-        }).throwIfError();
+        })
+        .throwIfError()
+        .throwResponse();
 
         // This should be unreachable
         return null;
@@ -97,13 +100,14 @@ public class PantryController {
     @PostMapping("/get-food-item-templates")
     public Response getFoodItemTemplates(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody(required = false) GetFoodItemTemplatesRequest requestBody) {
         Login login = Authorization.authorize(authorizationHeader);
+        UUID familyOwner = Authorization.getFamilyOwnerId(login);
         
         if (requestBody == null)
             requestBody = new GetFoodItemTemplatesRequest();
 
         final var body = requestBody;
 
-        Database.openDatabaseConnection((Connection con) -> {
+        Database.openConnection((Connection con) -> {
             String query = String.format("""
                 SELECT * FROM %s
                 WHERE owner = ?
@@ -114,7 +118,7 @@ public class PantryController {
 
             PreparedStatement statement;
             statement = con.prepareStatement(query);
-            statement.setObject(1, login.userId);
+            statement.setObject(1, familyOwner);
 
             if (body.search != null) {
                 String like = '%' + body.search + '%';
@@ -141,7 +145,9 @@ public class PantryController {
             }
 
             return Response.Success(templates);
-        }).throwIfError();
+        })
+        .throwIfError()
+        .throwResponse();
 
         // This should be unreachable
         return null;
@@ -167,8 +173,9 @@ public class PantryController {
             return Response.Success();
 
         Login login = Authorization.authorize(authorizationHeader);
+        UUID familyOwner = Authorization.getFamilyOwnerId(login);
 
-        Database.openDatabaseConnection((Connection con) -> {
+        Database.openConnection((Connection con) -> {
             String values = "";
             for (@SuppressWarnings("unused") var __ : requestBody.items)
                 values += "(CAST(? AS uuid), ?, now()::date, ?),";
@@ -196,15 +203,44 @@ public class PantryController {
                 i++;
             }
 
-            statement.setObject(i, login.userId);
+            statement.setObject(i, familyOwner);
 
             int updated = statement.executeUpdate();
 
             if (updated == 0)
                 return Response.Fail("No items added.");
 
+            // Update most recent unit price
+            String updateValues = "";
+
+            for (@SuppressWarnings("unused") var __ : requestBody.items)
+                updateValues += "(?, ?),";
+
+            updateValues = updateValues.substring(0, updateValues.length() - 1);
+
+            PreparedStatement updateQuery = con.prepareStatement(String.format("""
+                UPDATE %1$s
+                SET most_recent_unit_price = data.unit_price
+                FROM (VALUES
+                    %2$s
+                ) AS data (id, unit_price)
+                WHERE %1$s.id = data.id
+            """, FOOD_ITEM_TEMPLATES_TABLE, updateValues));
+
+            i = 1;
+            for (FoodItemFromTemplate item : requestBody.items) {
+                updateQuery.setObject(i, item.templateId);
+                i++;
+                updateQuery.setObject(i, item.unitPrice);
+                i++;
+            }
+
+            updateQuery.executeUpdate();
+
             return Response.Success("Items added: " + updated);
-        }).throwIfError();
+        })
+        .throwIfError()
+        .throwResponse();
 
         // This should be unreachable
         return null;
@@ -235,13 +271,14 @@ public class PantryController {
     @PostMapping("/get-food-items")
     public Response getFoodItems(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody(required = false) GetFoodItemsRequest requestBody) {
         Login login = Authorization.authorize(authorizationHeader);
+        UUID familyOwner = Authorization.getFamilyOwnerId(login);
 
         if (requestBody == null)
             requestBody = new GetFoodItemsRequest();
 
         final var body = requestBody;
 
-        Database.openDatabaseConnection((Connection con) -> {
+        Database.openConnection((Connection con) -> {
             String query = String.format("""
                 SELECT * FROM %s
                 INNER JOIN %s
@@ -253,7 +290,7 @@ public class PantryController {
                 query += "AND category = ?";
 
             PreparedStatement statement = con.prepareStatement(query);
-            statement.setObject(1, login.userId);
+            statement.setObject(1, familyOwner);
 
             if (body.category != null)
                 statement.setString(2, body.category);
@@ -278,7 +315,9 @@ public class PantryController {
             }
 
             return Response.Success(new GetFoodItemsResponse(items));
-        }).throwIfError();
+        })
+        .throwIfError()
+        .throwResponse();
 
         // This should be unreachable
         return null;
@@ -294,8 +333,9 @@ public class PantryController {
     @PostMapping("/update-food-item")
     public Response updateFoodItem(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody UpdateFoodItemRequest requestBody) {
         Login login = Authorization.authorize(authorizationHeader);
+        UUID familyOwner = Authorization.getFamilyOwnerId(login);
 
-        Database.openDatabaseConnection((Connection con) -> {
+        Database.openConnection((Connection con) -> {
             if (requestBody.newAmount > 0) {
                 PreparedStatement statement = con.prepareStatement(String.format("""
                     UPDATE %1$s
@@ -306,7 +346,7 @@ public class PantryController {
                 """, FOOD_ITEMS_TABLE, FOOD_ITEM_TEMPLATES_TABLE));
                 statement.setDouble(1, requestBody.newAmount);
                 statement.setObject(2, requestBody.foodItemId);
-                statement.setObject(3, login.userId);
+                statement.setObject(3, familyOwner);
 
                 if (statement.executeUpdate() < 1)
                     return Response.Fail("Food item not updated.");
@@ -319,14 +359,16 @@ public class PantryController {
                 """, Database.FOOD_ITEMS_TABLE, Database.FOOD_ITEM_TEMPLATES_TABLE));
 
                 statement.setObject(1, requestBody.foodItemId);
-                statement.setObject(2, login.userId);
+                statement.setObject(2, familyOwner);
 
                 if (statement.executeUpdate() < 1)
                     return Response.Fail("Food item not updated.");
             }
 
             return null;
-        }).throwIfError();
+        })
+        .throwIfError()
+        .throwResponse();
 
         return Response.Success("Food item updated");
     }
@@ -339,14 +381,15 @@ public class PantryController {
     @PostMapping("/create-category")
     public Response createCategory(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody CategoryRequest requestBody) {
         Login login = Authorization.authorize(authorizationHeader);
+        UUID familyOwner = Authorization.getFamilyOwnerId(login);
 
-        Database.openDatabaseConnection((Connection con) -> {
+        Database.openConnection((Connection con) -> {
             PreparedStatement statement = con.prepareStatement(String.format("""
                 INSERT INTO %s (name, owner)
                 VALUES (?, ?);
             """, CATEGORIES_TABLE));
             statement.setString(1, requestBody.name);
-            statement.setObject(2, login.userId);
+            statement.setObject(2, familyOwner);
 
             statement.executeUpdate();
 
@@ -356,7 +399,9 @@ public class PantryController {
                 return Response.Fail("Category already exists.");
             
             return null;
-        }).throwIfError();
+        })
+        .throwIfError()
+        .throwResponse();
 
         return Response.Success("Category created.");
     }
@@ -364,14 +409,15 @@ public class PantryController {
     @PostMapping("/remove-category")
     public Response removeCategory(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody CategoryRequest requestBody) {
         Login login = Authorization.authorize(authorizationHeader);
+        UUID familyOwner = Authorization.getFamilyOwnerId(login);
 
-        Database.openDatabaseConnection((Connection con) -> {
+        Database.openConnection((Connection con) -> {
             PreparedStatement statement = con.prepareStatement(String.format("""
                 DELETE FROM %s
                 WHERE name = ? AND owner = ?;
             """, CATEGORIES_TABLE));
             statement.setString(1, requestBody.name);
-            statement.setObject(2, login.userId);
+            statement.setObject(2, familyOwner);
 
             int removed = statement.executeUpdate();
 
@@ -379,7 +425,9 @@ public class PantryController {
                 return Response.Fail("Category not found.");
 
             return null;
-        }).throwIfError();
+        })
+        .throwIfError()
+        .throwResponse();
 
         return Response.Success("Category removed.");
     }
@@ -395,13 +443,14 @@ public class PantryController {
     @GetMapping("/get-categories")
     public Response getCategories(@RequestHeader("Authorization") String authorizationHeader) {
         Login login = Authorization.authorize(authorizationHeader);
+        UUID familyOwner = Authorization.getFamilyOwnerId(login);
 
-        Database.openDatabaseConnection((Connection con) -> {
+        Database.openConnection((Connection con) -> {
             PreparedStatement statement = con.prepareStatement(String.format("""
                 SELECT name FROM %s
                 WHERE owner = ?
             """, CATEGORIES_TABLE));
-            statement.setObject(1, login.userId);
+            statement.setObject(1, familyOwner);
             ResultSet result = statement.executeQuery();
 
             GetCategoriesResponse response = new GetCategoriesResponse();
@@ -410,9 +459,93 @@ public class PantryController {
             }
 
             return Response.Success(response);
-        }).throwIfError();
+        })
+        .throwIfError()
+        .throwResponse();
 
         // This should be unreachable
         return null;
+    }
+
+    public static class GetScanKeyRequest {
+        @NotNull
+        public String key;
+    }
+
+    @AllArgsConstructor
+    public static class GetScanKeyResponse {
+        public UUID templateId;
+    }
+
+    @PostMapping("get-scan-key")
+    public Response getScanKey(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody GetScanKeyRequest requestBody) {
+        Login login = Authorization.authorize(authorizationHeader);
+        UUID familyOwner = Authorization.getFamilyOwnerId(login);
+
+        UUID[] templateId = {null};
+        Database.openConnection((Connection con) -> {
+            PreparedStatement statement = con.prepareStatement("""
+                SELECT template_id FROM scan_items
+                WHERE scan_text = ? AND owner = ?;
+            """);
+
+            statement.setString(1, requestBody.key);
+            statement.setObject(2, familyOwner);
+
+            ResultSet result = statement.executeQuery();
+
+            if (result.next())
+                templateId[0] = (UUID) result.getObject(1);
+
+            return null;
+        })
+        .throwIfError()
+        .ignoreResponse();
+
+        return Response.Success(new GetScanKeyResponse(templateId[0]));
+    }
+
+    public static class SetScanKeyRequest {
+        @NotNull
+        public String key;
+        @Nullable
+        public UUID templateId;
+    }
+
+    @PostMapping("/set-scan-key")
+    public Response setScanKey(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody SetScanKeyRequest requestBody) {
+        Login login = Authorization.authorize(authorizationHeader);
+        UUID familyOwner = Authorization.getFamilyOwnerId(login);
+
+        Database.openConnection((Connection con) -> {
+            PreparedStatement deleteStatement = con.prepareStatement("""
+                DELETE FROM scan_items
+                WHERE scan_text = ? AND owner = ?;
+            """);
+
+            deleteStatement.setString(1, requestBody.key);
+            deleteStatement.setObject(2, familyOwner);
+
+            deleteStatement.executeUpdate();
+
+            if (requestBody.templateId != null) {
+                PreparedStatement statement = con.prepareStatement("""
+                    INSERT INTO scan_items (scan_text, template_id, owner)
+                    VALUES (?, ?, ?)
+                """);
+
+                statement.setString(1, requestBody.key);
+                statement.setObject(2, requestBody.templateId);
+                statement.setObject(3, familyOwner);
+
+                statement.executeUpdate();
+            }
+
+            return null;
+        })
+        .throwIfError()
+        .throwResponse();
+
+        return Response.Success("Key added.");
     }
 }

@@ -2,107 +2,161 @@ package com.chavna.pantryproject;
 
 import java.util.TreeSet;
 
-import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import software.amazon.awssdk.services.textract.model.Block;
-import software.amazon.awssdk.services.textract.model.BlockType;
-import software.amazon.awssdk.services.textract.model.BoundingBox;
 
 public class ReceiptParser {
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    private static class TextLineBlock implements Comparable<TextLineBlock> {
+    @AllArgsConstructor
+    public static class Point {
+        public float x;
+        public float y;
+    }
+
+    @AllArgsConstructor
+    public static class Word implements Cloneable, Comparable<Word> {
+        private float x;
+        private float y;
+        private float width;
+        private float height;
         @Getter
-        private double x;
-        @Getter
-        private double y;
-        @Getter
-        private double width;
-        @Getter
-        private double height;
+        private Point[] originalPolygon;
         @Getter
         private String text;
 
-        @Override
-        public int compareTo(TextLineBlock other) {
-            double aCenter = getCenterY();
-            double bCenter = other.getCenterY();
-
-            // If either block's y center is within the other's y bounds, they are considered on the same line.
-            if ((bCenter <= y + height && bCenter >= y) || (aCenter <= other.height && aCenter >= other.y))
-                return 0;
-
-            // Otherwise compare the y position of their centers
-            return Double.compare(aCenter, bCenter);
-        }
-
-        public double getCenterY() {
-            return y + height / 2.0;
-        }
-
-        public double getCharacterWidth() {
+        public float getCharacterWidth() {
             return width / text.length();
         }
 
-        public static TextLineBlock combine(TextLineBlock a, TextLineBlock b) {
-            // Use avg character width to calculate total line length
-            double characterWidth = (a.getCharacterWidth() + b.getCharacterWidth()) / 2.0;
+        @Override
+        public Word clone() {
+            Point[] points = new Point[originalPolygon.length];
+            for (int i = 0; i < originalPolygon.length; i++) {
+                points[i] = new Point(originalPolygon[i].x, originalPolygon[i].y);
+            }
 
-            double x = Double.min(a.x, b.x);
-            double y = Double.min(a.y, b.y);
-            double width = Double.max(a.x + a.width, b.x + b.width) - x;
-            double height = Double.max(a.y + a.height, b.y + b.height) - y;
+            return new Word(x, y, width, height, originalPolygon, text);
+        }
 
-            int textLength = (int) Math.round(width / characterWidth);
-            textLength = textLength * 3 / 2; // Add some extra space just in case.
-            StringBuilder combinedText = new StringBuilder(new String(new char[textLength]).replace('\0', ' '));
-
-            int aStart = (int) ((a.x - x) / characterWidth);
-            int bStart = (int) ((b.x - x) / characterWidth);
-
-            combinedText.replace(aStart, aStart + a.text.length(), a.text);
-            combinedText.replace(bStart, bStart + b.text.length(), b.text);
-
-            String text = combinedText.toString().stripTrailing();
-
-            return new TextLineBlock(x, y, width, height, text);
+        @Override
+        public int compareTo(Word other) {
+            return Float.compare(x, other.x);
         }
     }
 
-    private TreeSet<TextLineBlock> blocks;
+    public static class LineBlock implements Comparable<LineBlock> {
+        @Getter
+        private float x;
+        @Getter
+        private float y;
+        @Getter
+        private float width;
+        @Getter
+        private float height;
+        private Word[] words;
+
+        private LineBlock(Word[] words) {
+            this.words = words;
+
+            Float x = null;
+            for (Word w : words) {
+                if (x == null || w.x < x)
+                    x = w.x;
+            }
+            this.x = x != null? x : 0;
+
+            Float y = null;
+            for (Word w : words) {
+                if (y == null || w.y < y)
+                    y = w.y;
+            }
+            this.y = y != null? y : 0;
+
+            Float xMax = null;
+            for (Word w : words) {
+                if (xMax == null || w.x + w.width > xMax)
+                    xMax = w.x + w.width;
+            }
+            width = (xMax != null? xMax : 0) - this.x;
+
+            Float yMax = null;
+            for (Word w : words) {
+                if (yMax == null || w.y + w.height > yMax)
+                    yMax = w.y + w.height;
+            }
+            height = (yMax != null? yMax : 0) - this.y;
+        }
+
+        public LineBlock(Word word) {
+            this(new Word[] {word});
+        }
+
+        @Override
+        public int compareTo(LineBlock other) {
+            float aCenter = centerY();
+            float bCenter = other.centerY();
+
+            // If either block's y center is within the other's y bounds, they are considered on the same line.
+            if ((bCenter <= y + height && bCenter >= y) || (aCenter <= other.y + other.height && aCenter >= other.y))
+                return 0;
+
+            // Otherwise compare the y position of their centers
+            return Float.compare(aCenter, bCenter);
+        }
+
+        public float centerY() {
+            return getY() + getHeight() / 2;
+        }
+
+        public Word[] getWords() {
+            Word[] out = new Word[words.length];
+
+            for (int i = 0; i < words.length; i++)
+                out[i] = words[i].clone();
+
+            return out;
+        }
+
+        public static LineBlock combine(LineBlock a, LineBlock b) {
+            TreeSet<Word> wordSet = new TreeSet<>();
+
+            for (Word w : a.words)
+                wordSet.add(w);
+
+            for (Word w : b.words)
+                wordSet.add(w);
+
+            Word[] words = new Word[wordSet.size()];
+            wordSet.toArray(words);
+
+            return new LineBlock(words);
+        }
+    }
+
+    private TreeSet<LineBlock> blocks;
 
     public ReceiptParser() {
         blocks = new TreeSet<>();
     }
 
-    public void addBlock(Block block) {
-        if (block.blockType() != BlockType.LINE)
-            throw new IllegalArgumentException("BlockType must be LINE.");
+    public void addWord(Word word) {
+        LineBlock textBlock = new LineBlock(word);
 
-        BoundingBox boundingBox = block.geometry().boundingBox();
-        TextLineBlock textBlock = new TextLineBlock(boundingBox.left(), boundingBox.top(), boundingBox.width(), boundingBox.height(), block.text());
-
-        TextLineBlock existing = blocks.ceiling(textBlock);
+        LineBlock existing = blocks.ceiling(textBlock);
 
         if (existing != null && existing.compareTo(textBlock) != 0)
             existing = null;
 
         if (existing != null) {
             blocks.remove(existing);
-            textBlock = TextLineBlock.combine(existing, textBlock);
+            textBlock = LineBlock.combine(existing, textBlock);
         }
 
         blocks.add(textBlock);
     }
 
-    public String[] getLines() {
-        String[] out = new String[blocks.size()];
-
-        int i = 0;
-        for (TextLineBlock line : blocks) {
-            out[i] = line.text;
-            i++;
-        }
+    public LineBlock[] getLines() {
+        LineBlock[] out = new LineBlock[blocks.size()];
+        blocks.toArray(out);
 
         return out;
     }

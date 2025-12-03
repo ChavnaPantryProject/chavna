@@ -11,12 +11,11 @@ import software.amazon.awssdk.services.sesv2.model.Message;
 import software.amazon.awssdk.services.sesv2.model.SendEmailRequest;
 
 public class Email {
-    public static void verifyEmailAddress(String email) {
-        Region region = Region.US_EAST_1;
-        SesV2Client client = SesV2Client.builder()
-            .region(region)
-            .build();
+    private static SesV2Client client = SesV2Client.builder()
+        .region(Region.US_EAST_1)
+        .build();
         
+    public static void verifyEmailAddress(String email) {
         CreateEmailIdentityRequest request = CreateEmailIdentityRequest.builder()
             .emailIdentity(email)
             .build();
@@ -25,11 +24,6 @@ public class Email {
     }
 
     public static void sendEmail(String from, String to, String htmlContent, String subject) {
-        Region region = Region.US_EAST_1;
-        SesV2Client client = SesV2Client.builder()
-            .region(region)
-            .build();
-        
         Destination dest = Destination.builder()
             .toAddresses(to)
             .build();
