@@ -1,4 +1,3 @@
-
 import React, { useRef, useState } from "react";
 import { Text, View, StyleSheet, TouchableOpacity, Button, Alert } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -14,6 +13,7 @@ export default function ScannerScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const ref = useRef<CameraView>(null);
   const [image, setImage] = useState<string>("");
+  const [parsedItems, setParsedItems] = useState<{ name: string; price: string }[]>([]);
 
   const takePicture = async () => {
     const photo = await ref.current?.takePictureAsync({
@@ -78,6 +78,9 @@ export default function ScannerScreen() {
           }
           console.log(s);
         }
+
+        //Save parsed items for navigation
+        setParsedItems(body.payload);
       }
     } catch (error) {
       console.error("Error sending image:", error);
@@ -126,8 +129,16 @@ export default function ScannerScreen() {
       {/* Bottom Navigation Bar */}
       <View style={styles.bottomBar}>
         {/* Left Button */}
-        <TouchableOpacity style={styles.iconButton} onPress={toggleCameraFacing}>
-          <Ionicons name="camera-reverse" size={28} color="white" />
+        <TouchableOpacity
+          style={styles.iconButton}
+          onPress={() =>
+            router.push({
+              pathname: "/parsedResults",
+              params: { items: JSON.stringify(parsedItems) },
+            })
+          }
+        >
+          <Ionicons name="list-outline" size={28} color="white" />
         </TouchableOpacity>
 
         {/* Middle Button */}

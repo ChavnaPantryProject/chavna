@@ -1,3 +1,4 @@
+
 package com.chavna.pantryproject;
 
 import org.springframework.http.HttpStatus;
@@ -14,6 +15,8 @@ import jakarta.validation.constraints.NotNull;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import software.amazon.awssdk.core.SdkBytes;
 import software.amazon.awssdk.regions.Region;
@@ -30,13 +33,20 @@ public class OcrController {
         @NotNull
         public String base64Image;
     }
+    //put items parsed here
+    public static class ParsedItem {
+        public String name;
+        public String price;
 
-
+        public ParsedItem(String name, String price) {
+            this.name = name;
+            this.price = price;
+        }
+    }
 
     @PostMapping("/scan-receipt")
     @SuppressWarnings("CatchAndPrintStackTrace")
     public Response scanReceipt(@Valid @RequestBody ScanRequest requestBody) {
-        
         TextractClient textractClient = TextractClient.builder()
             .region(Region.US_EAST_1)
             .build();
@@ -64,8 +74,6 @@ public class OcrController {
             int count = 0;
             for (Block block : detectResponse.blocks()) {
                 if (block.blockType() == BlockType.WORD) {
-                    // Some of this stuff can be null, so i'm not gonna risk it
-                    
                     try {
                         List<software.amazon.awssdk.services.textract.model.Point> polygon = block.geometry().polygon();
                         var a  = polygon.get(0);
@@ -83,15 +91,17 @@ public class OcrController {
                         }
 
                         words.add(new Word(0, 0, 0, 0, points, block.text()));
+
                     } catch (NullPointerException ex) {
                         ex.printStackTrace();
-                    } 
+                    }
                 }
             }
 
             double avgAngle = totalAngle / count;
 
             ReceiptParser parser = new ReceiptParser();
+
             for (Word w : words) {
                 Point[] polygon = w.getOriginalPolygon();
 
@@ -106,30 +116,89 @@ public class OcrController {
                     double x = point.x*Math.cos(-avgAngle) - point.y*Math.sin(-avgAngle);
                     double y = point.x*Math.sin(-avgAngle) + point.y*Math.cos(-avgAngle);
 
-                    if (minX == null || x < minX)
-                        minX = (float) x;
-
-                    if (maxX == null || x > maxX)
-                        maxX = (float) x;
-
-                    if (minY == null || y < minY)
-                        minY = (float) y;
-
-                    if (maxY == null || y > maxY)
-                        maxY = (float) y;
+                    if (minX == null || x < minX) minX = (float) x;
+                    if (maxX == null || x > maxX) maxX = (float) x;
+                    if (minY == null || y < minY) minY = (float) y;
+                    if (maxY == null || y > maxY) maxY = (float) y;
                 }
-                
-                minX = minX != null? minX : 0;
-                minY = minY != null? minY : 0;
-                maxX = maxX != null? maxX : 0;
-                maxY = maxY != null? maxY : 0;
 
-                parser.addWord(new Word(minX, minY, maxX - minX, maxY - minY, polygon, w.getText()));
+                parser.addWord(new Word(
+                        minX != null ? minX : 0,
+                        minY != null ? minY : 0,
+                        maxX != null ? maxX - minX : 0,
+                        maxY != null ? maxY - minY : 0,
+                        polygon,
+                        w.getText()
+                ));
             }
 
-            System.out.println("avgAngle: " + avgAngle);
+            List<List<Word>> lines = parser.getLines();
+            List<ParsedItem> items = new ArrayList<>();
 
-            return Response.Success(parser.getLines());
+            Pattern pricePattern = Pattern.compile("\\d+\\.\\d{2}");
+            java.util.function.Function<String, String> normalizeText = (s) -> s
+                    .replaceAll("[Oo]", "0")
+                    .replaceAll(",", ".")
+                    .replaceAll("[^0-9A-Za-z.]",""); // remove weird OCR chars
+
+            System.out.println("LOG Raw OCR Lines:");
+            for (List<Word> line : lines) {
+                StringBuilder rawLine = new StringBuilder();
+                for (Word w : line) {
+                    rawLine.append(w.getText()).append("\t");
+                }
+                System.out.println(rawLine.toString().trim());
+            }
+
+            // Improved Parsing Logic
+            for (List<Word> line : lines) {
+                line.sort((a, b) -> Float.compare(a.getX(), b.getX()));
+
+                List<String> tokens = line.stream()
+                        .map(w -> normalizeText.apply(w.getText()))
+                        .filter(t -> !t.isEmpty())
+                        .collect(Collectors.toList());
+
+                String price = null;
+                int priceIndex = -1;
+
+                for (int i = 0; i < tokens.size(); i++) {
+                    String token = tokens.get(i);
+                    if (pricePattern.matcher(token).matches()) {
+                        price = token;
+                        priceIndex = i;
+                        break;
+                    }
+                    if (i + 2 < tokens.size() &&
+                        tokens.get(i).matches("\\d+") &&
+                        tokens.get(i + 1).equals(".") &&
+                        tokens.get(i + 2).matches("\\d{2}")) {
+                        price = tokens.get(i) + "." + tokens.get(i + 2);
+                        priceIndex = i;
+                        break;
+                    }
+                }
+
+                if (priceIndex == -1 || price == null || price.isEmpty()) continue;
+
+                String itemName = tokens.subList(0, priceIndex).stream()
+                        .filter(t -> !t.matches("\\d{4,}"))
+                        .collect(Collectors.joining(" "));
+
+                if (!itemName.isEmpty()) {
+                    items.add(new ParsedItem(itemName.trim(), price));
+                }
+            }
+
+            System.out.println("Parsed Items:");
+            if (items.isEmpty()) {
+                System.out.println("No parsed items found.");
+            } else {
+                items.forEach(item -> System.out.println(item.name + " -> " + item.price));
+            }
+
+            return Response.Success(items);
+
         } catch (IllegalArgumentException ex) {
             ex.printStackTrace();
             return Response.Error(HttpStatus.INTERNAL_SERVER_ERROR, "Base64 Decode Error");
