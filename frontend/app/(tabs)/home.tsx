@@ -60,6 +60,25 @@ function daysUntil(expiration: string): number | null {
   return Math.round((expUTC - todayUTC) / MS_PER_DAY);
 }
 
+function isInCurrentWeek(dateStr: string): boolean {
+  if (!dateStr) return false;
+
+  const added = new Date(dateStr);
+  if (isNaN(added.getTime())) return false;
+
+  const now = new Date();
+
+  const startOfWeek = new Date(now);
+  const day = now.getDay(); // 0 = Sunday
+  startOfWeek.setDate(now.getDate() - day);
+  startOfWeek.setHours(0, 0, 0, 0);
+
+  const endOfWeek = new Date(startOfWeek);
+  endOfWeek.setDate(startOfWeek.getDate() + 7);
+
+  return added >= startOfWeek && added < endOfWeek;
+}
+
 
 // Keep up to 2 weeks in the future, and 1 week in the past
 const EXPIRY_WINDOW_FUTURE = 14;
@@ -159,6 +178,49 @@ async function updateShoppingList(shoppingList: Array<ShoppingListItem>) {
     throw body;
 }
 
+async function getWeeklySpend(): Promise<number> {
+  const loginToken: string = (await retrieveValue('jwt'))!;
+
+  const response = await fetch(`${API_URL}/get-food-items`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${loginToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({}),
+  });
+
+  const body = await response.json();
+
+  if (!response.ok) throw body;
+  if (body.success !== 'success') throw body;
+
+  const items = body.payload.items as Array<{
+    amount: number;
+    unitPrice: number;
+    addDate: string;
+  }>;
+
+  let total = 0;
+
+  for (const item of items) {
+    if (
+      !item ||
+      typeof item.amount !== 'number' ||
+      typeof item.unitPrice !== 'number'
+    ) {
+      continue;
+    }
+
+    if (!isInCurrentWeek(item.addDate)) continue;
+
+    total += item.amount * item.unitPrice;
+  }
+
+  return total;
+}
+
+
 export default function HomeScreen() {
   const initialItems = [].map((_, i) => ({
     id: String(i + 1),
@@ -199,6 +261,26 @@ export default function HomeScreen() {
       }
     })();
   }, []);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      (async () => {
+        try {
+          const total = await getWeeklySpend();
+          setWeeklySpend(total);
+          setWeeklySpendError(null);
+        } catch (err) {
+          console.error('Failed to load weekly spend', err);
+          setWeeklySpend(null);
+          setWeeklySpendError('Failed to load weekly spend');
+        }
+      })();
+
+      // no cleanup needed for now
+      return () => { };
+    }, [])
+  );
+
 
   // Check for expiring items and send notifications on mount
   useEffect(() => {
@@ -242,6 +324,9 @@ export default function HomeScreen() {
     }
   }, [updateItems]);
   
+
+  const [weeklySpend, setWeeklySpend] = useState<number | null>(null);
+  const [weeklySpendError, setWeeklySpendError] = useState<string | null>(null);
 
     // Expiration Warning
   const [expiringOpen, setExpiringOpen] = useState(false);
@@ -325,8 +410,15 @@ export default function HomeScreen() {
             <View style={styles.spentPillWrap}>
               <Text style={styles.spentLabel}>Spent This Week</Text>
               <View style={styles.spentPill}>
-                <Text style={styles.spentValue}>$60.00</Text>
+                <Text style={styles.spentValue}>
+                  {weeklySpend === null ? '$--.--' : `$${weeklySpend.toFixed(2)}`}
+                </Text>
               </View>
+
+              {weeklySpendError ? (
+                <Text style={styles.spentErrorText}>{weeklySpendError}</Text>
+              ) : null}
+
             </View>
 
             <Pressable
@@ -1080,6 +1172,14 @@ ellipsisButton: {
   top: 0,
   padding: 6,
 },
+  spentErrorText: {
+    marginTop: 4,
+    fontSize: 12,
+    color: '#C62828',
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+
 
 });
 const expStyles = StyleSheet.create({
