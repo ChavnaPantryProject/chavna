@@ -19,12 +19,21 @@ import java.util.UUID;
 
 import javax.imageio.ImageIO;
 
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+
 public class S3 {
     private static S3Client s3Client = S3Client.builder()
         .region(Region.US_EAST_1)
         .build();
     
     public static final String PICTURES_BUCKET = "chavna-pictures";
+
+    @AllArgsConstructor
+    public static class S3Upload {
+        @Getter
+        private String key;
+    }
 
     public static void uploadImage(BufferedImage image, String key) {
         PutObjectRequest putObjectRequest = PutObjectRequest.builder()

@@ -37,6 +37,7 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-security'
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 	implementation 'org.springframework.boot:spring-boot-starter-jdbc'
+	implementation 'org.springframework.boot:spring-boot-starter-test'
 
 	implementation("org.apache.commons:commons-dbcp2:2.13.0")
 
@@ -54,10 +55,17 @@ dependencies {
     implementation 'com.google.auth:google-auth-library-oauth2-http:1.40.0'
 	implementation("com.google.http-client:google-http-client:2.0.2")
 	
+    // testImplementation 'org.junit.jupiter:junit-jupiter:5.7.1'
+    // testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
-tasks.named('test') {
-	useJUnitPlatform()
+test {
+	testLogging {
+		exceptionFormat = 'full'
+		showStandardStreams = true
+	}
+  	useJUnitPlatform()
+	jvmArgs '-Xms1G', '-Xmx2G'
 }
 
 task jarName {
