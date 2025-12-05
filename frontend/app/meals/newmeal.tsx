@@ -1,9 +1,8 @@
 // empty screen for new meal creation
-// implement the empty picture option.
 
 // NOTE: this will be the default screen when a usesr decides to add a new meal/
 
-import React, { use, useState } from "react";
+import React, { use, useEffect, useState } from "react";
 import { 
     View, 
     Text, 
@@ -15,17 +14,20 @@ import {
     Modal,
     Alert,
     ScrollView,
+    Pressable,
 } from "react-native";
 import DropDownPicker from "react-native-dropdown-picker";
 import * as ImagePicker from "expo-image-picker";
 import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
-import { API_URL, retrieveValue } from "../util";
+import { router, useFocusEffect } from "expo-router";
+import { API_URL, Response, retrieveValue } from "../util";
+import { getSelectedTemplate, Template } from "../select-template";
 
 export default function NewMeal() {
     const [mealName, setMealName] = useState("");
     const [mealImage, setMealImage] = useState<string | null>(null);
+    const [base64Image, setBase64Image] = useState<string | null>(null);
     const [ingredients, setIngredients] = useState<
         { templateId: string; name: string; amount: number; unit: string }[]
     >([]);
@@ -36,30 +38,45 @@ export default function NewMeal() {
     const [newUnit, setNewUnit] = useState("g");
     const [openUnit, setOpenUnit] = useState(false);
 
+    const [template, setTemplate] = useState<Template | null>(null);
+
     const navigation = useNavigation();
+
+    useEffect(() => {
+        setModalVisible(true);
+        console.log(template);
+    }, [template]);
+
+    useFocusEffect(() => {
+        const tmp = getSelectedTemplate();
+        if (tmp != null)
+            setTemplate(tmp);
+    })
 
     const pickImage = async () => {
         const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            mediaTypes: ["images"],
             allowsEditing: true,
             aspect: [4, 3],
-            quality: 1,
+            quality: 0,
+            base64: true
         });
 
         if (!result.canceled) {
             setMealImage(result.assets[0].uri);
+            setBase64Image(result.assets[0].base64!);
         }
     };
 
     const addIngredient = () => {
-        if (newIngredient && newAmount && newUnit) {
+        if (newAmount && template) {
             setIngredients(prev => [
                 ...prev,
                 { 
-                    templateId: newIngredient,
-                    name: newIngredient, 
+                    templateId: template!.id,
+                    name: template!.name, 
                     amount: parseFloat(newAmount), 
-                    unit: newUnit 
+                    unit: template!.unit.trim() 
                 },
             ]);
             setNewIngredient("");
@@ -100,7 +117,7 @@ export default function NewMeal() {
             ingredients: formattedIngredients,
         };
 
-        console.log("SENDING BODY:", requestBody);
+        console.log(requestBody);
 
         try {
             const response = await fetch(`${API_URL}/create-meal`, {
@@ -112,11 +129,39 @@ export default function NewMeal() {
                 body: JSON.stringify(requestBody),
             });
 
-            const text = await response.text();
-            console.log("RESPONSE:", text);
+            type CreateMealResponse = {
+                mealId: string,
+                ingredientsAdded: number
+            }
 
-            if (!response.ok) {
-                throw new Error(text);
+            const body: Response<CreateMealResponse> = await response.json();
+
+            if (!response.ok || body.success !== "success") {
+                throw new Error(JSON.stringify(body));
+            }
+
+            if (base64Image != null) {
+                const imageResponse = await fetch(`${API_URL}/update-meal`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({
+                        mealId: body.payload?.mealId,
+                        meal: {
+                            mealPictureBase64: base64Image
+                        }
+                    })
+                });
+                console.log(imageResponse);
+
+                const imageBody: Response<any> = await imageResponse.json();
+
+                if (!imageResponse.ok || imageBody.success !== "success") {
+                    console.log("update-meal failed: ", imageBody);
+                    return;
+                }
             }
 
             Alert.alert("Meal Saved!", `${mealName} has been saved successfully.`, [
@@ -185,7 +230,7 @@ export default function NewMeal() {
                             <Text style={styles.ingredientText}>{item.name}</Text>
                             <View style={styles.amountContainer}>
                                 <Text style={styles.amountText}>
-                                    {item.amount}{item.unit}
+                                    {item.amount} {item.unit}
                                 </Text>
 
                                 <TouchableOpacity
@@ -226,13 +271,14 @@ export default function NewMeal() {
                     <View style={styles.modalContent}>
                         <Text style={styles.modalTitle}>Add Ingredient</Text>
 
-                        <TextInput
-                            placeholder="Ingredient Name"
-                            placeholderTextColor="#888"
-                            style={styles.input}
-                            value={newIngredient}
-                            onChangeText={setNewIngredient}
-                        />
+                        <Pressable
+                            onPress={() => {
+                                setModalVisible(false);
+                                router.push("/select-template");
+                            }}
+                        >
+                            <Text style={[styles.ingredientInput, template == null && {color: "#888"}]}>{template? template.name : "Tap to set ingredient"}</Text>
+                        </Pressable>
 
                         <View style={styles.amountRow}>
                             <TextInput
@@ -243,33 +289,7 @@ export default function NewMeal() {
                                 value={newAmount}
                                 onChangeText={setNewAmount}
                             />
-                            <View style={{ flex: 1, zIndex: 1000}}>
-                                <DropDownPicker
-                                    open={openUnit}
-                                    value={newUnit}
-                                    items={[
-                                        { label: "grams (g)", value: "g" },
-                                        { label: "milliliters (ml)", value: "ml" },
-                                        { label: "ounces (oz)", value: "oz" },
-                                        { label: "pounds (lbs)", value: "lbs" },
-                                        { label: "liters (l)", value: "l" },
-                                        { label: "teaspoons", value: "tsp" },
-                                        { label: "tablespoons", value: "tbsp" },
-                                        { label: "cups", value: "cups" },
-                                    ]}
-                                    setOpen={setOpenUnit}
-                                    setValue={setNewUnit}
-                                    setItems={() => {}}
-                                    placeholder="Select Unit"
-                                    style={{
-                                        borderColor: '#ccc',
-                                        borderRadius: 8,
-                                    }}
-                                    dropDownContainerStyle={{
-                                        borderColor: '#ccc',
-                                    }}
-                                />
-                            </View>
+                            <Text style={styles.unit}>{template? template.unit.trim() : "units"}</Text>
                         </View>
 
                         <View style={styles.modalButtons}>
@@ -358,6 +378,14 @@ const styles = StyleSheet.create({
         top: 55,
         left: 20,
         zIndex: 10,
+    },
+
+    unit: {
+        textAlign: "center",
+        textAlignVertical: "center",
+        padding: 10,
+        marginBottom: 10,
+        fontSize: 15,
     },
 
     placeholder: {
@@ -483,6 +511,16 @@ const styles = StyleSheet.create({
         padding: 10,
         marginBottom: 10,
         fontSize: 15,
+    },
+
+    ingredientInput: {
+        borderWidth: 1,
+        borderColor: "#ccc",
+        borderRadius: 8,
+        padding: 10,
+        marginBottom: 10,
+        fontSize: 15,
+        textAlign: "center"
     },
 
     amountRow: {

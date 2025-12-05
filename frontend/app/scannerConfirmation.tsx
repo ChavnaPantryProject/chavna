@@ -2,9 +2,11 @@ import * as React from "react";
 import { useState, useEffect } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import { API_URL, retrieveValue } from "./util";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { API_URL, Response, retrieveValue } from "./util";
 import PopupForm, { PopupState } from "./PopupForm";
+import { getTemplates } from "./select-template";
+import { ScrollView } from "react-native-gesture-handler";
 
 type GetCategoriesResponse = {
   categories: Array<string>
@@ -29,9 +31,7 @@ export type ConfirmationItem = {
 
 export default function ConfirmationScreen() {
   const router = useRouter();
-  const [items, setItems] = useState<ConfirmationItem[]>([
-    {displayName: null, scanName: "CHKN BRST", qty: 4, price: 10, template: null }
-  ]);
+  const [items, setItems] = useState<ConfirmationItem[]>([]);
 
   const [isPopupVisible, setIsPopupVisible] = useState(false);
   const [allValid, setAllValid] = useState(false);
@@ -46,6 +46,63 @@ export default function ConfirmationScreen() {
       scanName: "New Item",
       template: null
   });
+
+  const { scanItems } = useLocalSearchParams<{scanItems: string}>();
+
+  useEffect(() => {
+    (async () => {
+      const scannedItems: ConfirmationItem[] = scanItems? JSON.parse(scanItems) : [];
+
+      if (scannedItems.length == 0)
+        return;
+
+      const scanTexts = scannedItems.map(v => (v.scanName));
+
+      const templates: Map<string, Template> = new Map((await getTemplates()).map(t => [t.id, t]));
+
+      const jwt = await retrieveValue('jwt');
+  
+      if (jwt == null) {
+        console.log("no jwt");
+        return;
+      }
+
+      const response = await fetch(`${API_URL}/get-scan-keys`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${jwt}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          keys: scanTexts 
+        })
+      });
+
+      type GetScanKeyResponse = {
+        templateIds: any
+      }
+
+      const body: Response<GetScanKeyResponse> = await response.json();
+
+      if (!response.ok || body.success !== "success") {
+        console.log("get-scan-keys request failed: ", body);
+        return;
+      }
+
+      const ids: Map<string, string> = new Map(Object.entries(body.payload?.templateIds));
+      for (let item of scannedItems) {
+        if (ids.has(item.scanName)) {
+          const id = ids.get(item.scanName);
+          const template = templates.get(id!);
+
+          item.displayName = template!.name;
+          item.template = template!;
+        }
+      }
+
+      setItems(scannedItems);
+    })();
+  }, [scanItems])
 
   useEffect(() => {
     let noTemplate = false;
@@ -125,7 +182,7 @@ export default function ConfirmationScreen() {
       return {
         templateId: item.template!.id,
         amount: actualAmount,
-        unitPrice: actualAmount / item.qty!
+        unitPrice: item.price! / actualAmount
       }
     });
 
@@ -176,7 +233,7 @@ export default function ConfirmationScreen() {
       </View>
 
       {/* Middle Section (Soft Green) */}
-      <View style={styles.content}>
+      <ScrollView style={styles.content}>
         <View style={styles.tableHeader}>
           <Text style={styles.headerCell}>Name</Text>
           <Text style={styles.headerCell}>Qty</Text>
@@ -217,18 +274,17 @@ export default function ConfirmationScreen() {
           }}>
           <Text style={styles.plusSign}>＋</Text>
         </TouchableOpacity>
-
-        {/* Save Button */}
-        <TouchableOpacity style={[styles.saveButton, (!allValid || items.length == 0) && {opacity: .5}]}
-        disabled={!allValid || items.length == 0}
-        onPress={() => {
-          saveItems();
-          router.push("/(tabs)/home");
-        }}
-        >
-          <Text style={styles.saveText}>Save</Text>
-        </TouchableOpacity>
-      </View>
+      </ScrollView>
+      {/* Save Button */}
+      <TouchableOpacity style={[styles.saveButton, (!allValid || items.length == 0) && {opacity: .5}]}
+      disabled={!allValid || items.length == 0}
+      onPress={() => {
+        saveItems();
+        router.push("/(tabs)/home");
+      }}
+      >
+        <Text style={styles.saveText}>Save</Text>
+      </TouchableOpacity>
 
       {/* Bottom White Section */}
       <View style={styles.bottomWhite} />
@@ -236,6 +292,15 @@ export default function ConfirmationScreen() {
         visible={isPopupVisible}
         onClose={() => setIsPopupVisible(false)}
         onSave={handleAddItem} 
+        onDelete={() => {
+          setIsPopupVisible(false);
+          
+          if (updateIndex < 0)
+            return;
+
+          const newItems = items.filter((_, i) => i != updateIndex);
+          setItems(newItems);
+        }}
         /*
         onSubmit={(data) => {
           handleAddItem(data);      // add the returned data to the table
@@ -244,6 +309,7 @@ export default function ConfirmationScreen() {
           */
          state={popupState}
          setState={setPopupState}
+         updateIndex={updateIndex}
         //title="Add Item"
       />
     </View>
@@ -322,6 +388,7 @@ const styles = StyleSheet.create({
     fontSize: 26,
     color: "#2E4E3F",
     marginVertical: 12,
+    marginBottom: 40
   },
   saveButton: {
     alignSelf: "center",

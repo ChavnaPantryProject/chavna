@@ -4,6 +4,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { CameraView, CameraType, useCameraPermissions } from "expo-camera";
 import { API_URL, Response } from "../util";
+import { ConfirmationItem } from "../scannerConfirmation";
+
+const priceRegex = new RegExp("\\$?([0-9]+\\.[0-9]{2})");
 
 export default function ScannerScreen() {
   const router = useRouter();
@@ -19,8 +22,7 @@ export default function ScannerScreen() {
       base64: true,
       quality: 0
     });
-    router.push("/scannerConfirmation");
-    return;
+
     console.log("take picture");
     if (photo?.base64) {
       console.log("process photo");
@@ -51,16 +53,72 @@ export default function ScannerScreen() {
         return;
 
       if (body.success === "success") {
-        const lines = body.payload!;
-        for (const line of lines) {
-          let s = "";
+        
+      let scans: ConfirmationItem[] = [];
+      let counts: Map<number, number> = new Map();
+      for (const line of body.payload!) {
+        console.log(line.words.map(word => word.text));
+        let priceIndex = -1;
+        let priceValue: number | null = null;
+        for (let i = 0; i < line.words.length; i++) {
+          // check for @
+          if (scans.length > 0 && line.words[i].text == "@") {
+            if (i > 0 && i + 1 < line.words.length) {
+              const prev = Number(line.words[i - 1].text);
+              const next = Number(line.words[i + 1].text.replace('$', ''));
 
-          for (const word of line.words) {
-            s += word.text + '\t';
+              if (!Number.isNaN(prev) && !Number.isNaN(next)) {
+                console.log(scans.length - 1);
+                counts.set(scans.length - 1, prev);
+                break;
+              }
+            }
+          } else {
+            // check if word is a price
+            const r = priceRegex.exec(line.words[i].text);
+            if (r != null) {
+              console.log("match");
+              let p = Number(r[1])
+              if (!Number.isNaN(p)) {
+                priceIndex = i;
+                priceValue = p;
+                break;
+              }
+            }
           }
-
-          console.log(s);
         }
+
+        let key = "";
+        for (let i = 0; i < priceIndex; i++) {
+          key += line.words[i].text + " ";
+        }
+
+        if (key !== "") {
+          scans.push({
+            displayName: null,
+            scanName: key,
+            qty: 1,
+            price: priceValue,
+            template: null
+          });
+        }
+      }
+
+      for (let i = 0; i < scans.length; i++) {
+        const count = counts.get(i);
+
+        if (count !== undefined) {
+          let scan = scans[i];
+          scan.qty = count;
+        }
+      }
+
+      router.navigate({
+        pathname: "/scannerConfirmation",
+        params: {
+          scanItems: JSON.stringify(scans)
+        }
+      })
       } else {
         console.log(body); 
       }

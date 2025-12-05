@@ -7,10 +7,12 @@ import {
   TouchableOpacity,
   StyleSheet,
   Pressable,
+  Alert,
 } from "react-native";
 import { router, useFocusEffect } from "expo-router";
 import { getSelectedTemplate, Template } from "./select-template";
 import { ConfirmationItem } from "./scannerConfirmation";
+import { API_URL, Response, retrieveValue } from "./util";
 
 interface DropdownOption {
   label: string;
@@ -21,8 +23,10 @@ interface PopupMenuProps {
   visible: boolean;
   onClose: () => void;
   onSave: (data: ConfirmationItem) => void;
+  onDelete: () => void;
   state: PopupState;
   setState: Dispatch<SetStateAction<PopupState>>;
+  updateIndex: number;
 }
 
 export type PopupState = {
@@ -41,8 +45,10 @@ const PopupMenu: React.FC<PopupMenuProps> = ({
   visible,
   onClose,
   onSave,
+  onDelete,
   state,
-  setState
+  setState,
+  updateIndex
 }) => {
   const setQuantity = (quantity: string) => {
     const newState = { ...state };
@@ -70,6 +76,38 @@ const PopupMenu: React.FC<PopupMenuProps> = ({
     }
   });
 
+  const saveScanKey = async () => {
+    const jwt = await retrieveValue('jwt');
+
+    if (jwt == null) {
+      console.log("no jwt");
+      return;
+    }
+
+    const response = await fetch(`${API_URL}/set-scan-key`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${jwt}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        key: state.scanName,
+        templateId: state.template?.id
+      })
+    });
+
+    if (response === null)
+      return;
+
+    const body: Response<any> = await response.json();
+
+    if (body.success !== "success")
+      console.log("Failed to save", body);
+    else
+      console.log(body);
+
+  };
+
   const handleSave = () => {
     const data: ConfirmationItem = {
       displayName: state.displayName,
@@ -78,6 +116,11 @@ const PopupMenu: React.FC<PopupMenuProps> = ({
       price: Number(state.price),
       template: state.template
     };
+
+    Alert.alert("Confirmation", "Would you like to remember this scan?", [
+      { text: "No" },
+      { text: "Yes", onPress: saveScanKey }
+    ])
 
     onSave(data);
     close();
@@ -140,6 +183,11 @@ const PopupMenu: React.FC<PopupMenuProps> = ({
               <Text style={styles.saveText}>Save</Text>
             </TouchableOpacity>
           </View>
+          {updateIndex >= 0 && (<View style={styles.buttonRow}>
+            <TouchableOpacity style={styles.deleteButton} onPress={onDelete}>
+              <Text style={styles.cancelText}>Delete Item</Text>
+            </TouchableOpacity>
+          </View>)}
         </View>
       </View>
     </Modal>
@@ -221,6 +269,13 @@ const styles = StyleSheet.create({
     backgroundColor: "#cde7c0",
     flex: 1,
     marginRight: 10,
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: "center",
+  },
+  deleteButton: {
+    backgroundColor: "#cde7c0",
+    flex: 1,
     borderRadius: 10,
     paddingVertical: 10,
     alignItems: "center",
