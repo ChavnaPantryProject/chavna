@@ -3,126 +3,235 @@ import {Text, View, StyleSheet, TouchableOpacity, Button,} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { CameraView, CameraType, useCameraPermissions } from "expo-camera";
-import { API_URL, Response } from "../util";
+import { API_URL, Response, retrieveValue } from "../util";
 import { ConfirmationItem } from "../scannerConfirmation";
+import { File } from "expo-file-system";
+import base64 from "react-native-base64";
 
 const priceRegex = new RegExp("\\$?([0-9]+\\.[0-9]{2})");
+
+
+async function setupScanUpload() {
+
+}
 
 export default function ScannerScreen() {
   const router = useRouter();
   const [facing, setFacing] = useState<CameraType>("back");
   const [permission, requestPermission] = useCameraPermissions();
   const ref = useRef<CameraView>(null);
-  const [image, setImage] = useState<string>("");
 
-  const takePicture = async () => {
-
+  const getPictureBytes = async (): Promise<Uint8Array> => {
     const photo = await ref.current?.takePictureAsync({
-      pictureRef: false,
-      base64: true,
-      quality: 0
+      quality: 1
     });
 
-    console.log("take picture");
-    if (photo?.base64) {
-      console.log("process photo");
-      setImage(photo?.base64!);
+    if (photo?.uri === undefined)
+      throw "No photo uri.";
 
-      const response = await fetch(`${API_URL}/scan-receipt`, {
+    const file = new File(photo.uri);
+
+    const handle = file.open();
+
+    if (file.size == null)
+      throw "No file size."
+
+    const bytes = handle.readBytes(handle.size!);
+
+    return bytes;
+  }
+
+  type UploadInfo = {
+    uploadId: string,
+    chunkCount: number,
+    chunkSize: number
+  };
+
+  const startUpload = async (fileSize: number): Promise<UploadInfo> => {
+    const jwt = await retrieveValue('jwt');
+
+    if (jwt == null)
+      throw "No jwt.";
+
+    const response = await fetch(`${API_URL}/initialize-receipt-upload`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${jwt}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        fileSize: fileSize
+      })
+    });
+
+    let body: Response<UploadInfo> | null;
+    try {
+      body = await response.json();
+    } catch (ex) {
+      body = null;
+    }
+
+    if (!response.ok || body?.success !== "success")
+      throw "Invalid response: " + JSON.stringify(body? body : response);
+    
+    return body.payload!;
+  }
+
+  const uploadChunks = async (data: Uint8Array, uploadInfo: UploadInfo) => {
+    let requests = [];
+
+    for (let i = 0; i < uploadInfo.chunkCount; i++) {
+      const start = i * uploadInfo.chunkSize;
+      const end = Math.min(start + uploadInfo.chunkSize, data.length);
+
+      const chunk = data.slice(start, end);
+      requests.push(fetch(`${API_URL}/upload-chunk`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify({
-          base64Image: photo?.base64
+          uploadId: uploadInfo.uploadId,
+          index: i,
+          base64Data: base64.encodeFromByteArray(chunk)
         })
-      });
+      }));
+    }
 
-      if (response === null || !response.ok)
-        return;
+    const responses = await Promise.all(requests);
 
-      type Word = {
-        originalPolygon: {x: number, y: number}[] // Point 
-        text: string
+    for (const response of responses) {
+      let body: Response<UploadInfo> | null;
+      try {
+        body = await response.json();
+      } catch (ex) {
+        body = null;
       }
 
-      type Line = {
-        words: Word[]
-      };
-      const body: Response<Line[]> = await response.json();
+      if (!response.ok || body?.success !== "success")
+        throw "Invalid response: " + JSON.stringify(body? body : response);
+    }
+  };
 
-      if (body === null)
-        return;
+  type Word = {
+    originalPolygon: {x: number, y: number}[] // Point 
+    text: string
+  }
 
-      if (body.success === "success") {
-        
-      let scans: ConfirmationItem[] = [];
-      let counts: Map<number, number> = new Map();
-      for (const line of body.payload!) {
-        console.log(line.words.map(word => word.text));
-        let priceIndex = -1;
-        let priceValue: number | null = null;
-        for (let i = 0; i < line.words.length; i++) {
-          // check for @
-          if (scans.length > 0 && line.words[i].text == "@") {
-            if (i > 0 && i + 1 < line.words.length) {
-              const prev = Number(line.words[i - 1].text);
-              const next = Number(line.words[i + 1].text.replace('$', ''));
+  type Line = {
+    words: Word[]
+  };
 
-              if (!Number.isNaN(prev) && !Number.isNaN(next)) {
-                console.log(scans.length - 1);
-                counts.set(scans.length - 1, prev);
-                break;
-              }
+  const processPhoto = async (uploadId: string): Promise<Line[]> => {
+    const response = await fetch(`${API_URL}/scan-receipt`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        uploadId: uploadId
+      })
+    });
+
+    let body: Response<Line[]> | null;
+    try {
+      body = await response.json();
+    } catch (ex) {
+      body = null;
+    }
+
+    if (!response.ok || body?.success !== "success")
+      throw "Invalid response: " + JSON.stringify(body? body : response);
+    
+    return body.payload!;
+  };
+
+  const takePicture = async () => {
+    let bytes;
+    try {
+      bytes = await getPictureBytes();
+    } catch (ex) {
+      console.error("Error taking picture: ", ex);
+      return;
+    }
+
+    if (bytes.length <= 0)
+      return;
+
+    let uploadInfo;
+    try {
+      uploadInfo = await startUpload(bytes.length);
+    } catch (ex) {
+      console.error("Error initializing upload: ", ex);
+      return;
+    }
+
+    await uploadChunks(bytes, uploadInfo);
+
+    const lines = await processPhoto(uploadInfo.uploadId);
+      
+    let scans: ConfirmationItem[] = [];
+    let counts: Map<number, number> = new Map();
+    for (const line of lines) {
+      let priceIndex = -1;
+      let priceValue: number | null = null;
+      for (let i = 0; i < line.words.length; i++) {
+        // check for @
+        if (scans.length > 0 && line.words[i].text == "@") {
+          if (i > 0 && i + 1 < line.words.length) {
+            const prev = Number(line.words[i - 1].text);
+            const next = Number(line.words[i + 1].text.replace('$', ''));
+
+            if (!Number.isNaN(prev) && !Number.isNaN(next)) {
+              counts.set(scans.length - 1, prev);
+              break;
             }
-          } else {
-            // check if word is a price
-            const r = priceRegex.exec(line.words[i].text);
-            if (r != null) {
-              console.log("match");
-              let p = Number(r[1])
-              if (!Number.isNaN(p)) {
-                priceIndex = i;
-                priceValue = p;
-                break;
-              }
+          }
+        } else {
+          // check if word is a price
+          const r = priceRegex.exec(line.words[i].text);
+          if (r != null) {
+            let p = Number(r[1])
+            if (!Number.isNaN(p)) {
+              priceIndex = i;
+              priceValue = p;
+              break;
             }
           }
         }
-
-        let key = "";
-        for (let i = 0; i < priceIndex; i++) {
-          key += line.words[i].text + " ";
-        }
-
-        if (key !== "") {
-          scans.push({
-            displayName: null,
-            scanName: key,
-            qty: 1,
-            price: priceValue,
-            template: null
-          });
-        }
       }
 
-      for (let i = 0; i < scans.length; i++) {
-        const count = counts.get(i);
-
-        if (count !== undefined) {
-          let scan = scans[i];
-          scan.qty = count;
-        }
+      let key = "";
+      for (let i = 0; i < priceIndex; i++) {
+        key += line.words[i].text + " ";
       }
 
-      router.navigate({
-        pathname: "/scannerConfirmation",
-        params: {
-          scanItems: JSON.stringify(scans)
-        }
-      })
-      } else {
-        console.log(body); 
+      if (key !== "") {
+        scans.push({
+          displayName: null,
+          scanName: key,
+          qty: 1,
+          price: priceValue,
+          template: null
+        });
       }
     }
+
+    for (let i = 0; i < scans.length; i++) {
+      const count = counts.get(i);
+
+      if (count !== undefined) {
+        let scan = scans[i];
+        scan.qty = count;
+      }
+    }
+
+    router.navigate({
+      pathname: "/scannerConfirmation",
+      params: {
+        scanItems: JSON.stringify(scans)
+      }
+    })
   };
 
   if (!permission) {
