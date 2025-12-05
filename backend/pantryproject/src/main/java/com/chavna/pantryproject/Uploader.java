@@ -139,8 +139,10 @@ public class Uploader implements Runnable {
         while (iterator.hasNext()) {
             Upload upload = iterator.next();
 
-            if (Duration.between(upload.created, Instant.now()).compareTo(maxLifetime) >= 0)
+            if (Duration.between(upload.created, Instant.now()).compareTo(maxLifetime) >= 0) {
+                System.out.println("Upload canceled: " + upload.uploadId);
                 iterator.remove();
+            }
         }
     }
 

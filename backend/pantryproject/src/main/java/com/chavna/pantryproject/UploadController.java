@@ -23,10 +23,10 @@ import jakarta.validation.constraints.NotNull;
 public class UploadController {
     public static final Uploader uploader = Uploader.builder()
         .cleanupInterval(Duration.ofSeconds(30))
-        .maxLifetime(Duration.ofMinutes(10))
+        .maxLifetime(Duration.ofMinutes(1))
         .build();
     
-    public static final int UPLOAD_CHUNK_SIZE = 50 * 1024 * 1024;
+    public static final int UPLOAD_CHUNK_SIZE = 50 * 1024;
 
     public static class UploadChunkRequest {
         @NotNull
@@ -60,6 +60,7 @@ public class UploadController {
         upload.uploadChunk(requestBody.index, decodedBytes);
 
         if (upload.isComplete()) {
+            System.out.println("Upload " + requestBody.uploadId.toString() + " complete.");
             if (upload.getMetadata() instanceof S3Upload) {
                 S3Upload s3Upload = (S3Upload) upload.getMetadata();
 
