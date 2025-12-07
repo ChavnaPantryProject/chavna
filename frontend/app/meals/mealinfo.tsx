@@ -1,6 +1,6 @@
 // meal nutrition facts screen
 
-import React, {useState} from "react";
+import React, {useState, useEffect} from "react";
 import { 
     View, 
     Text, 
@@ -12,24 +12,25 @@ import {
     Modal,
     Pressable,
     Alert,
+    TextInput,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { Stack } from "expo-router";
 
-export default function MealIngredientScreen() {
+export default function MealInfoScreen() {
     const router = useRouter();
+    const { id, imageURL, mealName } = useLocalSearchParams();
     const [menuVisible, setMenuVisible] = useState(false);
 
-    // nutrition data
-    const ingredients = [
-        { name: "Calories", amount: "1200 kcal" },
-        { name: "Protein", amount: "25g" },
-        { name: "Total Fat", amount: "75g" },
-        { name: "Saturated Fat", amount: "47g" },
-        { name: "Trans Fat", amount: "2g" },
-        { name: "Sodium", amount: "400g" },
-    ];
+    // Empty nutrition data - user needs to fill these in
+    const [nutritionData, setNutritionData] = useState([
+        { name: "Calories", amount: "", unit: "kcal" },
+        { name: "Protein", amount: "", unit: "g" },
+        { name: "Total Fat", amount: "", unit: "g" },
+        { name: "Saturated Fat", amount: "", unit: "g" },
+        { name: "Trans Fat", amount: "", unit: "g" },
+        { name: "Sodium", amount: "", unit: "mg" },
+    ]);
 
     const handleDeleteMeal = () => {
         setMenuVisible(false);
@@ -46,15 +47,11 @@ export default function MealIngredientScreen() {
                     text: "Delete",
                     style: "destructive",
                     onPress: () => {
-                        // delete meal logic
                         console.log("Meal deleted");
-
-                        // navigatee back to meals tab
                         router.replace("/(tabs)/meal");
 
-                        // confirmation
                         setTimeout(() => {
-                            Alert.alert("Meal Deleted", "This meal has beedn deleted successfully.");
+                            Alert.alert("Meal Deleted", "This meal has been deleted successfully.");
                         }, 500);
                     }
                 }
@@ -62,14 +59,26 @@ export default function MealIngredientScreen() {
         );
     };
 
+    const handleSaveNutrition = () => {
+        // Check if all fields are filled
+        const allFilled = nutritionData.every(item => item.amount.trim() !== "");
+        
+        if (!allFilled) {
+            Alert.alert("Incomplete Data", "Please fill in all nutrition fields.");
+            return;
+        }
+
+        // Save logic here
+        console.log("Saving nutrition data:", nutritionData);
+        Alert.alert("Success", "Nutrition information saved successfully!");
+    };
+
     return (
         <SafeAreaView style={styles.container}>
             {/* Header */}
             <View style={styles.header}>
                 <TouchableOpacity 
-                    onPress={() => {
-                        router.push("/(tabs)/meal");
-                    }}
+                    onPress={() => router.back()}
                 >
                     <Ionicons name="chevron-back" size={24} color="black" />
                 </TouchableOpacity>
@@ -95,7 +104,7 @@ export default function MealIngredientScreen() {
                             style={styles.dropdownItem}
                             onPress={() => {
                                 setMenuVisible(false);
-                                router.push("/meals/editmeal");  // navigate to edit meal screen
+                                router.push("/meals/editmeal");
                             }}
                         >
                             <Text style={styles.dropdownText}>Edit Meal</Text>
@@ -116,47 +125,68 @@ export default function MealIngredientScreen() {
             {/* Main content */}
             <View style={styles.fixedSection}>
                 <View style={styles.mealHeader}>
-                    <Text style={styles.mealTitle}>Fettuccine Alfredo</Text>
+                    <Text style={styles.mealTitle}>{mealName || "Meal Name"}</Text>
                 </View>
 
-                {/* Image */}
+                {/* Image from previous screen */}
                 <Image
-                    source={require('../../assets/images/FETTUCCINE_ALFREDO_HOMEPAGE.jpg')}
+                    source={{uri: imageURL ? String(imageURL) : ""}}
                     style={styles.mealImage}
                 />
             </View>
             
-            {/* scrollable ingredient list */}
+            {/* scrollable nutrition input form */}
             <ScrollView
                 style={styles.scrollContainer}
                 showsVerticalScrollIndicator={false}
             >
-
                 {/* Table Header */}
                 <View style={styles.tableHeader}>
                     <Text style={styles.headerText}>Nutrition</Text>
                     <Text style={styles.headerText}>Amount</Text>
                 </View>
 
-                {/* Ingredient list with separators */}
-                {ingredients.map((item, index) => (
+                {/* Nutrition input fields with separators */}
+                {nutritionData.map((item, index) => (
                     <View key={index} style={styles.rowContainer}>
                         <View style={styles.row}>
-                            <Text style={styles.ingredientText}>{item.name}</Text>
-                            <Text style={styles.amountText}>{item.amount}</Text>
+                            <Text style={styles.nutritionLabel}>{item.name}</Text>
+                            <View style={styles.inputContainer}>
+                                <TextInput
+                                    style={styles.input}
+                                    value={item.amount}
+                                    onChangeText={(text) => {
+                                        const newData = [...nutritionData];
+                                        newData[index].amount = text;
+                                        setNutritionData(newData);
+                                    }}
+                                    placeholder="0"
+                                    keyboardType="numeric"
+                                    placeholderTextColor="#999"
+                                />
+                                <Text style={styles.unitText}>{item.unit}</Text>
+                            </View>
                         </View>
 
                         {/* Separator line */}
-                        {index < ingredients.length - 1 && <View style={styles.divider} />}
+                        {index < nutritionData.length - 1 && <View style={styles.divider} />}
                     </View>
                 ))}
 
-                {/* Navigation Button to Nutrition Info */}
+                {/* Save Button */}
+                <TouchableOpacity
+                    style={styles.saveButton}
+                    onPress={handleSaveNutrition}
+                >
+                    <Text style={styles.saveButtonText}>Save Nutrition Info</Text>
+                </TouchableOpacity>
+
+                {/* Navigation Button to Ingredients */}
                 <TouchableOpacity
                     style={styles.linkContainer}
-                    onPress={() => router.push('/meals/meal_ingredient')}
+                    onPress={() => router.back()}
                 >
-                    <Text style={styles.linkText}>Go to Ingredients {'>'}</Text>
+                    <Text style={styles.linkText}>{'<'} Back to Ingredients</Text>
                 </TouchableOpacity>
             </ScrollView>
         </SafeAreaView>
@@ -164,8 +194,7 @@ export default function MealIngredientScreen() {
 }
 
 const styles = StyleSheet.create({
-    container:
-    {
+    container: {
         flex: 1,
         backgroundColor: '#FFFFFF',
     },
@@ -195,7 +224,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         marginVertical: 10,
         borderWidth: 1,
-        borderColor: "499F44",
+        borderColor: "#499F44",
     },
 
     mealTitle: {
@@ -230,55 +259,41 @@ const styles = StyleSheet.create({
         alignSelf: "stretch",
     },
 
-    tableBody: {
-        width: "90%",
-        alignItems: "center",
-    },
-
-    tableRow: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        width: "85%",
-        paddingVertical: 8,
-        marginLeft: 15,
-    },
-
-    tableLabel: {
-        fontSize: 15,
-        color: "#000",
-    },
-
-    tableValue: {
-        fontSize: 15,
-        color: "#000",
-    },
-
-    linkContainer: {
-        alignSelf: 'flex-end',
-        marginTop: 12,
-        marginRight: 0,
-    },
-
-    linkText: {
-        color: '#499F44',
-        fontWeight: '500',
-    },
-
     row: {
         flexDirection: "row",
         justifyContent: "space-between",
+        alignItems: "center",
         paddingVertical: 8,
         paddingHorizontal: 10,
     },
 
-    ingredientText: {
+    nutritionLabel: {
         fontSize: 15,
         color: "#000",
+        flex: 1,
     },
 
-    amountText: {
+    inputContainer: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 5,
+    },
+
+    input: {
         fontSize: 15,
         color: "#000",
+        borderBottomWidth: 1,
+        borderBottomColor: "#499F44",
+        paddingVertical: 2,
+        paddingHorizontal: 8,
+        minWidth: 60,
+        textAlign: "right",
+    },
+
+    unitText: {
+        fontSize: 15,
+        color: "#666",
+        width: 40,
     },
 
     divider: {
@@ -286,6 +301,32 @@ const styles = StyleSheet.create({
         height: 1,
         backgroundColor: "#499F44",
         alignSelf: "center",
+    },
+
+    saveButton: {
+        backgroundColor: "#499F44",
+        borderRadius: 10,
+        paddingVertical: 12,
+        paddingHorizontal: 20,
+        marginTop: 20,
+        alignItems: "center",
+    },
+
+    saveButtonText: {
+        color: "#FFFFFF",
+        fontSize: 16,
+        fontWeight: "600",
+    },
+
+    linkContainer: {
+        alignSelf: 'flex-start',
+        marginTop: 12,
+        marginBottom: 20,
+    },
+
+    linkText: {
+        color: '#499F44',
+        fontWeight: '500',
     },
 
     // dropdown menu styles
