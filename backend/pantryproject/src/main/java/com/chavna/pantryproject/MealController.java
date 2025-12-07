@@ -2,6 +2,7 @@ package com.chavna.pantryproject;
 
 import static com.chavna.pantryproject.Database.FOOD_ITEMS_TABLE;
 import static com.chavna.pantryproject.Database.FOOD_ITEM_TEMPLATES_TABLE;
+import static com.chavna.pantryproject.Database.MEALS_TABLE;
 
 import java.awt.image.BufferedImage;
 import java.io.IOException;
@@ -21,6 +22,8 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.chavna.pantryproject.Authorization.Login;
+import com.chavna.pantryproject.S3.S3Upload;
+import com.chavna.pantryproject.Uploader.Upload;
 
 import jakarta.annotation.Nullable;
 import jakarta.validation.Valid;
@@ -476,5 +479,51 @@ public class MealController {
         .throwResponse();
 
         return null;
+    }
+
+    public static class InitializeMealPictureUploadRequest {
+        @NotNull
+        public UUID mealId;
+        public int fileSize;
+    }
+
+    @AllArgsConstructor
+    public static class InitializeMealPictureUploadResponse {
+        public UUID uploadId;
+        public int chunkCount;
+        public int chunkSize;
+    }
+
+    @PostMapping("/initialize-meal-picture-upload")
+    public Response initializeMealPictureUpload(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody InitializeMealPictureUploadRequest requestBody) {
+        if (requestBody.fileSize <= 0)
+            return Response.Error(HttpStatus.BAD_REQUEST, "File size must be > 0.");
+        
+        Login login = Authorization.authorize(authorizationHeader);
+        UUID familyOwner = Authorization.getFamilyOwnerId(login);
+
+        Database.openConnection((Connection con) -> {
+            PreparedStatement statement = con.prepareStatement(String.format("""
+                SELECT * FROM %s
+                WHERE id = ? AND owner = ?
+            """, MEALS_TABLE));
+            statement.setObject(1, requestBody.mealId);
+            statement.setObject(2, familyOwner);
+
+            ResultSet result = statement.executeQuery();
+
+            if (!result.next())
+                return Response.Fail("Meal does not exist or cannot be modified by current user.");
+
+            return null;
+        })
+        .throwIfError()
+        .throwResponse();
+
+        String key = S3.getImageKey(MEAL_PREFIX, requestBody.mealId);
+        S3Upload s3Upload = new S3Upload(key);
+        Upload upload = UploadController.uploader.initializeUpload(UploadController.UPLOAD_CHUNK_SIZE, requestBody.fileSize, s3Upload);
+
+        return Response.Success(new InitializeMealPictureUploadResponse(upload.getUploadId(), upload.getChunkCount(), upload.getChunkSize()));
     }
 }

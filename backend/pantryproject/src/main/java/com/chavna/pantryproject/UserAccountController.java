@@ -28,6 +28,8 @@ import org.springframework.web.bind.annotation.RestController;
 import com.chavna.pantryproject.Authorization.GoogleLogin;
 import com.chavna.pantryproject.Authorization.Login;
 import com.chavna.pantryproject.Authorization.NormalLogin;
+import com.chavna.pantryproject.S3.S3Upload;
+import com.chavna.pantryproject.Uploader.Upload;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwe;
@@ -435,30 +437,27 @@ public class UserAccountController {
     }
 
     public static class SetProfilePictureRequest {
-        public String profilePictureBase64;
+        public int fileSize;
     }
 
-    @PostMapping("/set-profile-picture")
+    @AllArgsConstructor
+    public static class SetProfilePictureResponse {
+        public UUID uploadId;
+        public int chunkCount;
+        public int chunkSize;
+    }
+
+    @PostMapping("/initialize-profile-picture-upload")
     public Response setProfilePicture(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody SetProfilePictureRequest requestBody) {
+        if (requestBody.fileSize <= 0)
+            return Response.Error(HttpStatus.BAD_REQUEST, "File size must be > 0.");
+
         Login login = Authorization.authorize(authorizationHeader);
 
-        BufferedImage image;
-        // Attempt to decode the image
-        try {
-            image = S3.decodeBase64Image(requestBody.profilePictureBase64);
-        } catch (IllegalArgumentException ex) {
-            return Response.Error(HttpStatus.BAD_REQUEST, "Meal picture is not a valid base64 string.");
-        } catch (IOException ex) {
-            return Response.Error(HttpStatus.INTERNAL_SERVER_ERROR, "Unable to decode image.", ex);
-        }
-
         String key = S3.getImageKey(PROFILE_PICTURE_PREFIX, login.userId);
-        try {
-            S3.uploadImage(image, key);
-        } catch (Exception ex) {
-            return Response.Fail("Unable to upload image.");
-        }
 
-        return Response.Success("Profile picture set.");
+        Upload upload = UploadController.uploader.initializeUpload(UploadController.UPLOAD_CHUNK_SIZE, requestBody.fileSize, new S3Upload(key));
+
+        return Response.Success(new SetProfilePictureResponse(upload.getUploadId(), upload.getChunkCount(), upload.getChunkSize()));
     }
 }

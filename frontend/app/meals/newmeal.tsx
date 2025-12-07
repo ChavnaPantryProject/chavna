@@ -21,7 +21,7 @@ import * as ImagePicker from "expo-image-picker";
 import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
-import { API_URL, Response, retrieveValue } from "../util";
+import { API_URL, loadFileBytes, Response, retrieveValue, uploadChunks, UploadInfo } from "../util";
 import { getSelectedTemplate, Template } from "../select-template";
 
 export default function NewMeal() {
@@ -53,19 +53,72 @@ export default function NewMeal() {
             setTemplate(tmp);
     })
 
+    
+    const initializeMealPictureUpload = async (mealId: string, fileSize: number): Promise<UploadInfo> => {
+        const jwt = await retrieveValue('jwt');
+
+        if (jwt == null)
+            throw "No jwt.";
+
+        const response = await fetch(`${API_URL}/initialize-meal-picture-upload`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${jwt}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                mealId: mealId,
+                fileSize: fileSize
+            })
+        });
+
+        let body: Response<UploadInfo> | null;
+        try {
+            body = await response.json();
+        } catch (ex) {
+            body = null;
+        }
+
+        if (!response.ok || body?.success !== "success")
+            throw "Invalid response: " + JSON.stringify(body ? body : response);
+
+        return body.payload!;
+    }
+
+    const uploadMealPicture = async (image: string, mealId: string) => {
+        let bytes;
+        try {
+            bytes = loadFileBytes(image);
+        } catch (ex) {
+            console.error("Failed to load picture.", ex);
+            return;
+        }
+
+        let uploadInfo;
+        try {
+            uploadInfo = await initializeMealPictureUpload(mealId, bytes.length);
+        } catch (ex) {
+            console.error("Failed to initialize upload.", ex);
+            return;
+        }
+
+        try {
+            await uploadChunks(bytes, uploadInfo);
+        } catch (ex) {
+            console.error("Failed to upload picture", ex);
+        }
+    };
+
     const pickImage = async () => {
         const result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ["images"],
             allowsEditing: true,
             aspect: [4, 3],
-            quality: 0,
-            base64: true
+            quality: 1
         });
 
-        if (!result.canceled) {
+        if (!result.canceled)
             setMealImage(result.assets[0].uri);
-            setBase64Image(result.assets[0].base64!);
-        }
     };
 
     const addIngredient = () => {
@@ -140,29 +193,8 @@ export default function NewMeal() {
                 throw new Error(JSON.stringify(body));
             }
 
-            if (base64Image != null) {
-                const imageResponse = await fetch(`${API_URL}/update-meal`, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        Authorization: `Bearer ${token}`,
-                    },
-                    body: JSON.stringify({
-                        mealId: body.payload?.mealId,
-                        meal: {
-                            mealPictureBase64: base64Image
-                        }
-                    })
-                });
-                console.log(imageResponse);
-
-                const imageBody: Response<any> = await imageResponse.json();
-
-                if (!imageResponse.ok || imageBody.success !== "success") {
-                    console.log("update-meal failed: ", imageBody);
-                    return;
-                }
-            }
+            if (mealImage != null)
+                await uploadMealPicture(mealImage, body.payload?.mealId!);
 
             Alert.alert("Meal Saved!", `${mealName} has been saved successfully.`, [
                 {

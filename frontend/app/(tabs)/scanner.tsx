@@ -3,17 +3,10 @@ import {Text, View, StyleSheet, TouchableOpacity, Button,} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { CameraView, CameraType, useCameraPermissions } from "expo-camera";
-import { API_URL, Response, retrieveValue } from "../util";
+import { API_URL, loadFileBytes, Response, retrieveValue, uploadChunks, UploadInfo } from "../util";
 import { ConfirmationItem } from "../scannerConfirmation";
-import { File } from "expo-file-system";
-import base64 from "react-native-base64";
 
 const priceRegex = new RegExp("\\$?([0-9]+\\.[0-9]{2})");
-
-
-async function setupScanUpload() {
-
-}
 
 export default function ScannerScreen() {
   const router = useRouter();
@@ -29,23 +22,8 @@ export default function ScannerScreen() {
     if (photo?.uri === undefined)
       throw "No photo uri.";
 
-    const file = new File(photo.uri);
-
-    const handle = file.open();
-
-    if (file.size == null)
-      throw "No file size."
-
-    const bytes = handle.readBytes(handle.size!);
-
-    return bytes;
+    return loadFileBytes(photo.uri);
   }
-
-  type UploadInfo = {
-    uploadId: string,
-    chunkCount: number,
-    chunkSize: number
-  };
 
   const startUpload = async (fileSize: number): Promise<UploadInfo> => {
     const jwt = await retrieveValue('jwt');
@@ -76,42 +54,6 @@ export default function ScannerScreen() {
     
     return body.payload!;
   }
-
-  const uploadChunks = async (data: Uint8Array, uploadInfo: UploadInfo) => {
-    let requests = [];
-
-    for (let i = 0; i < uploadInfo.chunkCount; i++) {
-      const start = i * uploadInfo.chunkSize;
-      const end = Math.min(start + uploadInfo.chunkSize, data.length);
-
-      const chunk = data.slice(start, end);
-      requests.push(fetch(`${API_URL}/upload-chunk`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          uploadId: uploadInfo.uploadId,
-          index: i,
-          base64Data: base64.encodeFromByteArray(chunk)
-        })
-      }));
-    }
-
-    const responses = await Promise.all(requests);
-
-    for (const response of responses) {
-      let body: Response<UploadInfo> | null;
-      try {
-        body = await response.json();
-      } catch (ex) {
-        body = null;
-      }
-
-      if (!response.ok || body?.success !== "success")
-        throw "Invalid response: " + JSON.stringify(body? body : response);
-    }
-  };
 
   type Word = {
     originalPolygon: {x: number, y: number}[] // Point 

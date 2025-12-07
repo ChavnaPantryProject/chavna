@@ -30,9 +30,21 @@ public class S3 {
     public static final String PICTURES_BUCKET = "chavna-pictures";
 
     @AllArgsConstructor
-    public static class S3Upload {
+    public static abstract class AbstractS3Upload {
         @Getter
-        private String key;
+        protected String key;
+
+        public abstract void uploadPostProcess();
+    }
+
+    public static final class S3Upload extends AbstractS3Upload {
+        public S3Upload(String key) {
+            super(key);
+        }
+
+        @Override
+        public void uploadPostProcess() {}
+
     }
 
     public static void uploadImage(BufferedImage image, String key) {
