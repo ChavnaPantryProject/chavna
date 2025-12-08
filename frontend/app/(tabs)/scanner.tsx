@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import {Text, View, StyleSheet, TouchableOpacity, Button,} from "react-native";
+import {Text, View, StyleSheet, TouchableOpacity, Button, ActivityIndicator,} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { CameraView, CameraType, useCameraPermissions } from "expo-camera";
@@ -15,16 +15,25 @@ export default function ScannerScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const { isRefreshing, onTap } = useAutofocus();
   const ref = useRef<CameraView>(null);
+  const [processing, setProcessing] = useState(false);
 
   const tap = Gesture.Tap().onBegin(onTap);
 
   const getPictureBytes = async (): Promise<Uint8Array> => {
     const photo = await ref.current?.takePictureAsync({
-      quality: 1
+      quality: 1,
+      
     });
 
     if (photo?.uri === undefined)
       throw "No photo uri.";
+
+    router.push({
+      pathname: "/scanCropper",
+      params: {
+        imageUri: photo.uri
+      }
+    });
 
     return loadFileBytes(photo.uri);
   }
@@ -100,6 +109,8 @@ export default function ScannerScreen() {
       console.error("Error taking picture: ", ex);
       return;
     }
+    bytes = new Uint8Array();
+    setProcessing(true);
 
     if (bytes.length <= 0)
       return;
@@ -215,6 +226,13 @@ export default function ScannerScreen() {
       </View>
       </GestureDetector>
 
+      {processing &&
+        <View style={styles.processing}>
+          <ActivityIndicator size="large" color="#499F44" />
+          <Text style={styles.processingText}>Scanning...</Text>
+        </View>
+      }
+
       {/* Bottom Navigation Bar */}
       <View style={styles.bottomBar}>
         {/* Left Button */}
@@ -225,15 +243,18 @@ export default function ScannerScreen() {
         {/* Middle Button */}
         <TouchableOpacity
           style={styles.cameraButton}
-          onPress={() => takePicture()}
+          onPress={async () => {
+            await takePicture();
+            setProcessing(false);
+          }}
         >
           <View style={styles.cameraInnerCircle} />
         </TouchableOpacity>
 
         {/* Right Button */}
         <TouchableOpacity
-          style={styles.iconButton}
-          onPress={() => router.push("/")}
+          style={[styles.iconButton, {opacity: 0}]}
+          // onPress={() => router.push("/")}
         >
           <Ionicons name="home-outline" size={28} color="white" />
         </TouchableOpacity>
@@ -321,6 +342,20 @@ const styles = StyleSheet.create({
     borderRightWidth: 3,
     borderColor: "black",
   },
+  processing: {
+    position: "absolute",
+    justifyContent: "center",
+    gap: 25,
+    alignItems: "center",
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#00000088",
+    zIndex: 100
+  },
+  processingText: {
+    color: "white",
+    fontSize: 24,
+  },
   bottomBar: {
     flexDirection: "row",
     justifyContent: "space-around",
@@ -329,7 +364,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#499F4458",
   },
   iconButton: {
-    padding: 10,
+    padding: 10
   },
   cameraButton: {
     width: 60,
