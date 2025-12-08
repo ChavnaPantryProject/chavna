@@ -1,5 +1,4 @@
 // normal layout when displaying meal ingredients (not in edit mode)
-// "go to nutrition info" at the bottom right corner.
 
 import React, {useEffect, useState} from "react";
 import { 
@@ -23,80 +22,71 @@ export default function MealIngredientScreen() {
     const router = useRouter();
     const { id } = useLocalSearchParams();
     const [menuVisible, setMenuVisible] = useState(false);
-
-    console.log("Meal ID:", id);
-
-    // ingredient list data
-    // const ingredients = [
-    //     { name: "Dry Fettuccine Pasta", amount: "680g" },
-    //     { name: "Butter", amount: "240g" },
-    //     { name: "Heavy Cream", amount: "360g" },
-    //     { name: "Garlic Salt", amount: ".5g" },
-    //     { name: "Romano Cheese", amount: "75g" },
-    //     { name: "Parmesan Cheese", amount: "45g" },
-    // ];
     const [ingredients, setIngredients] = useState<{name: string, amount: string}[]>([])
     const [imageURL, setImageURL] = useState<string | null>(null);
     const [mealName, setMealName] = useState<string>("");
 
+    console.log("Meal ID:", id);
+
     useEffect(() => {
-        (async () => {
-            try {
-                const loginToken = await retrieveValue('jwt');
-        
-                if (!loginToken) {
-                    Alert.alert('Error', 'Please log in to view meals');
-                    return;
-                }
-        
-                // GET request to /get-meals
-                const response = await fetch(`${API_URL}/get-meal`, {
-                    method: 'POST',
-                    headers: {
-                        Authorization: `Bearer ${loginToken}`,
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        mealId: id
-                    })
-                });
-
-                type MealResponse = {
-                    meal: {
-                        name: string,
-                        mealPictureURL: string,
-                        ingredients: [{
-                            name: string,
-                            amount: number,
-                            unit: string
-                        }]
-                    }
-                }
-        
-                const body: Response<MealResponse> = await response.json();
-        
-                if (!response.ok) {
-                throw new Error(body.message || 'Failed to fetch meals');
-                }
-        
-                if (body.success !== 'success') {
-                    throw new Error(body.message || 'Failed to fetch meals');
-                }
-
-                setIngredients(body.payload!.meal.ingredients.map(ingredient => ({
-                    name: ingredient.name,
-                    amount: String(ingredient.amount) + " " + ingredient.unit.trim()
-                })));
-                setImageURL(body.payload!.meal.mealPictureURL);
-                setMealName(body.payload!.meal.name);
-            } catch (error) {
-                console.error('Error fetching meals:', error);
-                Alert.alert('Error', 'Failed to load meals. Please try again.');
-            }
-        })();
+        fetchMealData();
     }, [id]);
 
-    const handleDeleteMeal = () => {
+    const fetchMealData = async () => {
+        try {
+            const loginToken = await retrieveValue('jwt');
+    
+            if (!loginToken) {
+                Alert.alert('Error', 'Please log in to view meals');
+                return;
+            }
+    
+            const response = await fetch(`${API_URL}/get-meal`, {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${loginToken}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    mealId: id
+                })
+            });
+
+            type MealResponse = {
+                meal: {
+                    name: string,
+                    mealPictureURL: string,
+                    ingredients: [{
+                        name: string,
+                        amount: number,
+                        unit: string
+                    }]
+                }
+            }
+    
+            const body: Response<MealResponse> = await response.json();
+    
+            if (!response.ok) {
+                throw new Error(body.message || 'Failed to fetch meals');
+            }
+    
+            if (body.success !== 'success') {
+                throw new Error(body.message || 'Failed to fetch meals');
+            }
+
+            setIngredients(body.payload!.meal.ingredients.map(ingredient => ({
+                name: ingredient.name,
+                amount: String(ingredient.amount) + " " + ingredient.unit.trim()
+            })));
+            setImageURL(body.payload!.meal.mealPictureURL);
+            setMealName(body.payload!.meal.name);
+        } catch (error) {
+            console.error('Error fetching meals:', error);
+            Alert.alert('Error', 'Failed to load meals. Please try again.');
+        }
+    };
+
+    const handleDeleteMeal = async () => {
         setMenuVisible(false);
 
         Alert.alert(
@@ -110,17 +100,41 @@ export default function MealIngredientScreen() {
                 {
                     text: "Delete",
                     style: "destructive",
-                    onPress: () => {
-                        // delete meal logic
-                        console.log("Meal deleted");
+                    onPress: async () => {
+                        try {
+                            const loginToken = await retrieveValue('jwt');
 
-                        // navigatee back to meals tab
-                        router.replace("/(tabs)/meal");
+                            if (!loginToken) {
+                                Alert.alert('Error', 'Please log in to delete meals');
+                                return;
+                            }
 
-                        // confirmation
-                        setTimeout(() => {
-                            Alert.alert("Meal Deleted", "This meal has beedn deleted successfully.");
-                        }, 500);
+                            const response = await fetch(`${API_URL}/delete-meal`, {
+                                method: 'POST',
+                                headers: {
+                                    Authorization: `Bearer ${loginToken}`,
+                                    'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({ mealId: id }),
+                            });
+
+                            const body = await response.json();
+
+                            if (!response.ok || body.success !== 'success') {
+                                throw new Error(body.message || 'Failed to delete meal');
+                            }
+
+                            // Navigate back to meals tab
+                            router.replace("/(tabs)/meal");
+
+                            // Show confirmation
+                            setTimeout(() => {
+                                Alert.alert("Meal Deleted", "This meal has been deleted successfully.");
+                            }, 500);
+                        } catch (error) {
+                            console.error('Error deleting meal:', error);
+                            Alert.alert('Error', 'Failed to delete meal. Please try again.');
+                        }
                     }
                 }
             ]
@@ -156,7 +170,10 @@ export default function MealIngredientScreen() {
                             style={styles.dropdownItem}
                             onPress={() => {
                                 setMenuVisible(false);
-                                router.push("/meals/editmeal");  // navigate to edit meal screen
+                                router.push({
+                                    pathname: "/meals/editmeal",
+                                    params: { id }  // Pass the meal ID
+                                });
                             }}
                         >
                             <Text style={styles.dropdownText}>Edit Meal</Text>
@@ -181,10 +198,16 @@ export default function MealIngredientScreen() {
                 </View>
 
                 {/* Image */}
-                <Image
-                    source={{uri: imageURL? imageURL : ""}}
-                    style={styles.mealImage}
-                />
+                {imageURL ? (
+                    <Image
+                        source={{uri: imageURL}}
+                        style={styles.mealImage}
+                    />
+                ) : (
+                    <View style={[styles.mealImage, styles.placeholderImage]}>
+                        <Ionicons name="fast-food" size={60} color="#499F44" />
+                    </View>
+                )}
             </View>
             
             {/* scrollable ingredient list */}
@@ -192,7 +215,6 @@ export default function MealIngredientScreen() {
                 style={styles.scrollContainer}
                 showsVerticalScrollIndicator={false}
             >
-
                 {/* Table Header */}
                 <View style={styles.tableHeader}>
                     <Text style={styles.headerText}>Ingredients</Text>
@@ -211,26 +233,13 @@ export default function MealIngredientScreen() {
                         {index < ingredients.length - 1 && <View style={styles.divider} />}
                     </View>
                 ))}
-
-                {/* Navigation Button to Nutrition Info */}
-                <TouchableOpacity
-                    style={styles.linkContainer}
-                    onPress={() => router.push({
-                        pathname: '/meals/mealinfo',
-                        params: { id }
-                    })
-                }
-                >
-                    <Text style={styles.linkText}>Go to Nutrition {'>'}</Text>
-                </TouchableOpacity>
             </ScrollView>
         </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
-    container:
-    {
+    container: {
         flex: 1,
         backgroundColor: '#FFFFFF',
     },
@@ -260,7 +269,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         marginVertical: 10,
         borderWidth: 1,
-        borderColor: "499F44",
+        borderColor: "#499F44",
     },
 
     mealTitle: {
@@ -275,7 +284,14 @@ const styles = StyleSheet.create({
         height: 180,
         borderRadius: 15,
         borderColor: "#499F44",
+        borderWidth: 1,
         marginVertical: 10,
+    },
+
+    placeholderImage: {
+        backgroundColor: 'rgba(73, 159, 68, 0.2)',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
 
     tableHeader: {
@@ -295,40 +311,6 @@ const styles = StyleSheet.create({
         alignSelf: "stretch",
     },
 
-    tableBody: {
-        width: "90%",
-        alignItems: "center",
-    },
-
-    tableRow: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        width: "85%",
-        paddingVertical: 8,
-        marginLeft: 15,
-    },
-
-    tableLabel: {
-        fontSize: 15,
-        color: "#000",
-    },
-
-    tableValue: {
-        fontSize: 15,
-        color: "#000",
-    },
-
-    linkContainer: {
-        alignSelf: 'flex-end',
-        marginTop: 12,
-        marginRight: 0,
-    },
-
-    linkText: {
-        color: '#499F44',
-        fontWeight: '500',
-    },
-
     row: {
         flexDirection: "row",
         justifyContent: "space-between",
@@ -339,6 +321,7 @@ const styles = StyleSheet.create({
     ingredientText: {
         fontSize: 15,
         color: "#000",
+        flex: 1,
     },
 
     amountText: {

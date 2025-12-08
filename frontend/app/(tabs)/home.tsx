@@ -19,7 +19,7 @@ import {
   AppState,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { API_URL, retrieveValue } from '../util';
@@ -35,6 +35,12 @@ type ExpiringItem = {
   name: string;
   daysLeft: number;
 };
+
+interface FavoriteMeal {
+  mealId: string;
+  name: string;
+  mealPictureURL: string | null;
+}
 
 function daysUntil(expiration: string): number | null {
   if (!expiration) return null;
@@ -220,8 +226,43 @@ async function getWeeklySpend(): Promise<number> {
   return total;
 }
 
+async function getFavoriteMeals(): Promise<FavoriteMeal[]> {
+  const loginToken: string = (await retrieveValue('jwt'))!;
+
+  const response = await fetch(`${API_URL}/get-meals`, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${loginToken}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  const body = await response.json();
+
+  if (!response.ok) throw body;
+  if (body.success !== 'success') throw body;
+
+  // Filter only favorite meals and limit to 3
+  const allMeals = body.payload.meals as Array<{
+    mealId: string;
+    name: string;
+    mealPictureURL: string | null;
+    isFavorite: boolean;
+  }>;
+
+  return allMeals
+    .filter(meal => meal.isFavorite)
+    .slice(0, 3)
+    .map(meal => ({
+      mealId: meal.mealId,
+      name: meal.name,
+      mealPictureURL: meal.mealPictureURL,
+    }));
+}
+
 
 export default function HomeScreen() {
+  const router = useRouter(); // Add router for navigation
   const initialItems = [].map((_, i) => ({
     id: String(i + 1),
     name: '',
@@ -258,6 +299,17 @@ export default function HomeScreen() {
         setExpiringItems(soon);
       } catch (err) {
         console.error('Failed to load expiring items', err);
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const favorites = await getFavoriteMeals();
+        setFavoriteMeals(favorites);
+      } catch (err) {
+        console.error('Failed to load favorite meals', err);
       }
     })();
   }, []);
@@ -327,6 +379,7 @@ export default function HomeScreen() {
 
   const [weeklySpend, setWeeklySpend] = useState<number | null>(null);
   const [weeklySpendError, setWeeklySpendError] = useState<string | null>(null);
+  const [favoriteMeals, setFavoriteMeals] = useState<FavoriteMeal[]>([]);
 
     // Expiration Warning
   const [expiringOpen, setExpiringOpen] = useState(false);
@@ -369,6 +422,10 @@ export default function HomeScreen() {
           // Also refresh expiring items list
           const soon = await getExpiringSoonItems();
           setExpiringItems(soon);
+          
+          // Refresh favorite meals
+          const favorites = await getFavoriteMeals();
+          setFavoriteMeals(favorites);
         } catch (err) {
           console.error('Failed to check notifications on focus', err);
         }
@@ -517,10 +574,23 @@ export default function HomeScreen() {
         <View style={styles.favWrap}>
           <Text style={styles.favTitle}>Favorite Meals</Text>
           <View style={styles.favRow}>
-            <FavMeal source={require('../../assets/images/FETTUCCINE_ALFREDO_HOMEPAGE.jpg')} />
-            <FavMeal source={require('../../assets/images/CHICKEN_AND_RICE_HOMEPAGE.jpg')} />
-            <FavMeal source={require('../../assets/images/BURGER_HOMEPAGE.jpg')} />
-            
+            {favoriteMeals.length === 0 ? (
+              <>
+                <FavMeal />
+                <FavMeal />
+                <FavMeal />
+              </>
+            ) : (
+              <>
+                {favoriteMeals.map((meal) => (
+                  <FavMeal key={meal.mealId} uri={meal.mealPictureURL} mealId={meal.mealId} />
+                ))}
+                {/* Fill remaining slots with placeholders */}
+                {Array.from({ length: 3 - favoriteMeals.length }).map((_, index) => (
+                  <FavMeal key={`placeholder-${index}`} />
+                ))}
+              </>
+            )}
           </View>
         </View>
           <OptionsSheet
@@ -566,11 +636,32 @@ export default function HomeScreen() {
 
 
 
-function FavMeal({ source }: { source: ImageSourcePropType }) {
+function FavMeal({ source, uri, mealId }: { source?: ImageSourcePropType; uri?: string | null; mealId?: string }) {
+  const router = useRouter();
+  
+  const handlePress = () => {
+    if (mealId) {
+      router.push({
+        pathname: "/meals/meal_ingredient",
+        params: { id: mealId }
+      });
+    }
+  };
+
   return (
-    <View style={styles.favItem}>
-      <Image source={source} style={styles.favImage} />
-    </View>
+    <Pressable onPress={handlePress} disabled={!mealId}>
+      <View style={styles.favItem}>
+        {uri ? (
+          <Image source={{ uri }} style={styles.favImage} />
+        ) : source ? (
+          <Image source={source} style={styles.favImage} />
+        ) : (
+          <View style={[styles.favImage, styles.placeholderFavImage]}>
+            <Ionicons name="fast-food" size={32} color="#499F44" />
+          </View>
+        )}
+      </View>
+    </Pressable>
   );
 }
 
@@ -1156,6 +1247,12 @@ const styles = StyleSheet.create({
   // Image adjustments in container
   favImage: { width: '100%', height: '100%' },
 
+  placeholderFavImage: {
+    backgroundColor: 'rgba(73, 159, 68, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
 sectionHeaderRow: {
   position: 'relative',      
   alignItems: 'center',
@@ -1295,5 +1392,3 @@ const confirmStyles = StyleSheet.create({
     color: '#C62828',
   },
 });
-
-

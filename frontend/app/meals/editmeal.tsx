@@ -1,6 +1,6 @@
 // meal ingredients editing screen
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { 
     View, 
     Text, 
@@ -12,30 +12,96 @@ import {
     TextInput,
     Alert,
     ScrollView,
+    ActivityIndicator,
 } from "react-native";
 import DropDownPicker from "react-native-dropdown-picker";
 import * as ImagePicker from "expo-image-picker";
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
+import { useRouter, useLocalSearchParams } from "expo-router";
+import { API_URL, Response, retrieveValue } from "../util";
+
+interface Ingredient {
+    name: string;
+    amount: string;
+    unit: string;
+}
 
 export default function EditMeal() {
-    const [mealName, setMealName] = useState("Fettuccine Alfredo");
-    const [mealImage, setMealImage] = useState(require("../../assets/images/FETTUCCINE_ALFREDO_HOMEPAGE.jpg"));
-    const [ingredients, setIngredients] = useState([
-        { name: "Dry Fettuccine Pasta", amount: "680", unit: "g" },
-        { name: "Butter", amount: "240", unit: "g" },
-        { name: "Heavy Cream", amount: "360", unit: "g" },
-        { name: "Garlic Salt", amount: "0.5", unit: "g" },
-        { name: "Romano Cheese", amount: "75", unit: "g" },
-        { name: "Parmesan Cheese", amount: "45", unit: "g" },
-    ]);
+    const router = useRouter();
+    const { id } = useLocalSearchParams();
+    const [mealName, setMealName] = useState("");
+    const [mealImage, setMealImage] = useState<string | null>(null);
+    const [ingredients, setIngredients] = useState<Ingredient[]>([]);
+    const [loading, setLoading] = useState(true);
 
     const [modalVisible, setModalVisible] = useState(false);
     const [newIngredient, setNewIngredient] = useState("");
     const [newAmount, setNewAmount] = useState("");
     const [newUnit, setNewUnit] = useState("g");
     const [openUnit, setOpenUnit] = useState(false);
-    const navigation = useNavigation();
+
+    // Fetch meal data when component mounts
+    useEffect(() => {
+        fetchMealData();
+    }, [id]);
+
+    const fetchMealData = async () => {
+        try {
+            setLoading(true);
+            const loginToken = await retrieveValue('jwt');
+
+            if (!loginToken) {
+                Alert.alert('Error', 'Please log in to edit meals');
+                router.back();
+                return;
+            }
+
+            const response = await fetch(`${API_URL}/get-meal`, {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${loginToken}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    mealId: id
+                })
+            });
+
+            type MealResponse = {
+                meal: {
+                    name: string,
+                    mealPictureURL: string,
+                    ingredients: [{
+                        name: string,
+                        amount: number,
+                        unit: string
+                    }]
+                }
+            }
+
+            const body: Response<MealResponse> = await response.json();
+
+            if (!response.ok || body.success !== 'success') {
+                throw new Error(body.message || 'Failed to fetch meal');
+            }
+
+            // Set the meal data
+            setMealName(body.payload!.meal.name);
+            setMealImage(body.payload!.meal.mealPictureURL);
+            setIngredients(body.payload!.meal.ingredients.map(ingredient => ({
+                name: ingredient.name,
+                amount: String(ingredient.amount),
+                unit: ingredient.unit.trim()
+            })));
+
+        } catch (error) {
+            console.error('Error fetching meal:', error);
+            Alert.alert('Error', 'Failed to load meal data. Please try again.');
+            router.back();
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const pickImage = async () => {
         const result = await ImagePicker.launchImageLibraryAsync({
@@ -46,30 +112,30 @@ export default function EditMeal() {
         });
 
         if (!result.canceled) {
-            setMealImage({ uri: result.assets[0].uri} as any);
+            setMealImage(result.assets[0].uri);
         }
     }
 
     const addIngredient = () => {
         if (newIngredient && newAmount && newUnit) {
-        setIngredients([
-            ...ingredients,
-            { name: newIngredient, amount: newAmount, unit: newUnit },
-         ]);
-        setNewIngredient("");
-        setNewAmount("");
-        setNewUnit("g");
-        setModalVisible(false);
+            setIngredients([
+                ...ingredients,
+                { name: newIngredient, amount: newAmount, unit: newUnit },
+            ]);
+            setNewIngredient("");
+            setNewAmount("");
+            setNewUnit("g");
+            setModalVisible(false);
         }
     };
 
     const deleteIngredient = (index: number) => {
         Alert.alert(
             "Delete Ingredient",
-            'Are you sure you want to delete ${ingredients[index].name}?',
+            `Are you sure you want to delete ${ingredients[index].name}?`,
             [
                 {
-                    text: "cancel",
+                    text: "Cancel",
                     style: "cancel",
                 },
                 {
@@ -84,33 +150,78 @@ export default function EditMeal() {
         );
     };
 
-    const saveMeal = () => {
-        const mealData = {
-            name: mealName,
-            image: mealImage,
-            ingredients: ingredients,
-        };
+    const saveMeal = async () => {
+        try {
+            const loginToken = await retrieveValue('jwt');
 
-        console.log("Saving meal changes:", mealData);
+            if (!loginToken) {
+                Alert.alert('Error', 'Please log in to save changes');
+                return;
+            }
 
-        Alert.alert(
-            "Changes Saved!",
-            '${mealName} has been updated successfully.',
-            [
-                {
-                    text: "OK",
-                    onPress: () => navigation.goBack(),
+            // Prepare the meal update data
+            const updateData = {
+                mealId: id,
+                meal: {
+                    name: mealName,
+                    mealPictureURL: mealImage,
+                    ingredients: ingredients.map(ing => ({
+                        name: ing.name,
+                        amount: parseFloat(ing.amount),
+                        unit: ing.unit
+                    }))
                 }
-            ]
-        );
+            };
+
+            const response = await fetch(`${API_URL}/update-meal`, {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${loginToken}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(updateData)
+            });
+
+            const body = await response.json();
+
+            if (!response.ok || body.success !== 'success') {
+                throw new Error(body.message || 'Failed to update meal');
+            }
+
+            Alert.alert(
+                "Changes Saved!",
+                `${mealName} has been updated successfully.`,
+                [
+                    {
+                        text: "OK",
+                        onPress: () => router.back(),
+                    }
+                ]
+            );
+
+        } catch (error) {
+            console.error('Error saving meal:', error);
+            Alert.alert('Error', 'Failed to save changes. Please try again.');
+        }
     };
+
+    if (loading) {
+        return (
+            <SafeAreaView style={styles.container}>
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color="#499F44" />
+                    <Text style={styles.loadingText}>Loading meal...</Text>
+                </View>
+            </SafeAreaView>
+        );
+    }
 
     return (
         <SafeAreaView style={styles.container}>
-        {/* back button */}
+            {/* back button */}
             <View style={styles.header}>
                 <TouchableOpacity
-                    onPress={() => navigation.goBack()}
+                    onPress={() => router.back()}
                     style={styles.backButton}
                 >
                     <Ionicons name="chevron-back" size={24} color="black" />
@@ -129,14 +240,20 @@ export default function EditMeal() {
 
                 {/* Meal Image */}
                 <View style={styles.imageContainer}>
-                    <Image source={mealImage} style={styles.mealImage} />
+                    {mealImage ? (
+                        <Image source={{ uri: mealImage }} style={styles.mealImage} />
+                    ) : (
+                        <View style={[styles.mealImage, styles.placeholderImage]}>
+                            <Ionicons name="fast-food" size={60} color="#499F44" />
+                        </View>
+                    )}
                     <TouchableOpacity style={styles.editPhotoButton} onPress={pickImage}>
                         <Ionicons name="camera" size={20} color="white" />
                     </TouchableOpacity>
                 </View>
             </View>
 
-        {/* Ingredients Header */}
+            {/* Ingredients Header */}
             <ScrollView 
                 style={styles.scrollContainer}
                 showsVerticalScrollIndicator={false}
@@ -147,129 +264,139 @@ export default function EditMeal() {
                     <Text style={styles.tableHeaderText}>Measurement</Text>
                 </View>
 
-            {/* Ingredients List */}
-            {ingredients.map((item, index) => (
-                <View key={index} style={styles.rowContainer}>
-                    <View style={styles.row}>
-                        <Text style={styles.ingredientText}>{item.name}</Text>
-                        <View style={styles.amountContainer}>
-                            <Text style={styles.amountText}>
-                                {item.amount}{item.unit}
-                            </Text>
+                {/* Ingredients List */}
+                {ingredients.map((item, index) => (
+                    <View key={index} style={styles.rowContainer}>
+                        <View style={styles.row}>
+                            <Text style={styles.ingredientText}>{item.name}</Text>
+                            <View style={styles.amountContainer}>
+                                <Text style={styles.amountText}>
+                                    {item.amount}{item.unit}
+                                </Text>
 
-                            <TouchableOpacity
-                                onPress={() => deleteIngredient(index)}
-                                style={styles.deleteButton}
+                                <TouchableOpacity
+                                    onPress={() => deleteIngredient(index)}
+                                    style={styles.deleteButton}
+                                >
+                                    <Ionicons name="trash-outline" size={16} color="#E38B4D" />
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+
+                        {/* separator line */}
+                        {index < ingredients.length - 1 && <View style={styles.divider} />}
+                    </View>
+                ))}
+
+                {/* Add Button */}
+                <TouchableOpacity
+                    style={styles.addButton}
+                    onPress={() => setModalVisible(true)}
+                >
+                    <Ionicons name="add" size={24} color="#499F44" />
+                </TouchableOpacity>
+
+                {/* Save Button */}
+                <TouchableOpacity style={styles.saveButton} onPress={saveMeal}>
+                    <Text style={styles.saveButtonText}>Save</Text>
+                </TouchableOpacity>
+            </ScrollView>
+
+            {/* Add Ingredient Modal */}
+            <Modal visible={modalVisible} transparent animationType="fade">
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>Add Ingredient</Text>
+
+                        <TextInput
+                            placeholder="Ingredient name"
+                            placeholderTextColor="#888"
+                            style={styles.input}
+                            value={newIngredient}
+                            onChangeText={setNewIngredient}
+                        />
+
+                        <View style={styles.amountRow}>
+                            <TextInput
+                                placeholder="Amount"
+                                placeholderTextColor="#888"
+                                keyboardType="numeric"
+                                style={[styles.input, { flex: 1, marginRight: 10 }]}
+                                value={newAmount}
+                                onChangeText={setNewAmount}
+                            />
+                            <View style={{ flex: 1, zIndex: 1000 }}>
+                                <DropDownPicker
+                                    open={openUnit}
+                                    value={newUnit}
+                                    items={[
+                                        {label: "grams (g)", value: "g" },
+                                        {label: "kilograms (kg)", value: "kg" },
+                                        {label: "milliliters (ml)", value: "ml" },
+                                        {label: "liters (L)", value: "L" },
+                                        {label: "teaspoons (tsp)", value: "tsp" },
+                                        {label: "tablespoons (tbsp)", value: "tbsp" },
+                                        {label: "cups (cup)", value: "cup" },
+                                        {label: "ounces (oz)", value: "oz" },
+                                        {label: "pounds (lbs)", value: "lbs" },
+                                    ]}
+                                    setOpen={setOpenUnit}
+                                    setValue={setNewUnit}
+                                    setItems={() => {}}
+                                    placeholder="Select Unit"
+                                    style={{
+                                        borderColor: "#ccc",
+                                        borderRadius: 8,
+                                    }}
+                                    dropDownContainerStyle={{
+                                        borderColor: "#ccc",
+                                    }}
+                                />
+                            </View>
+                        </View>
+
+                        <View style={styles.modalButtons}>
+                            <TouchableOpacity 
+                                style={styles.cancelButton}
+                                onPress={() => {
+                                    setModalVisible(false);
+                                    setNewIngredient("");
+                                    setNewAmount("");
+                                    setNewUnit("g");
+                                }}
                             >
-                                <Ionicons name="trash-outline" size={16} color="#E38B4D" />
+                                <Text style={styles.cancelText}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity 
+                                style={styles.addModalButton}
+                                onPress={addIngredient}
+                            >
+                                <Text style={styles.addText}>Add</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
-
-                    {/* separator line */}
-                    {index < ingredients.length -1 && <View style={styles.divider} />}
                 </View>
-            ))}
-
-            {/* Add Button */}
-            <TouchableOpacity
-                style={styles.addButton}
-                onPress={() => setModalVisible(true)}
-            >
-                <Ionicons name="add" size={24} color="#499F444" />
-            </TouchableOpacity>
-
-            {/* Save Button */}
-            <TouchableOpacity style={styles.saveButton} onPress={saveMeal}>
-                <Text style={styles.saveButtonText}>Save</Text>
-            </TouchableOpacity>
-        </ScrollView>
-
-        {/* Add Ingredient Modal */}
-        <Modal visible={modalVisible} transparent animationType="fade">
-            <View style={styles.modalOverlay}>
-                <View style={styles.modalContent}>
-                    <Text style={styles.modalTitle}>Add Ingredient</Text>
-
-                    <TextInput
-                        placeholder="Ingredient name"
-                        placeholderTextColor="#888"
-                        style={styles.input}
-                        value={newIngredient}
-                        onChangeText={setNewIngredient}
-                    />
-
-                    <View style={styles.amountRow}>
-                        <TextInput
-                            placeholder="Amount"
-                            placeholderTextColor="#888"
-                            keyboardType="numeric"
-                            style={[styles.input, { flex: 1, marginRight: 10 }]}
-                            value={newAmount}
-                            onChangeText={setNewAmount}
-                        />
-                        <View
-                            style={{ flex: 1, zIndex: 1000 }}
-                        >
-                            <DropDownPicker
-                                open={openUnit}
-                                value={newUnit}
-                                items={[
-                                    {label: "grams (g)", value: "g" },
-                                    {label: "kilograms (kg)", value: "kg" },
-                                    {label: "milliliters (ml)", value: "ml" },
-                                    {label: "liters (L)", value: "L" },
-                                    {label: "teaspoons (tsp)", value: "tsp" },
-                                    {label: "tablespoons (tbsp)", value: "tbsp" },
-                                    {label: "cups (cup)", value: "cup" },
-                                    {label: "ounces (oz)", value: "oz" },
-                                    {label: "pounds (lbs)", value: "lbs" },
-                                ]}
-                                setOpen={setOpenUnit}
-                                setValue={setNewUnit}
-                                setItems={() => {}}
-                                placeholder="Select Unit"
-                                style={{
-                                    borderColor: "#ccc",
-                                    borderRadius: 8,
-                                }}
-                                dropDownContainerStyle={{
-                                    borderColor: "#ccc",
-                                }}
-                            />
-                        </View>
-                    </View>
-
-                    <View style={styles.modalButtons}>
-                        <TouchableOpacity 
-                            style={styles.cancelButton}
-                            onPress={() => {
-                                setModalVisible(false);
-                                setNewIngredient("");
-                                setNewAmount("");
-                                setNewUnit("g");
-                            }}
-                        >
-                            <Text style={styles.cancelText}>Cancel</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity 
-                            style={styles.addModalButton}
-                            onPress={addIngredient}
-                        >
-                            <Text style={styles.addText}>Add</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-             </View>
-        </Modal>
-    </SafeAreaView>
-  );
+            </Modal>
+        </SafeAreaView>
+    );
 }
 
 const styles = StyleSheet.create({
     container: { 
         flex: 1, 
         backgroundColor: "#fff", 
+    },
+
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+
+    loadingText: {
+        marginTop: 10,
+        fontSize: 16,
+        color: '#666'
     },
 
     header: {
@@ -309,20 +436,6 @@ const styles = StyleSheet.create({
         zIndex: 10,
     },
 
-    mealName: {
-        fontSize: 20,
-        fontWeight: "600",
-        textAlign: "center",
-        color: "#2B2B2B",
-    },
-
-    headerText: { 
-        flex: 1, 
-        textAlign: "center", 
-        fontSize: 18, 
-        fontWeight: "500" 
-    },
-
     mealNameInput: {
         fontSize: 20,
         fontWeight: "700",
@@ -340,13 +453,20 @@ const styles = StyleSheet.create({
         width: 230,
         height: 180,
         borderRadius: 15,
-        borderColor: "#499f44f",
+        borderColor: "#499F44",
         borderWidth: 1,
+    },
+
+    placeholderImage: {
+        backgroundColor: 'rgba(73, 159, 68, 0.2)',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
 
     editPhotoButton: {
         position: "absolute",
         bottom: 5,
+        right: 5,
         backgroundColor: "rgba(0,0,0,0.5)",
         paddingHorizontal: 12,
         paddingVertical: 5,
@@ -378,15 +498,6 @@ const styles = StyleSheet.create({
         alignItems: "center",
     },
 
-    tableRow: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        borderBottomColor: "#A2C49F",
-        borderBottomWidth: 1,
-        paddingVertical: 8,
-        paddingHorizontal: 5,
-    },
-
     ingredientText: { 
         fontSize: 15,
         color: "#000",
@@ -402,8 +513,8 @@ const styles = StyleSheet.create({
     amountText: {
         fontSize: 15,
         color: "#000",
-        minWidth: 50, // keeps numbers aligned
-        textAlign: "right", // aligns numbers to the right
+        minWidth: 50,
+        textAlign: "right",
     },
 
     deleteButton: {
@@ -423,7 +534,7 @@ const styles = StyleSheet.create({
         justifyContent: "center",
         marginTop: 15,
         paddingVertical: 10,
-        gap:8,
+        gap: 8,
     },
 
     saveButton: {
@@ -476,23 +587,6 @@ const styles = StyleSheet.create({
         flexDirection: "row", 
         alignItems: "flex-start",
         marginBottom: 10,
-    },
-
-    dropdown: {
-        borderWidth: 1,
-        borderColor: "#ccc",
-        borderRadius: 8,
-        paddingHorizontal: 10,
-        paddingVertical: 8,
-    },
-
-    dropdownText: { 
-        fontSize: 14 
-    },
-
-    picker: {
-        height: 50,
-        width: "100%",
     },
 
     modalButtons: {
