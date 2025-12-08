@@ -644,7 +644,7 @@
 // export default InventoryScreen;
 
 import { useState, useEffect, useMemo } from "react";
-import { Text, View, StyleSheet, TextInput, Pressable, ActivityIndicator, ScrollView, Platform } from "react-native";
+import { Text, View, StyleSheet, TextInput, Pressable, ActivityIndicator, ScrollView, Modal } from "react-native";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import ModalFoodCategory from "../pantry/modalFoodCategory";
 import ModalCreateFoodCategory from "../pantry/modalAddCategory";
@@ -928,29 +928,32 @@ const InventoryScreen = () => {
                 </Pressable>
             </View>
 
-        {/* search bar */}
-        <View style={style.searchContainer}>
-            <Ionicons
-                name="search"
-                size={22}
-                color="#499F44"
-                style={{ marginRight: 6 }}
-            />
-            <TextInput
-                value={searchEntry}
-                onChangeText={setSearchEntry}
-                placeholder="Search"
-                placeholderTextColor="#555"
-                autoCorrect={false}
-                style={style.searchInput}
-            />
-            {searchEntry.length > 0 && (
-                <Pressable onPress={() => setSearchEntry("")}>
-                    <Ionicons name="close-circle" size={20} color="#499F44" />
-                </Pressable>
-            )}
-        </View>
-
+            {/* search bar */}
+            <View style={style.searchBar}>
+                <Ionicons
+                    name="search"
+                    size={22}
+                    color="#499F44"
+                    style={{ marginRight: 8 }}
+                />
+                <TextInput
+                    value={searchEntry}
+                    onChangeText={setSearchEntry}
+                    placeholder="Search items..."
+                    placeholderTextColor="#999"
+                    autoCorrect={false}
+                    style={style.searchInput}
+                />
+                {searchEntry.length > 0 && (
+                    <Pressable
+                        onPress={() => setSearchEntry("")}
+                        hitSlop={8}
+                        style={style.clearButton}
+                    >
+                        <Ionicons name="close-circle" size={22} color="#999" />
+                    </Pressable>
+                )}
+            </View>
 
             {/* Show search results or category list */}
             <View style={style.catergoryContainer}>
@@ -1167,27 +1170,11 @@ const InventoryScreen = () => {
 
             {/* create category button - only show when not searching */}
             {searchEntry.trim().length === 0 && (
-                <Pressable
-                    onPress={openCreateCategory}
-                    style={({ pressed }) => [
-                        style.addButton,
-                        pressed && {
-                            backgroundColor: '#CBE8CC',
-                            shadowColor: '#499F44',
-                            shadowOffset: { width: 0, height: 0 },
-                            shadowOpacity: 0.5,
-                            shadowRadius: 10,
-                            transform: [{ scale: 0.95 }],
-                            ...(Platform.OS === 'android' ? { elevation: 8 } : {}),
-                        },
-                    ]}
-                >
-                    <Ionicons name="add" size={35} color="#2E7D32" />
+                <Pressable onPress={openCreateCategory}>
+                    <Text style={style.addButton}>+</Text>
                 </Pressable>
             )}
 
-
-            {/* create category modal (kept outside of the button) */}
             {/* create category modal */}
             <ModalCreateFoodCategory
                 visible={modalCreateCategory}
@@ -1245,10 +1232,9 @@ const style = StyleSheet.create({
 
     searchInput: {
         flex: 1,
-        fontSize: 15,
+        fontSize: 16,
         color: "#333",
     },
-
 
     clearButton: {
         marginLeft: 8,
@@ -1290,19 +1276,12 @@ const style = StyleSheet.create({
     },
 
     addButton: {
-    marginTop: 16,
-    marginBottom: 24,
-    alignSelf: 'center',
-    width: 45,
-    height: 45,
-    borderRadius: 30,
-    borderWidth: 2,
-    borderColor: '#499F44',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#E6F4EA',
+        fontSize: 40,
+        color: "rgba(138, 141, 138, 1)",
+        textShadowColor: "rgba(0, 0, 0, 0.1)",
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 2,
     },
-
 
     searchResultsContainer: {
         flex: 1,
@@ -1351,21 +1330,6 @@ const style = StyleSheet.create({
         paddingTop: 80,
         paddingHorizontal: 32,
     },
-
-    searchContainer: {
-        flexDirection: "row",
-        alignItems: "center",
-        borderWidth: 1.5,
-        borderColor: "#499F44",
-        borderRadius: 25,
-        paddingHorizontal: 12,
-        marginBottom: 20,
-        height: 50,
-        backgroundColor: "#FFFFFF",
-        alignSelf: "stretch",
-        marginHorizontal: 16,
-    },
-
 
     emptySearchText: {
         fontSize: 16,
