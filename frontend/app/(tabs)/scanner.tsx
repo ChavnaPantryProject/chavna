@@ -208,7 +208,7 @@ export default function ScannerScreen() {
 
       {/* Scanner Area with Live Camera */}
       <View style={styles.scannerArea}>
-        <CameraView style={styles.camera} ref={ref} facing={facing} />
+        <CameraView style={styles.camera} ref={ref} facing={facing} autofocus="on"/>
         {/* Scanner corners */}
         <View style={styles.cornerTopLeft} />
         <View style={styles.cornerTopRight} />
