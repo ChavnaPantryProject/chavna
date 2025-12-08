@@ -3,13 +3,34 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_URL, retrieveValue } from './util';
 
 // Configure notification handler
+/*
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
   }),
 });
+*/
+Notifications.setNotificationHandler({
+  handleNotification: async (notification) => {
+    console.log("🔔 Notification received in handler:", notification.request.identifier);
+
+    return {
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
+
+      // Do NOT attempt background scheduling here (OPTION A)
+      // No shouldShowBanner or shouldShowList (iOS only)
+    };
+  }
+});
+
 
 export type ExpiringItem = {
   id: string;
@@ -98,7 +119,7 @@ async function getFoodItems(): Promise<ExpiringItem[]> {
     return [];
   }
 }
-
+/*
 // Request notification permissions
 export async function requestNotificationPermissions(): Promise<boolean> {
   try {
@@ -116,6 +137,35 @@ export async function requestNotificationPermissions(): Promise<boolean> {
     return false;
   }
 }
+*/
+
+// Request notification permissions
+export async function requestNotificationPermissions(): Promise<boolean> {
+  try {
+    const stored = await AsyncStorage.getItem("notificationPermissionStatus");
+
+    if (stored === "denied") {
+      // User already said NO — never ask again
+      return false;
+    }
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+
+    if (existingStatus === "granted") {
+      await AsyncStorage.setItem("notificationPermissionStatus", "granted");
+      return true;
+    }
+    const { status } = await Notifications.requestPermissionsAsync();
+
+    // Save user's choice
+    await AsyncStorage.setItem("notificationPermissionStatus", status);
+
+    return status === "granted";
+  } catch (error) {
+    console.error("Error requesting notification permissions:", error);
+    return false;
+  }
+}
+
 
 // Check if expiration notifications are enabled
 async function isExpirationNotificationsEnabled(): Promise<boolean> {
@@ -197,11 +247,20 @@ export async function scheduleExpirationNotifications(): Promise<void> {
       await cancelAllExpirationNotifications();
       return;
     }
-
+/*
     // Request permissions if needed
     const hasPermission = await requestNotificationPermissions();
     if (!hasPermission) {
       console.log('Notification permissions not granted');
+      //new line
+      await cancelAllExpirationNotifications();
+      return;
+    }
+*/
+    const hasPermission = await requestNotificationPermissions();
+    if (!hasPermission) {
+    // Do NOT spam logs
+      await cancelAllExpirationNotifications();
       return;
     }
 
