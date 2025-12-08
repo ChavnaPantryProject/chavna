@@ -12,8 +12,9 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faCrown } from '@fortawesome/free-solid-svg-icons';
+//import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
+//import { faCrown } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesome5 } from "@expo/vector-icons";
 import { API_URL, retrieveValue } from "../util";
 
 interface FamilyMember {
@@ -406,7 +407,7 @@ const HouseholdManagementScreen = () => {
                   </Text>
                   {member.role === "Owner" && (
                     <View style={styles.crownIcon}>
-                      <FontAwesomeIcon icon={faCrown} size={14} color="#FFD700" />
+                      <FontAwesome5 name="crown" size={14} color="#FFD700" />
                     </View>
                   )}
                 </View>
@@ -711,6 +712,8 @@ const styles = StyleSheet.create({
     marginTop: 10,
     width: 200,
     alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#d9893c", 
   },
   refreshButton: {
     backgroundColor: "#499f44",

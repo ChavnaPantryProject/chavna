@@ -10,6 +10,8 @@ import {
   Modal,
   ActivityIndicator,
   Alert,
+  Pressable,
+  Platform,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useFocusEffect, useRouter } from "expo-router";
@@ -363,12 +365,24 @@ export default function MealScreen() {
       )}
 
       {/* Add Meal Button */}
-      <TouchableOpacity
-        style={styles.addBtn}
+      <Pressable
         onPress={() => router.push("/meals/newmeal")}
+        style={({ pressed }) => [
+          styles.addBtn,
+          pressed && {
+            backgroundColor: '#CBE8CC', // On press glow
+            shadowColor: '#499F44',
+            shadowOffset: { width: 0, height: 0 },
+            shadowOpacity: 0.5,
+            shadowRadius: 10,
+            transform: [{ scale: 0.95 }],
+            ...(Platform.OS === 'android' ? { elevation: 8 } : {}),
+          },
+        ]}
       >
-        <Text style={styles.addText}>+</Text>
-      </TouchableOpacity>
+        <Ionicons name="add" size={35} color="#2E7D32" />
+      </Pressable>
+
 
       {/* Delete Meal Confirmation */}
       <Modal
@@ -405,12 +419,14 @@ export default function MealScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 15,
-    backgroundColor: "#fff",
-  },
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: "#fff",
+      paddingHorizontal: 15,
+      paddingBottom: 15,
+      paddingTop: -30,
+    },
 
   loadingContainer: {
     flex: 1,
@@ -523,10 +539,17 @@ const styles = StyleSheet.create({
   },
 
   addBtn: {
-    position: "absolute",
+    position: 'absolute',
     bottom: 25,
-    alignSelf: "center",
-    backgroundColor: "transparent",
+    alignSelf: 'center',
+    width: 45,
+    height: 45,
+    borderRadius: 30,
+    borderWidth: 2,
+    borderColor: '#499F44',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#E6F4EA',
   },
 
   addText: {

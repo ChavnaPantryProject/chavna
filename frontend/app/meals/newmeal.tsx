@@ -9,12 +9,12 @@ import {
     Image, 
     TouchableOpacity, 
     StyleSheet,
-    SafeAreaView,
     TextInput,
     Modal,
     Alert,
     ScrollView,
     Pressable,
+    Platform,
 } from "react-native";
 import DropDownPicker from "react-native-dropdown-picker";
 import * as ImagePicker from "expo-image-picker";
@@ -23,6 +23,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import { API_URL, loadFileBytes, Response, retrieveValue, uploadChunks, UploadInfo } from "../util";
 import { getSelectedTemplate, Template } from "../select-template";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function NewMeal() {
     const [mealName, setMealName] = useState("");
@@ -208,8 +209,9 @@ export default function NewMeal() {
         }
     };
 
-    return (
-        <SafeAreaView style={styles.container}>
+        return (
+            <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
+
 
             {/* back button */}
             <TouchableOpacity 
@@ -251,9 +253,17 @@ export default function NewMeal() {
 
                 {/* ingredients header */}
                 <View style={styles.tableHeader}>
-                    <Text style={styles.tableHeaderText}>Ingredients</Text>
-                    <Text style={styles.tableHeaderText}>Measurement</Text>
+                    <View style={styles.headerCell}>
+                        <Text style={styles.tableHeaderText}>Ingredients</Text>
+                        <View style={styles.headerUnderline} />
+                    </View>
+
+                    <View style={styles.headerCell}>
+                        <Text style={styles.tableHeaderText}>Measurement</Text>
+                        <View style={styles.headerUnderline} />
+                    </View>
                 </View>
+
 
                 {/* ingredients list */}
                 {ingredients.map((item, index) => (
@@ -280,12 +290,24 @@ export default function NewMeal() {
                 ))}
 
                 {/* add ingredient button */}
-                <TouchableOpacity
-                    style={styles.addButton}
-                    onPress={() => setModalVisible(true)}
+                <Pressable
+                onPress={() => setModalVisible(true)}
+                style={({ pressed }) => [
+                    styles.addBtn,
+                    pressed && {
+                    backgroundColor: '#CBE8CC', // On press glow
+                    shadowColor: '#499F44',
+                    shadowOffset: { width: 0, height: 0 },
+                    shadowOpacity: 0.5,
+                    shadowRadius: 10,
+                    transform: [{ scale: 0.95 }],
+                    ...(Platform.OS === 'android' ? { elevation: 8 } : {}),
+                    },
+                ]}
                 >
-                    <Ionicons name="add" size={28} color="#4C6444" />
-                </TouchableOpacity>
+                <Ionicons name="add" size={35} color="#2E7D32" />
+                </Pressable>
+
 
                 {/* save button */}
                 <TouchableOpacity style={styles.saveButton} onPress={saveMeal}>
@@ -301,7 +323,12 @@ export default function NewMeal() {
             >
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalContent}>
+                        <View style={styles.modalTitleWrap}>
                         <Text style={styles.modalTitle}>Add Ingredient</Text>
+                        <View style={styles.modalTitleUnderline} />
+                        </View>
+
+
 
                         <Pressable
                             onPress={() => {
@@ -309,7 +336,7 @@ export default function NewMeal() {
                                 router.push("/select-template");
                             }}
                         >
-                            <Text style={[styles.ingredientInput, template == null && {color: "#888"}]}>{template? template.name : "Tap to set ingredient"}</Text>
+                            <Text style={[styles.ingredientInput, template == null && {color: "#888"}]}>{template? template.name : "Tap to Set Ingredient"}</Text>
                         </Pressable>
 
                         <View style={styles.amountRow}>
@@ -321,28 +348,30 @@ export default function NewMeal() {
                                 value={newAmount}
                                 onChangeText={setNewAmount}
                             />
-                            <Text style={styles.unit}>{template? template.unit.trim() : "units"}</Text>
+                            <Text style={styles.unit}>{template? template.unit.trim() : "Unit"}</Text>
                         </View>
 
                         <View style={styles.modalButtons}>
-                            <TouchableOpacity
-                                style={styles.cancelButton}
-                                onPress={() => {
-                                    setModalVisible(false);
-                                    setNewIngredient("");
-                                    setNewAmount("");
-                                    setNewUnit("g");
-                                }}
-                            >
-                                    <Text style={styles.cancelText}>Cancel</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity 
-                                style={styles.addModalButton}
-                                onPress={addIngredient}
-                            >
-                                    <Text style={styles.addText}>Add</Text>
-                            </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.pillButton, styles.cancelPill]}
+                            onPress={() => {
+                            setModalVisible(false);
+                            setNewIngredient("");
+                            setNewAmount("");
+                            setNewUnit("g");
+                            }}
+                        >
+                            <Text style={styles.cancelPillText}>Cancel</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity 
+                            style={[styles.pillButton, styles.addPill]}
+                            onPress={addIngredient}
+                        >
+                            <Text style={styles.addPillText}>Add</Text>
+                        </TouchableOpacity>
                         </View>
+
                     </View>
                 </View>
             </Modal>
@@ -354,6 +383,7 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: "#FFFFFF",
+        paddingTop: 20,
     },
 
     topSection: {
@@ -407,7 +437,7 @@ const styles = StyleSheet.create({
 
     backButton: {
         position: "absolute",
-        top: 55,
+        top: 80,
         left: 20,
         zIndex: 10,
     },
@@ -501,12 +531,14 @@ const styles = StyleSheet.create({
 
     saveButton: {
         alignSelf: "center",
-        backgroundColor: "#E38B4D",
+        backgroundColor: "#F3A261", 
         borderRadius: 10,
         paddingVertical: 12,
         paddingHorizontal: 60,
         marginTop: 20,
         marginBottom: 30,
+        borderWidth: 2,
+        borderColor: "#d9893c", 
     },
 
     saveButtonText: {
@@ -528,14 +560,7 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         width: "85%",
     },
-
-    modalTitle: {
-        fontWeight: "700",
-        fontSize: 18,
-        marginBottom: 15,
-        textAlign: "center",
-    },
-
+    
     input: {
         borderWidth: 1,
         borderColor: "#ccc",
@@ -543,6 +568,7 @@ const styles = StyleSheet.create({
         padding: 10,
         marginBottom: 10,
         fontSize: 15,
+        textAlign: "center",
     },
 
     ingredientInput: {
@@ -552,21 +578,20 @@ const styles = StyleSheet.create({
         padding: 10,
         marginBottom: 10,
         fontSize: 15,
-        textAlign: "center"
+        textAlign: "center",
+        marginTop: 10
     },
 
     amountRow: {
         flexDirection: "row",
         alignItems: "flex-start",
-        marginBottom: 10,
+        marginBottom: -8,
     },
-
     modalButtons: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        marginTop: 20,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 20,
     },
-
     addModalButton: {
         flex: 1,
         alignItems: "center",
@@ -592,4 +617,80 @@ const styles = StyleSheet.create({
         fontWeight: "700",
         fontSize: 16,
     },
-});
+    pillButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 25,       
+    alignItems: "center",
+    marginHorizontal: 5,
+    borderWidth: 2,
+    },
+
+    cancelPill: {
+    backgroundColor: "#fff",
+    borderColor: "#ccc",
+    },
+
+    addPill: {
+    backgroundColor: "#E3F7E3",
+    borderColor: "#499F44",
+    },
+
+    cancelPillText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#666",
+    },
+
+    addPillText: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#2E7D32",
+    },
+    addBtn: {
+    marginBottom: 12,
+    marginTop: 15,
+    alignSelf: 'center',
+    width: 45,
+    height: 45,
+    borderRadius: 30,
+    borderWidth: 2,
+    borderColor: '#499F44',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#E6F4EA',
+    },
+    headerCell: {
+    flex: 1,
+    alignItems: "center",
+},
+
+headerUnderline: {
+    width: "50%",   
+    height: 1.5,
+    backgroundColor: "#499F44",
+    borderRadius: 1,
+    marginTop: 4,
+},
+modalTitleWrap: {
+    alignItems: "center",
+    marginBottom: 12, 
+},
+
+modalTitle: {
+    fontWeight: "700",
+    fontSize: 18,
+    textAlign: "center",
+    marginBottom: 2, 
+    lineHeight: 22,    
+},
+
+modalTitleUnderline: {
+    width: 300,
+    height: 1.5,
+    backgroundColor: "#499F44",
+    borderRadius: 2,
+    marginTop: 2,    
+},
+
+    });

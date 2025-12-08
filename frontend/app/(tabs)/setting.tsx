@@ -26,7 +26,7 @@ const SettingScreen = () => {
     { id: 3, text: "Your chicken will expire tomorrow." }
   ]);
   const [hasUnread, setHasUnread] = useState(true);
-  const [avatar, setAvatar] = useState("https://api.dicebear.com/7.x/adventurer/png?seed=User");
+  const [avatar, setAvatar] = useState<string | null>(null);
   const [jwtToken, setJwtToken] = useState<string | null>(null);
   const [userName, setUserName] = useState("User");
   const [loadingUserInfo, setLoadingUserInfo] = useState(true);
@@ -233,7 +233,7 @@ const SettingScreen = () => {
     <ScrollView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Settings</Text>
+        <Text style={styles.headerTitle}></Text>
 
         <View style={{ position: "relative" }}>
           <TouchableOpacity onPress={handleNotificationPress}>
@@ -248,15 +248,19 @@ const SettingScreen = () => {
 
       {/* Avatar Section */}
       <View style={styles.avatarContainer}>
-        <TouchableOpacity onPress={handleChangeAvatar}>
-          <Image
-            source={{ uri: avatar }}
-            style={styles.avatar}
-          />
-          <View style={styles.cameraIconContainer}>
-            <Ionicons name="camera-outline" size={20} color="white" />
+        <TouchableOpacity onPress={handleChangeAvatar} style={{ position: "relative" }}>
+        {avatar ? (
+          <Image source={{ uri: avatar }} style={styles.avatar} />
+        ) : (
+          <View style={[styles.avatar, styles.defaultAvatar]}>
+            <Ionicons name="person" size={40} color="#499F44" />
           </View>
-        </TouchableOpacity>
+        )}
+
+        <View style={styles.cameraIconContainer}>
+          <Ionicons name="camera-outline" size={20} color="white" />
+        </View>
+      </TouchableOpacity>
         {loadingUserInfo ? (
           <ActivityIndicator size="small" color="#499F44" style={{ marginVertical: 10 }} />
         ) : (
@@ -380,6 +384,8 @@ const styles = StyleSheet.create({
     height: 80,
     borderRadius: 40,
     marginBottom: 10,
+    borderWidth: 3,
+    borderColor: "#499F44",
   },
   cameraIconContainer: {
     position: 'absolute',
@@ -413,18 +419,25 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginBottom: 12,
     alignItems: "center",
+    borderColor: "#499F44",
+    borderWidth: 2,
   },
   optionText: {
     fontSize: 16,
     fontWeight: "500",
   },
-  signOutButton: {
-    backgroundColor: "#f89d5d",
-    padding: 15,
-    borderRadius: 20,
+signOutButton: {
+    backgroundColor: "#F3A261",  
+    paddingVertical: 14,
+    borderRadius: 23,             // rounded pill
     alignItems: "center",
     marginTop: 40,
-  },
+    borderWidth: 2,
+    borderColor: "#d9893c",       // darker outline
+    minWidth: 350,
+    alignSelf: "center",
+},
+
   signOutText: {
     color: "#fff",
     fontSize: 16,
@@ -466,4 +479,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#999",
   },
+  defaultAvatar: {
+  backgroundColor: "#E6F4EA",
+  justifyContent: "center",
+  alignItems: "center",
+},
+
 });
