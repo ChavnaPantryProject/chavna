@@ -219,10 +219,6 @@ export default function ScannerScreen() {
       {/* Bottom Navigation Bar */}
       <View style={styles.bottomBar}>
         {/* Left Button */}
-        <TouchableOpacity style={styles.iconButton} onPress={toggleCameraFacing}>
-          <Ionicons name="camera-reverse" size={28} color="white" />
-        </TouchableOpacity>
-
         {/* Middle Button */}
         <TouchableOpacity
           style={styles.cameraButton}
@@ -232,12 +228,6 @@ export default function ScannerScreen() {
         </TouchableOpacity>
 
         {/* Right Button */}
-        <TouchableOpacity
-          style={styles.iconButton}
-          onPress={() => router.push("/")}
-        >
-          <Ionicons name="home-outline" size={28} color="white" />
-        </TouchableOpacity>
       </View>
     </View>
   );
