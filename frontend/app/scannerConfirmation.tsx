@@ -330,6 +330,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderColor: "#D6EAD8",
     backgroundColor: "#FFFFFF",
+    
   },
   backButton: {
     position: "absolute",

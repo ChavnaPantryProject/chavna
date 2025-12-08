@@ -1,6 +1,5 @@
 package com.chavna.pantryproject;
 
-import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;

@@ -1,10 +1,11 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {Text, View, StyleSheet, TouchableOpacity, Button,} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { CameraView, CameraType, useCameraPermissions } from "expo-camera";
-import { API_URL, loadFileBytes, Response, retrieveValue, uploadChunks, UploadInfo } from "../util";
+import { API_URL, loadFileBytes, Response, retrieveValue, uploadChunks, UploadInfo, useAutofocus } from "../util";
 import { ConfirmationItem } from "../scannerConfirmation";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 
 const priceRegex = new RegExp("\\$?([0-9]+\\.[0-9]{2})");
 
@@ -12,7 +13,10 @@ export default function ScannerScreen() {
   const router = useRouter();
   const [facing, setFacing] = useState<CameraType>("back");
   const [permission, requestPermission] = useCameraPermissions();
+  const { isRefreshing, onTap } = useAutofocus();
   const ref = useRef<CameraView>(null);
+
+  const tap = Gesture.Tap().onBegin(onTap);
 
   const getPictureBytes = async (): Promise<Uint8Array> => {
     const photo = await ref.current?.takePictureAsync({
@@ -196,17 +200,11 @@ export default function ScannerScreen() {
   return (
     <View style={styles.container}>
       {/* Top Bar */}
-      <View style={styles.topBar}>
-        <TouchableOpacity
-          style={styles.addTemplateButton}
-          onPress={() => router.push('/select-template')}
-        >
-          <Text style={styles.addTemplateText}>Manually Add Item</Text>
-        </TouchableOpacity>
-      </View>
+      <View style={styles.topBar}></View>
 
 
       {/* Scanner Area with Live Camera */}
+      <GestureDetector gesture={tap}>
       <View style={styles.scannerArea}>
         <CameraView style={styles.camera} ref={ref} facing={facing} autofocus="on"/>
         {/* Scanner corners */}
@@ -215,14 +213,11 @@ export default function ScannerScreen() {
         <View style={styles.cornerBottomLeft} />
         <View style={styles.cornerBottomRight} />
       </View>
+      </GestureDetector>
 
       {/* Bottom Navigation Bar */}
       <View style={styles.bottomBar}>
         {/* Left Button */}
-        <TouchableOpacity style={styles.iconButton} onPress={toggleCameraFacing}>
-          <Ionicons name="camera-reverse" size={28} color="white" />
-        </TouchableOpacity>
-
         {/* Middle Button */}
         <TouchableOpacity
           style={styles.cameraButton}
@@ -232,12 +227,6 @@ export default function ScannerScreen() {
         </TouchableOpacity>
 
         {/* Right Button */}
-        <TouchableOpacity
-          style={styles.iconButton}
-          onPress={() => router.push("/")}
-        >
-          <Ionicons name="home-outline" size={28} color="white" />
-        </TouchableOpacity>
       </View>
     </View>
   );

@@ -184,35 +184,42 @@ public class MealController {
     }
 
     private FlattenedMeal getFlattenedMeal(Connection con, UUID mealId, UUID owner) throws SQLException {
+        PreparedStatement mealStatement = con.prepareStatement(String.format("""
+            SELECT name, is_favorite FROM %s
+            WHERE owner = ? AND id = ?
+        """, Database.MEALS_TABLE));
+        mealStatement.setObject(1, owner);
+        mealStatement.setObject(2, mealId);
+
+        ResultSet mealResult = mealStatement.executeQuery();
+
+        if (!mealResult.next())
+            throw new ResponseException(Response.Fail("Meal not found."));
+
+        String mealName = mealResult.getString(1);
+        boolean isFavorite = mealResult.getBoolean(2);
+
         String query = String.format("""
-            SELECT %2$s.name, %3$s.id, %1$s.amount, %3$s.name, %3$s.unit, %2$s.is_favorite FROM %1$s
-            INNER JOIN %3$s
-            ON %1$s.template_id = %3$s.id
+            SELECT %2$s.id, %1$s.amount, %2$s.name, %2$s.unit FROM %1$s
             INNER JOIN %2$s
-            ON %1$s.meal_id = %2$s.id
-            WHERE %2$s.id = ? AND %2$s.owner = ? AND %3$s.owner = ?
+            ON %1$s.template_id = %2$s.id
+            WHERE %1$s.meal_id = ? AND %2$s.owner = ?
             ORDER BY order_index;
-        """, Database.MEAL_INGREDIENTS_TABLE, Database.MEALS_TABLE, Database.FOOD_ITEM_TEMPLATES_TABLE);
-        PreparedStatement statement = con.prepareStatement(query);
+        """, Database.MEAL_INGREDIENTS_TABLE, Database.FOOD_ITEM_TEMPLATES_TABLE);
+        PreparedStatement ingredientsStatement = con.prepareStatement(query);
 
-        statement.setObject(1, mealId);
-        statement.setObject(2, owner);
-        statement.setObject(3, owner);
+        ingredientsStatement.setObject(1, mealId);
+        ingredientsStatement.setObject(2, owner);
 
-        ResultSet result = statement.executeQuery();
+        ResultSet result = ingredientsStatement.executeQuery();
 
         List<FlattenedIngredient> ingredients = new ArrayList<>();
-        String mealName = null;
-        Boolean isFavorite = null;
         while (result.next()) {
-            mealName = result.getString(1);
-
             FlattenedIngredient ingredient = new FlattenedIngredient();
-            ingredient.templateId = (UUID) result.getObject(2);
-            ingredient.amount = result.getDouble(3);
-            ingredient.name = result.getString(4);
-            ingredient.unit = result.getString(5);
-            isFavorite = result.getBoolean(6);
+            ingredient.templateId = (UUID) result.getObject(1);
+            ingredient.amount = result.getDouble(2);
+            ingredient.name = result.getString(3);
+            ingredient.unit = result.getString(4);
 
             ingredients.add(ingredient);
         }
@@ -223,7 +230,7 @@ public class MealController {
         FlattenedMeal meal = new FlattenedMeal();
         meal.name = mealName;
         meal.ingredients = ingredients;
-        meal.isFavorite = isFavorite != null && isFavorite;
+        meal.isFavorite = isFavorite;
 
         String key = S3.getImageKey(MEAL_PREFIX, mealId);
         if (S3.imageExists(key))
