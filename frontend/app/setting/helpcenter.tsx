@@ -60,7 +60,7 @@ const HelpCenterScreen = () => {
         <Text style={styles.contactLabel}>Contact</Text>
         <View style={styles.emailRow}>
           <Ionicons name="mail-outline" size={16} color="#499f44" />
-          <Text style={styles.emailText}> email@email.com</Text>
+          <Text style={styles.emailText}> chavnapantry@gmail.com</Text>
         </View>
       </View>
 
@@ -127,6 +127,8 @@ const styles = StyleSheet.create({
     width: 120,
     alignItems: "center",
     marginBottom: 25,
+    borderWidth: 2,
+    borderColor: "#d9893c", 
   },
   sendButtonText: {
     color: "#fff",
@@ -161,6 +163,8 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     marginTop: "auto",
     marginBottom: 40,
+    borderWidth: 2,
+    borderColor: "#d9893c", 
   },
   signOutText: {
     color: "#fff",

@@ -338,6 +338,8 @@ const styles = StyleSheet.create({
     padding: 15,
     borderRadius: 10,
     marginBottom: 12,
+    borderColor: "#499F44",
+    borderWidth: 2,
   },
   optionText: { fontSize: 16, fontWeight: "500", textAlign: "center" },
 

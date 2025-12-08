@@ -9,7 +9,6 @@ import {
     Image, 
     TouchableOpacity, 
     StyleSheet,
-    SafeAreaView,
     TextInput,
     Modal,
     Alert,
@@ -23,6 +22,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import { API_URL, loadFileBytes, Response, retrieveValue, uploadChunks, UploadInfo } from "../util";
 import { getSelectedTemplate, Template } from "../select-template";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function NewMeal() {
     const [mealName, setMealName] = useState("");
@@ -208,8 +208,9 @@ export default function NewMeal() {
         }
     };
 
-    return (
-        <SafeAreaView style={styles.container}>
+        return (
+            <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
+
 
             {/* back button */}
             <TouchableOpacity 
@@ -407,7 +408,7 @@ const styles = StyleSheet.create({
 
     backButton: {
         position: "absolute",
-        top: 55,
+        top: 10,
         left: 20,
         zIndex: 10,
     },

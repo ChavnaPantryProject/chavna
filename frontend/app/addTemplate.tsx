@@ -420,7 +420,7 @@ const styles = StyleSheet.create({
         gap: 8,
     },
     saveText: {
-        color: "#5c3b14", // higher-contrast text
+        color: "#FFFFFF",
         fontWeight: "700",
         fontSize: 16,
     },

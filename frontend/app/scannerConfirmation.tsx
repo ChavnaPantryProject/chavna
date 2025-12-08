@@ -399,8 +399,8 @@ const styles = StyleSheet.create({
     marginTop: "auto",
   },
   saveText: {
-    color: "white",
-    fontWeight: "600",
+    color: "#FFFFFF",
+    fontWeight: "700",
     fontSize: 16,
   },
   bottomWhite: {
