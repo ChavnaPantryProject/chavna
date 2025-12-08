@@ -1,6 +1,8 @@
 import * as SecureStore from 'expo-secure-store';
 import { File } from "expo-file-system";
 import base64 from "react-native-base64";
+import { useEffect, useState } from 'react';
+import { GestureStateChangeEvent, TapGestureHandlerEventPayload } from 'react-native-gesture-handler';
 
 export async function storeValue(key: string, value: string) {
     try {
@@ -98,4 +100,23 @@ export async function uploadChunks(data: Uint8Array, uploadInfo: UploadInfo) {
         if (!response.ok || body?.success !== "success")
             throw "Invalid response: " + JSON.stringify(body ? body : response);
     }
+};
+
+// Source - https://stackoverflow.com/a
+// Posted by vncntbyr, modified by community. See post 'Timeline' for change history
+// Retrieved 2025-12-08, License - CC BY-SA 4.0
+export const useAutofocus = () => {
+    const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+
+    useEffect(() => {
+    if (isRefreshing) {
+        setIsRefreshing(false);
+    }
+    }, [isRefreshing]);
+
+    const onTap = (_event: GestureStateChangeEvent<TapGestureHandlerEventPayload>): void => {
+        setIsRefreshing(true);
+    };
+
+    return { isRefreshing, onTap };
 };

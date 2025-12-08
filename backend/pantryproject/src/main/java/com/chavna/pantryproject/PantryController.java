@@ -118,6 +118,8 @@ public class PantryController {
             if (body.search != null)
                 query += " AND name LIKE ?";
 
+            query += "\nORDER BY name";
+
             PreparedStatement statement;
             statement = con.prepareStatement(query);
             statement.setObject(1, familyOwner);
