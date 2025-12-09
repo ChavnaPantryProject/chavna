@@ -643,12 +643,14 @@
 
 // export default InventoryScreen;
 
-import { useState, useEffect, useMemo } from "react";
-import { Text, View, StyleSheet, TextInput, Pressable, ActivityIndicator, ScrollView, Modal, Platform } from "react-native";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { Text, View, StyleSheet, TextInput, Pressable, ActivityIndicator, ScrollView, Modal, Platform, Alert } from "react-native";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import ModalFoodCategory from "../pantry/modalFoodCategory";
 import ModalCreateFoodCategory from "../pantry/modalAddCategory";
-import Swipeable from "react-native-gesture-handler/ReanimatedSwipeable";
+import Swipeable, {
+  SwipeableMethods,
+} from "react-native-gesture-handler/ReanimatedSwipeable";
 import { API_URL, retrieveValue } from "../util";
 
 type GetCategoriesResponse = {
@@ -675,6 +677,71 @@ type FoodItem = {
     category?: string;
     unit?: string;
 };
+
+type FoodItemRowProps = {
+  foodItem: FoodItem;
+  onDelete: (id: string) => void;
+};
+
+const FoodItemRow = ({ foodItem, onDelete }: FoodItemRowProps) => {
+  const swipeableRef = useRef<SwipeableMethods | null>(null);
+
+  return (
+    <Swipeable
+      ref={swipeableRef}
+      overshootRight={false}
+      renderRightActions={() => (
+        <View style={style.swipeDeleteBackground} />
+      )}
+      onSwipeableOpen={() => {
+        Alert.alert(
+          "Delete item",
+          `Delete "${foodItem.name}" from your inventory?`,
+          [
+            {
+              text: "Cancel",
+              style: "cancel",
+              onPress: () => {
+                // snap the row back when user cancels
+                swipeableRef.current?.close();
+              },
+            },
+            {
+              text: "Delete",
+              style: "destructive",
+              onPress: () => {
+                onDelete(foodItem.id);
+                // row unmounts after deletion
+              },
+            },
+          ]
+        );
+      }}
+    >
+      <View style={style.searchResultCard}>
+        <View style={style.searchResultContent}>
+          <Text style={style.searchResultName}>{foodItem.name}</Text>
+          {foodItem.category && (
+            <Text style={style.searchResultCategory}>
+              {foodItem.category}
+            </Text>
+          )}
+          <View style={style.searchResultBottom}>
+            <Text style={style.searchResultQty}>
+              {foodItem.qty} {foodItem.unit || "None"}
+            </Text>
+            {foodItem.expDate && (
+              <Text style={style.searchResultExp}>
+                Exp: {foodItem.expDate}
+              </Text>
+            )}
+          </View>
+        </View>
+      </View>
+    </Swipeable>
+  );
+};
+
 
 const InventoryScreen = () => {
     const [searchEntry, setSearchEntry] = useState("");
@@ -1006,54 +1073,20 @@ const InventoryScreen = () => {
             </Text>
           </View>
         ) : (
-          <View style={style.searchResultsList}>
-            {filteredFoodItems.map((foodItem) => (
-              <Swipeable
-                key={foodItem.id}
-                renderRightActions={() => (
-                  <View style={style.rightAction}>
-                    <Pressable
-                      style={style.deleteBtn}
-                      onPress={() => handleDeleteFood(foodItem.id)}
-                    >
-                      <Text style={style.deleteText}>Delete</Text>
-                    </Pressable>
-                  </View>
-                )}
-              >
-                <View style={style.searchResultCard}>
-                  <View style={style.searchResultContent}>
-                    <Text style={style.searchResultName}>
-                      {foodItem.name}
-                    </Text>
+         <View style={style.searchResultsList}>
+        {filteredFoodItems.map((foodItem) => (
+            <FoodItemRow
+            key={foodItem.id}
+            foodItem={foodItem}
+            onDelete={handleDeleteFood}
+            />
+        ))}
+        </View>
 
-                    {foodItem.category && (
-                      <Text style={style.searchResultCategory}>
-                        {foodItem.category}
-                      </Text>
-                    )}
-
-                    <View style={style.searchResultBottom}>
-                      <Text style={style.searchResultQty}>
-                        {foodItem.qty} {foodItem.unit || "None"}
-                      </Text>
-
-                      {foodItem.expDate && (
-                        <Text style={style.searchResultExp}>
-                          Exp: {foodItem.expDate}
-                        </Text>
-                      )}
-                    </View>
-                  </View>
-                </View>
-              </Swipeable>
-            ))}
-          </View>
         )}
       </ScrollView>
     </View>
   ) : (
-    // Show category cards (your current code)
     loading ? (
       <ActivityIndicator
         size="large"
@@ -1328,14 +1361,12 @@ const style = StyleSheet.create({
         borderBottomWidth: 2,
         borderBottomColor: "rgba(73,159,68,1)",
         backgroundColor: "white",
-        shadowColor: "#000",
-        shadowOffset: {
-            width: 0,
-            height: 1,
-        },
-        shadowOpacity: 0.05,
-        shadowRadius: 2,
-        elevation: 2,
+
+        shadowColor: "transparent",
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0,
+        shadowRadius: 0,
+        elevation: 0,
     },
 
     searchResultsTitleContainer: {
@@ -1375,23 +1406,22 @@ const style = StyleSheet.create({
         paddingBottom: 24,
     },
 
-    searchResultCard: {
-        width: "100%",
-        borderWidth: 2,
-        borderColor: "rgba(73,159,68,1)",
-        borderRadius: 15,
-        backgroundColor: "rgba(73,159,68,0.1)",
-        marginBottom: 12,
-        padding: 16,
-        shadowColor: "#000",
-        shadowOffset: {
-            width: 0,
-            height: 1,
-        },
-        shadowOpacity: 0.05,
-        shadowRadius: 2,
-        elevation: 2,
-    },
+  searchResultCard: {
+    width: "100%",
+    marginTop: 10,
+    borderWidth: 2,
+    borderColor: "rgba(73,159,68,1)",
+    borderRadius: 15,
+    backgroundColor: "rgba(73,159,68,0.1)",
+    marginBottom: 12,
+    padding: 16,
+
+    shadowColor: "transparent",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0, 
+  },
 
     searchResultContent: {
         width: "100%",
@@ -1414,7 +1444,7 @@ const style = StyleSheet.create({
     searchResultBottom: {
         flexDirection: "row",
         justifyContent: "space-between",
-        alignItems: "center",
+        alignItems: "center", 
         marginTop: 4,
     },
 
@@ -1430,18 +1460,31 @@ const style = StyleSheet.create({
     },
 
     rightAction: {
+        flex: 1,
         justifyContent: "center",
-        alignItems: "center",
+        alignItems: "flex-end",
+        paddingRight: 10,
         marginBottom: 12,
-        marginLeft: 8,
-        backgroundColor: "#DC2626",
-        borderRadius: 12,
-        paddingHorizontal: 16,
     },
 
+    deleteIconButton: {
+        backgroundColor: "#DC2626",
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+
+
+
     deleteBtn: {
-        paddingVertical: 8,
-        paddingHorizontal: 4,
+        backgroundColor: "#DC2626",
+        borderRadius: 20,
+        height: 120,
+        width: 70,
+        alignItems: "center",
+        justifyContent: "center",
     },
 
     deleteText: {
@@ -1565,6 +1608,16 @@ searchInput: {
     fontSize: 15,
     color: "#333",
 },
+swipeDeleteBackground: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "flex-end",
+    marginBottom: 12,
+    borderTopRightRadius: 15,
+    borderBottomRightRadius: 15,
+    paddingRight: 16,  
+},
+
 
 
 });
