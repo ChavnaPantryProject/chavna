@@ -335,20 +335,7 @@ const InventoryScreen = () => {
 
     return (
         <View style={style.container}>
-            {/* header trashcan */}
-            <View style={style.header}>
-                <Pressable
-                    onPress={() => {
-                        if (searchEntry.trim().length === 0 && foodCategories.length > 0) {
-                            // If not searching, show menu for first category or all categories
-                            setMenuVisible(true);
-                        }
-                    }}
-                    hitSlop={8}
-                >
-                    <Ionicons name="trash-outline" size={24} color="rgba(73,159,68,1)" />
-                </Pressable>
-            </View>
+
 
             {/* search bar */}
             <View style={style.searchContainer}>
@@ -371,6 +358,21 @@ const InventoryScreen = () => {
                         <Ionicons name="close-circle" size={20} color="#499F44" />
                     </Pressable>
                 )}
+            </View>
+
+                        {/* header trashcan */}
+            <View style={style.header}>
+                <Pressable
+                    onPress={() => {
+                        if (searchEntry.trim().length === 0 && foodCategories.length > 0) {
+                            // If not searching, show menu for first category or all categories
+                            setMenuVisible(true);
+                        }
+                    }}
+                    hitSlop={8}
+                >
+                    <Ionicons name="trash-outline" size={24} color="rgba(73,159,68,1)" />
+                </Pressable>
             </View>
 
 {/* Show search results or category list */}
@@ -951,7 +953,8 @@ searchContainer: {
     borderColor: "#499F44",
     borderRadius: 25,
     paddingHorizontal: 12,
-    marginBottom: 20,
+    marginTop: 10,
+    marginBottom: 10,
     height: 50,
     backgroundColor: "#FFFFFF",  
     alignSelf: "stretch",
