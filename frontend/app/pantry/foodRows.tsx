@@ -1,13 +1,15 @@
 // pantry/foodRows.tsx
-import React from "react";
+import React, { useRef } from "react";
 import {
     View,
     Text,
     StyleSheet,
     ActivityIndicator,
-    Pressable,
+    Alert,
 } from "react-native";
-import Swipeable from "react-native-gesture-handler/ReanimatedSwipeable";
+import Swipeable, {
+    SwipeableMethods,
+} from "react-native-gesture-handler/ReanimatedSwipeable";
 
 type FoodItem = {
     id: string;
@@ -20,6 +22,75 @@ type Props = {
     loading: boolean;
     displayArr: FoodItem[];
     onDelete: (id: string) => void;
+};
+
+type FoodRowItemProps = {
+    foodItem: FoodItem;
+    onDelete: (id: string) => void;
+};
+
+const FoodRowItem = ({ foodItem, onDelete }: FoodRowItemProps) => {
+    const swipeableRef = useRef<SwipeableMethods | null>(null);
+
+    return (
+        <Swipeable
+            ref={swipeableRef}
+            overshootRight={false}
+            renderRightActions={() => (
+                <View style={styles.rightAction} />
+            )}
+            onSwipeableOpen={() => {
+                Alert.alert(
+                    "Delete item",
+                    `Delete "${foodItem.name}" from this category?`,
+                    [
+                        {
+                            text: "Cancel",
+                            style: "cancel",
+                            onPress: () => {
+                                // snap the row back when user cancels
+                                swipeableRef.current?.close();
+                            },
+                        },
+                        {
+                            text: "Delete",
+                            style: "destructive",
+                            onPress: () => {
+                                onDelete(foodItem.id);
+                                // row unmounts after deletion
+                            },
+                        },
+                    ]
+                );
+            }}
+        >
+            <View style={styles.card}>
+                <View style={styles.cardContent}>
+                    {/* Name */}
+                    <Text
+                        style={styles.nameText}
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
+                    >
+                        {foodItem.name}
+                    </Text>
+
+                    {/* Bottom row: qty + exp date */}
+                    <View style={styles.bottomRow}>
+                        <Text style={styles.qtyText}>
+                            {foodItem.qty}
+                        </Text>
+
+                        {foodItem.expDate ? (
+                            <Text style={styles.expText}>
+                                Exp: {foodItem.expDate}
+                            </Text>
+                        ) : null}
+                    </View>
+                </View>
+            </View>
+        </Swipeable>
+    );
 };
 
 const FoodRows = ({ loading, displayArr, onDelete }: Props) => {
@@ -42,45 +113,11 @@ const FoodRows = ({ loading, displayArr, onDelete }: Props) => {
     return (
         <View style={styles.listContainer}>
             {displayArr.map((foodItem) => (
-                <Swipeable
+                <FoodRowItem
                     key={foodItem.id}
-                    renderRightActions={() => (
-                        <View style={styles.rightAction}>
-                            <Pressable
-                                style={styles.deleteBtn}
-                                onPress={() => onDelete(foodItem.id)}
-                            >
-                                <Text style={styles.deleteText}>Delete</Text>
-                            </Pressable>
-                        </View>
-                    )}
-                >
-                    <View style={styles.card}>
-                        <View style={styles.cardContent}>
-                            {/* Name */}
-                            <Text
-                                style={styles.nameText}
-                                numberOfLines={1}
-                                ellipsizeMode="tail"
-                            >
-                                {foodItem.name}
-                            </Text>
-
-                            {/* Bottom row: qty + exp date */}
-                            <View style={styles.bottomRow}>
-                                <Text style={styles.qtyText}>
-                                    {foodItem.qty}
-                                </Text>
-
-                                {foodItem.expDate ? (
-                                    <Text style={styles.expText}>
-                                        Exp: {foodItem.expDate}
-                                    </Text>
-                                ) : null}
-                            </View>
-                        </View>
-                    </View>
-                </Swipeable>
+                    foodItem={foodItem}
+                    onDelete={onDelete}
+                />
             ))}
         </View>
     );
@@ -144,16 +181,18 @@ const styles = StyleSheet.create({
         textAlign: "right",
     },
 
+    // updated to act like the swipe background (no button press, just visual area)
     rightAction: {
+        flex: 1,
         justifyContent: "center",
-        alignItems: "center",
+        alignItems: "flex-end",
         marginBottom: 12,
-        marginLeft: 8,
-        backgroundColor: "#DC2626",
-        borderRadius: 12,
-        paddingHorizontal: 16,
+        borderTopRightRadius: 15,
+        borderBottomRightRadius: 15,
+        paddingRight: 16,
     },
 
+    // kept from original file (no longer used, but left to avoid unnecessary changes)
     deleteBtn: {
         paddingVertical: 8,
         paddingHorizontal: 4,
