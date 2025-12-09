@@ -195,6 +195,8 @@ const styles = StyleSheet.create({
     padding: 15,
     borderRadius: 10,
     marginBottom: 15,
+    borderColor: "#499F44",
+    borderWidth: 2,
   },
   optionText: { textAlign: "center", fontSize: 16, fontWeight: "500" },
   signOutButton: {
@@ -203,6 +205,8 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: "center",
     marginTop: 350,
+    borderWidth: 2,
+    borderColor: "#d9893c",
   },
   signOutText: {
     color: "#fff",

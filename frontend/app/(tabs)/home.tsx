@@ -11,12 +11,12 @@ import {
   Image,
   type ImageSourcePropType,
   ScrollView,
-  Platform,
   Alert,
   Modal,
   Animated,
   Dimensions,
   AppState,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter } from 'expo-router';

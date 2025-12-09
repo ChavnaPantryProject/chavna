@@ -10,6 +10,8 @@ import {
   Modal,
   ActivityIndicator,
   Alert,
+  Pressable,
+  Platform,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useFocusEffect, useRouter } from "expo-router";
@@ -356,19 +358,34 @@ export default function MealScreen() {
           data={filteredMeals}
           keyExtractor={(item) => item.id}
           renderItem={renderMeal}
-          contentContainerStyle={{ paddingBottom: 80 }}
+          contentContainerStyle={{ paddingBottom: 140 }}
           refreshing={loading}
           onRefresh={fetchAllMeals}
         />
       )}
 
-      {/* Add Meal Button */}
-      <TouchableOpacity
-        style={styles.addBtn}
-        onPress={() => router.push("/meals/newmeal")}
-      >
-        <Text style={styles.addText}>+</Text>
-      </TouchableOpacity>
+      {/* Bottom add area  */}
+      <View style={styles.bottomAddContainer}>
+        <Pressable
+          onPress={() => router.push("/meals/newmeal")}
+          style={({ pressed }) => [
+            styles.addBtn,
+            pressed && {
+              backgroundColor: '#CBE8CC',
+              shadowColor: '#499F44',
+              shadowOffset: { width: 0, height: 0 },
+              shadowOpacity: 0.5,
+              shadowRadius: 10,
+              transform: [{ scale: 0.95 }],
+              ...(Platform.OS === 'android' ? { elevation: 8 } : {}),
+            },
+          ]}
+        >
+          <Ionicons name="add" size={35} color="#2E7D32" />
+        </Pressable>
+      </View>
+
+
 
       {/* Delete Meal Confirmation */}
       <Modal
@@ -405,12 +422,14 @@ export default function MealScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 15,
-    backgroundColor: "#fff",
-  },
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: "#fff",
+      paddingHorizontal: 15,
+      paddingBottom: -15,
+      paddingTop: -30,
+    },
 
   loadingContainer: {
     flex: 1,
@@ -478,6 +497,8 @@ const styles = StyleSheet.create({
     height: 100,
     borderRadius: 16,
     marginRight: 12,
+    borderColor: "#499F44",
+    borderWidth: 1,
   },
 
   placeholderImage: {
@@ -520,13 +541,19 @@ const styles = StyleSheet.create({
     marginRight: 10,
     justifyContent: "center",
     alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#d9893c",  
   },
 
   addBtn: {
-    position: "absolute",
-    bottom: 25,
-    alignSelf: "center",
-    backgroundColor: "transparent",
+    width: 45,
+    height: 45,
+    borderRadius: 30,
+    borderWidth: 2,
+    borderColor: '#499F44',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#E6F4EA',
   },
 
   addText: {
@@ -610,4 +637,12 @@ const styles = StyleSheet.create({
     color: "white",
     fontWeight: "600",
   },
+
+    bottomAddContainer: {
+    alignSelf: "stretch",
+    height: 70,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
 });

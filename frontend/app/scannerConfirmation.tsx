@@ -331,6 +331,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderColor: "#D6EAD8",
     backgroundColor: "#FFFFFF",
+    
   },
   backButton: {
     position: "absolute",
@@ -400,8 +401,8 @@ const styles = StyleSheet.create({
     marginTop: "auto",
   },
   saveText: {
-    color: "white",
-    fontWeight: "600",
+    color: "#FFFFFF",
+    fontWeight: "700",
     fontSize: 16,
   },
   bottomWhite: {
