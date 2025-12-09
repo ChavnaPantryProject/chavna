@@ -573,7 +573,11 @@ export default function HomeScreen() {
         
         <View style={styles.favWrap}>
           <Text style={styles.favTitle}>Favorite Meals</Text>
-          <View style={styles.favRow}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.favRow}
+          >
             {favoriteMeals.length === 0 ? (
               <>
                 <FavMeal />
@@ -583,15 +587,16 @@ export default function HomeScreen() {
             ) : (
               <>
                 {favoriteMeals.map((meal) => (
-                  <FavMeal key={meal.mealId} uri={meal.mealPictureURL} mealId={meal.mealId} />
+                  <FavMeal
+                    key={meal.mealId}
+                    uri={meal.mealPictureURL}
+                    mealId={meal.mealId}
+                  />
                 ))}
-                {/* Fill remaining slots with placeholders */}
-                {Array.from({ length: 3 - favoriteMeals.length }).map((_, index) => (
-                  <FavMeal key={`placeholder-${index}`} />
-                ))}
-              </>
-            )}
-          </View>
+             </>
+          )}
+          </ScrollView>
+
         </View>
           <OptionsSheet
           visible={menuOpen}
@@ -1233,6 +1238,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     marginTop: 10,
     marginBottom: 0,
+    gap: 12,
+    paddingHorizontal: 6,
   },
   // Circular containers
   favItem: {
