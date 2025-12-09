@@ -127,9 +127,7 @@ export default function ModalFoodCategory({
 
                 // Map backend items to frontend format
                 const mappedItems: FoodItem[] = backendItems.map(
-                    (item) => (
-                        console.log(item),
-                        {
+                    (item) => ({
                         id: item.id,
                         name: item.name,
                         qty: item.amount,
@@ -440,7 +438,8 @@ const style = StyleSheet.create({
         justifyContent: "center",
         alignItems: "center",
         padding: 20,
-        marginTop: 80,
+        paddingTop: "15%",
+         backgroundColor: "rgba(0,0,0,0.2)",
     },
 
     // area that holds the rows & scroll
