@@ -110,7 +110,7 @@ const styles = StyleSheet.create({
         borderWidth: 2,
         borderColor: "rgba(73,159,68,1)",
         borderRadius: 15,
-        backgroundColor: "#F8F5E9", // color of the card
+        backgroundColor: "#f6f4eaff", // color of the card
         marginBottom: 12,
         padding: 12,
     },
