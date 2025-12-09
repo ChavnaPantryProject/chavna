@@ -497,6 +497,8 @@ export default function MealScreen() {
     height: 100,
     borderRadius: 16,
     marginRight: 12,
+    borderColor: "#499F44",
+    borderWidth: 1,
   },
 
   placeholderImage: {
@@ -539,6 +541,8 @@ export default function MealScreen() {
     marginRight: 10,
     justifyContent: "center",
     alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#d9893c",  
   },
 
   addBtn: {
