@@ -55,41 +55,30 @@ const FoodRows = ({ loading, displayArr, onDelete }: Props) => {
                         </View>
                     )}
                 >
-                    <View style={styles.entryOfFood}>
-                        {/* Name – left aligned, most space */}
-                        <Text
-                            style={[
-                                styles.baseText,
-                                styles.nameText,
-                                styles.flexName,
-                            ]}
-                            numberOfLines={1}
-                            ellipsizeMode="tail"
-                        >
-                            {foodItem.name}
-                        </Text>
+                    <View style={styles.card}>
+                        <View style={styles.cardContent}>
+                            {/* Name */}
+                            <Text
+                                style={styles.nameText}
+                                numberOfLines={1}
+                                ellipsizeMode="tail"
+                            >
+                                {foodItem.name}
+                            </Text>
 
-                        {/* Qty – centered */}
-                        <Text
-                            style={[
-                                styles.baseText,
-                                styles.qtyText,
-                                styles.flexQty,
-                            ]}
-                        >
-                            {foodItem.qty}
-                        </Text>
+                            {/* Bottom row: qty + exp date */}
+                            <View style={styles.bottomRow}>
+                                <Text style={styles.qtyText}>
+                                    {foodItem.qty}
+                                </Text>
 
-                        {/* Exp Date – right aligned, more room & inset a bit */}
-                        <Text
-                            style={[
-                                styles.baseText,
-                                styles.dateText,
-                                styles.flexDate,
-                            ]}
-                        >
-                            {foodItem.expDate}
-                        </Text>
+                                {foodItem.expDate ? (
+                                    <Text style={styles.expText}>
+                                        Exp: {foodItem.expDate}
+                                    </Text>
+                                ) : null}
+                            </View>
+                        </View>
                     </View>
                 </Swipeable>
             ))}
@@ -116,61 +105,52 @@ const styles = StyleSheet.create({
         color: "gray",
     },
 
-    baseText: {
-        fontSize: 17,
+    card: {
+        width: "100%",
+        borderWidth: 2,
+        borderColor: "rgba(73,159,68,1)",
+        borderRadius: 15,
+        backgroundColor: "#F8F5E9", // color of the card
+        marginBottom: 12,
+        padding: 12,
+    },
+
+    cardContent: {
+        width: "100%",
     },
 
     nameText: {
-        textAlign: "left",
-        paddingLeft: 8,
+        fontSize: 18,
+        fontWeight: "700",
+        color: "#000",
+        marginBottom: 6,
     },
 
-    qtyText: {
-        textAlign: "center",
-    },
-
-    dateText: {
-        textAlign: "right",
-        paddingRight: 4, // small inset so it doesn’t touch the border
-    },
-
-    // Name gets the most space
-    flexName: {
-        flex: 1.7,
-    },
-
-    // Qty is smaller in the middle
-    flexQty: {
-        flex: 0.9,
-    },
-
-    // Exp date gets more space than before so it fits nicely
-    flexDate: {
-        flex: 1.6,
-    },
-
-    entryOfFood: {
-        width: "96%",                     // slight inset from the green border
-        alignSelf: "center",
-        borderWidth: 2,
-        borderColor: "rgba(73,159,68,1)",
-        borderRadius: 5,
-        backgroundColor: "white",
-        marginTop: 5,
-        paddingVertical: 6,
-        paddingHorizontal: 6,
+    bottomRow: {
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "center",
+        marginTop: 4,
+    },
+
+    qtyText: {
+        fontSize: 14,
+        color: "#333",
+    },
+
+    expText: {
+        fontSize: 14,
+        color: "#333",
+        textAlign: "right",
     },
 
     rightAction: {
         justifyContent: "center",
         alignItems: "center",
-        marginTop: 5,
+        marginBottom: 12,
         marginLeft: 8,
         backgroundColor: "#DC2626",
-        borderRadius: 5,
+        borderRadius: 12,
         paddingHorizontal: 16,
     },
 
