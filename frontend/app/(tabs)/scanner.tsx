@@ -83,14 +83,6 @@ export default function ScannerScreen() {
         >
           <View style={styles.cameraInnerCircle} />
         </TouchableOpacity>
-
-        {/* Right Button */}
-        <TouchableOpacity
-          style={[styles.iconButton, {opacity: 0}]}
-          // onPress={() => router.push("/")}
-        >
-          <Ionicons name="home-outline" size={28} color="white" />
-        </TouchableOpacity>
       </View>
     </View>
   );
