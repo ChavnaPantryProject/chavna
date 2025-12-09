@@ -268,7 +268,7 @@ const InventoryScreen = () => {
 
     return (
         <View style={style.container}>
-            {/* header meatball */}
+            {/* header trashcan */}
             <View style={style.header}>
                 <Pressable
                     onPress={() => {
@@ -279,7 +279,7 @@ const InventoryScreen = () => {
                     }}
                     hitSlop={8}
                 >
-                    <Feather name="more-horizontal" size={24} style={style.meatballButton} />
+                    <Ionicons name="trash-outline" size={24} color="rgba(73,159,68,1)" />
                 </Pressable>
             </View>
 
