@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import {Text, View, StyleSheet, TouchableOpacity, Button,} from "react-native";
+import {Text, View, StyleSheet, TouchableOpacity, Button, ActivityIndicator,} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { CameraView, CameraType, useCameraPermissions } from "expo-camera";
@@ -7,177 +7,32 @@ import { API_URL, loadFileBytes, Response, retrieveValue, uploadChunks, UploadIn
 import { ConfirmationItem } from "../scannerConfirmation";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 
-const priceRegex = new RegExp("\\$?([0-9]+\\.[0-9]{2})");
-
 export default function ScannerScreen() {
   const router = useRouter();
   const [facing, setFacing] = useState<CameraType>("back");
   const [permission, requestPermission] = useCameraPermissions();
   const { isRefreshing, onTap } = useAutofocus();
   const ref = useRef<CameraView>(null);
+  const [processing, setProcessing] = useState(false);
 
   const tap = Gesture.Tap().onBegin(onTap);
 
-  const getPictureBytes = async (): Promise<Uint8Array> => {
+  const takePicture = async () => {
     const photo = await ref.current?.takePictureAsync({
-      quality: 1
+      quality: 1,
     });
 
     if (photo?.uri === undefined)
       throw "No photo uri.";
 
-    return loadFileBytes(photo.uri);
-  }
-
-  const startUpload = async (fileSize: number): Promise<UploadInfo> => {
-    const jwt = await retrieveValue('jwt');
-
-    if (jwt == null)
-      throw "No jwt.";
-
-    const response = await fetch(`${API_URL}/initialize-receipt-upload`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${jwt}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        fileSize: fileSize
-      })
-    });
-
-    let body: Response<UploadInfo> | null;
-    try {
-      body = await response.json();
-    } catch (ex) {
-      body = null;
-    }
-
-    if (!response.ok || body?.success !== "success")
-      throw "Invalid response: " + JSON.stringify(body? body : response);
-    
-    return body.payload!;
-  }
-
-  type Word = {
-    originalPolygon: {x: number, y: number}[] // Point 
-    text: string
-  }
-
-  type Line = {
-    words: Word[]
-  };
-
-  const processPhoto = async (uploadId: string): Promise<Line[]> => {
-    const response = await fetch(`${API_URL}/scan-receipt`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        uploadId: uploadId
-      })
-    });
-
-    let body: Response<Line[]> | null;
-    try {
-      body = await response.json();
-    } catch (ex) {
-      body = null;
-    }
-
-    if (!response.ok || body?.success !== "success")
-      throw "Invalid response: " + JSON.stringify(body? body : response);
-    
-    return body.payload!;
-  };
-
-  const takePicture = async () => {
-    let bytes;
-    try {
-      bytes = await getPictureBytes();
-    } catch (ex) {
-      console.error("Error taking picture: ", ex);
-      return;
-    }
-
-    if (bytes.length <= 0)
-      return;
-
-    let uploadInfo;
-    try {
-      uploadInfo = await startUpload(bytes.length);
-    } catch (ex) {
-      console.error("Error initializing upload: ", ex);
-      return;
-    }
-
-    await uploadChunks(bytes, uploadInfo);
-
-    const lines = await processPhoto(uploadInfo.uploadId);
-      
-    let scans: ConfirmationItem[] = [];
-    let counts: Map<number, number> = new Map();
-    for (const line of lines) {
-      let priceIndex = -1;
-      let priceValue: number | null = null;
-      for (let i = 0; i < line.words.length; i++) {
-        // check for @
-        if (scans.length > 0 && line.words[i].text == "@") {
-          if (i > 0 && i + 1 < line.words.length) {
-            const prev = Number(line.words[i - 1].text);
-            const next = Number(line.words[i + 1].text.replace('$', ''));
-
-            if (!Number.isNaN(prev) && !Number.isNaN(next)) {
-              counts.set(scans.length - 1, prev);
-              break;
-            }
-          }
-        } else {
-          // check if word is a price
-          const r = priceRegex.exec(line.words[i].text);
-          if (r != null) {
-            let p = Number(r[1])
-            if (!Number.isNaN(p)) {
-              priceIndex = i;
-              priceValue = p;
-              break;
-            }
-          }
-        }
-      }
-
-      let key = "";
-      for (let i = 0; i < priceIndex; i++) {
-        key += line.words[i].text + " ";
-      }
-
-      if (key !== "") {
-        scans.push({
-          displayName: null,
-          scanName: key,
-          qty: 1,
-          price: priceValue,
-          template: null
-        });
-      }
-    }
-
-    for (let i = 0; i < scans.length; i++) {
-      const count = counts.get(i);
-
-      if (count !== undefined) {
-        let scan = scans[i];
-        scan.qty = count;
-      }
-    }
-
-    router.navigate({
-      pathname: "/scannerConfirmation",
+    router.push({
+      pathname: "/scanCropper",
       params: {
-        scanItems: JSON.stringify(scans)
+        imageUri: photo.uri,
+        width: photo.width,
+        height: photo.height
       }
-    })
+    });
   };
 
   if (!permission) {
@@ -221,12 +76,21 @@ export default function ScannerScreen() {
         {/* Middle Button */}
         <TouchableOpacity
           style={styles.cameraButton}
-          onPress={() => takePicture()}
+          onPress={async () => {
+            await takePicture();
+            setProcessing(false);
+          }}
         >
           <View style={styles.cameraInnerCircle} />
         </TouchableOpacity>
 
         {/* Right Button */}
+        <TouchableOpacity
+          style={[styles.iconButton, {opacity: 0}]}
+          // onPress={() => router.push("/")}
+        >
+          <Ionicons name="home-outline" size={28} color="white" />
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -319,7 +183,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#499F4458",
   },
   iconButton: {
-    padding: 10,
+    padding: 10
   },
   cameraButton: {
     width: 60,
