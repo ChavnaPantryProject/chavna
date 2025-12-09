@@ -266,14 +266,17 @@ export default function ConfirmationScreen() {
           </Pressable>
         ))}
 
-        {/* + Button */}
-        <TouchableOpacity
-          onPress={() => {
-            setUpdateIndex(-1);
-            setIsPopupVisible(true);
-          }}>
-          <Text style={styles.plusSign}>＋</Text>
-        </TouchableOpacity>
+      {/* + Button */}
+      <TouchableOpacity
+        onPress={() => {
+          setUpdateIndex(-1);
+          setIsPopupVisible(true);
+        }}
+        style={styles.plusButton}
+      >
+        <Ionicons name="add" size={32} color="#2E7D32" />
+      </TouchableOpacity>
+
       </ScrollView>
       {/* Save Button */}
       <TouchableOpacity style={[styles.saveButton, (!allValid || items.length == 0) && {opacity: .5}]}
@@ -399,6 +402,8 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 40,
     marginTop: "auto",
+    borderWidth: 2,
+    borderColor: "#d9893c", 
   },
   saveText: {
     color: "#FFFFFF",
@@ -411,4 +416,18 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
   },
+  plusButton: {
+  alignSelf: "center",
+  width: 45,
+  height: 45,
+  borderRadius: 30,
+  borderWidth: 2,
+  borderColor: "#499F44",
+  alignItems: "center",
+  justifyContent: "center",
+  backgroundColor: "#E6F4EA",
+  marginVertical: 12,
+  marginBottom: 40,
+},
+
 });

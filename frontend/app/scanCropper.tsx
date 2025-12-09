@@ -485,11 +485,12 @@ export default function Splash() {
             </View>
 
             <View style={styles.bottomBar}>
-                <Pressable style={styles.button} onPress={handleCancel}>
-                    <Text>Cancel</Text>
+                <Pressable style={styles.cancelButton} onPress={handleCancel}>
+                    <Text style={styles.cancelText}>Cancel</Text>
                 </Pressable>
-                <Pressable style={styles.button} onPress={handleConfirm}>
-                    <Text>Confirm</Text>
+
+                <Pressable style={styles.confirmButton} onPress={handleConfirm}>
+                    <Text style={styles.confirmText}>Confirm</Text>
                 </Pressable>
             </View>
 
@@ -504,65 +505,125 @@ export default function Splash() {
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        flexDirection: "column",
-        width: "100%",
-        height: "100%"
-    },
-    pictureContainer: {
-        position: "relative",
-        width: "100%",
-        height: "85%",
-        overflow: "hidden",
-        backgroundColor: "black",
-    },
-    picture: {
-        position: "relative",
-        width: "100%",
-        height: "100%",
-        resizeMode: "contain"
-    },
-    box: {
-        position: "absolute",
-        outlineColor: "#00000088",
-        outlineWidth: 100000,
-        borderColor: "white",
-        borderWidth: 2
-    },
-    corner: {
-        width: 75,
-    },
-    edge: {
-        width: 50
-    },
-    bottomBar: {
-        position: "relative",
-        justifyContent: "space-evenly",
-        flexDirection: "row",
-        alignItems: "center",
-        width: "100%",
-        height: "15%"
-    },
-    button: {
-        justifyContent: "center",
-        alignItems: "center",
-        width: 150,
-        height: 40,
-        backgroundColor: "grey"
-    },
-    processing: {
-        position: "absolute",
-        justifyContent: "center",
-        gap: 25,
-        alignItems: "center",
-        width: "100%",
-        height: "100%",
-        backgroundColor: "#00000088",
-        zIndex: 100
-    },
-    processingText: {
-        color: "white",
-        fontSize: 24,
-    },
+  container: {
+    flex: 1,
+    backgroundColor: "#000000ff",
+  },
+
+  pictureContainer: {
+    position: "relative",
+    width: "100%",
+    flex: 1,
+    overflow: "hidden",
+    backgroundColor: "#bfcfbaff",
+  },
+
+  picture: {
+    position: "relative",
+    width: "100%",
+    height: "100%",
+    resizeMode: "contain",
+  },
+
+  box: {
+    position: "absolute",
+    outlineColor: "#9ed48f9d",
+    outlineWidth: 100000,
+    borderColor: "#FFFFFF",
+    borderWidth: 2,
+    borderRadius: 8,
+  },
+
+  corner: {
+    width: 75,
+  },
+
+  edge: {
+    width: 50,
+  },
+
+  bottomBar: {
+    width: "100%",
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    backgroundColor: "#F3F5F2",
+    borderTopWidth: 1,
+    borderTopColor: "#E0E4DD",
+    flexDirection: "row",
+    justifyContent: "space-evenly",
+    alignItems: "center",
+  },
+
+  button: {
+    width: 140,
+    height: 44,
+    borderRadius: 24,
+    borderWidth: 2,
+    borderColor: "#499F44",
+    backgroundColor: "#FFFFFF",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+
+confirmButton: {
+    width: 140,
+    height: 44,
+    borderRadius: 24,
+    borderWidth: 2,
+    borderColor: "#499F44",
+    backgroundColor: "#DCEFD7",
+    justifyContent: "center",
+    alignItems: "center",
+},
+
+cancelText: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#595959",
+},
+
+  buttonText: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#499F44",
+  },
+
+  confirmButtonText: {
+    color: "#FFFFFF",
+  },
+
+  confirmText: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#499F44",
+},
+
+  processing: {
+    position: "absolute",
+    justifyContent: "center",
+    gap: 25,
+    alignItems: "center",
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#00000088",
+    zIndex: 100,
+  },
+
+  processingText: {
+    color: "white",
+    fontSize: 20,
+    fontWeight: "600",
+  },
+
+  cancelButton: {
+    width: 140,
+    height: 44,
+    borderRadius: 24,
+    borderWidth: 1.5,
+    borderColor: "#CFCFCF",
+    backgroundColor: "#FFFFFF",
+    justifyContent: "center",
+    alignItems: "center",
+},
 });
