@@ -33,6 +33,7 @@ export default function EditMeal() {
     const [mealImage, setMealImage] = useState<string | null>(null);
     const [ingredients, setIngredients] = useState<Ingredient[]>([]);
     const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
 
     const [modalVisible, setModalVisible] = useState(false);
     const [newIngredient, setNewIngredient] = useState("");
@@ -152,6 +153,7 @@ export default function EditMeal() {
 
     const saveMeal = async () => {
         try {
+            setSaving(true);
             const loginToken = await retrieveValue('jwt');
 
             if (!loginToken) {
@@ -202,6 +204,8 @@ export default function EditMeal() {
         } catch (error) {
             console.error('Error saving meal:', error);
             Alert.alert('Error', 'Failed to save changes. Please try again.');
+        } finally {
+            setSaving(false);
         }
     };
 
@@ -218,11 +222,22 @@ export default function EditMeal() {
 
     return (
         <SafeAreaView style={styles.container}>
+            {/* Saving Overlay */}
+            {saving && (
+                <View style={styles.savingOverlay}>
+                    <View style={styles.savingBox}>
+                        <ActivityIndicator size="large" color="#499F44" />
+                        <Text style={styles.savingText}>Saving changes...</Text>
+                    </View>
+                </View>
+            )}
+
             {/* back button */}
             <View style={styles.header}>
                 <TouchableOpacity
                     onPress={() => router.back()}
                     style={styles.backButton}
+                    disabled={saving}
                 >
                     <Ionicons name="chevron-back" size={24} color="black" />
                 </TouchableOpacity>
@@ -235,6 +250,7 @@ export default function EditMeal() {
                         style={styles.mealNameInput}
                         value={mealName}
                         onChangeText={setMealName}
+                        editable={!saving}
                     />
                 </View>
 
@@ -247,7 +263,11 @@ export default function EditMeal() {
                             <Ionicons name="fast-food" size={60} color="#499F44" />
                         </View>
                     )}
-                    <TouchableOpacity style={styles.editPhotoButton} onPress={pickImage}>
+                    <TouchableOpacity 
+                        style={styles.editPhotoButton} 
+                        onPress={pickImage}
+                        disabled={saving}
+                    >
                         <Ionicons name="camera" size={20} color="white" />
                     </TouchableOpacity>
                 </View>
@@ -257,6 +277,7 @@ export default function EditMeal() {
             <ScrollView 
                 style={styles.scrollContainer}
                 showsVerticalScrollIndicator={false}
+                scrollEnabled={!saving}
             >
                 {/* table header */}
                 <View style={styles.tableHeader}>
@@ -277,6 +298,7 @@ export default function EditMeal() {
                                 <TouchableOpacity
                                     onPress={() => deleteIngredient(index)}
                                     style={styles.deleteButton}
+                                    disabled={saving}
                                 >
                                     <Ionicons name="trash-outline" size={16} color="#E38B4D" />
                                 </TouchableOpacity>
@@ -292,18 +314,23 @@ export default function EditMeal() {
                 <TouchableOpacity
                     style={styles.addButton}
                     onPress={() => setModalVisible(true)}
+                    disabled={saving}
                 >
                     <Ionicons name="add" size={24} color="#499F44" />
                 </TouchableOpacity>
 
                 {/* Save Button */}
-                <TouchableOpacity style={styles.saveButton} onPress={saveMeal}>
+                <TouchableOpacity 
+                    style={[styles.saveButton, saving && styles.saveButtonDisabled]} 
+                    onPress={saveMeal}
+                    disabled={saving}
+                >
                     <Text style={styles.saveButtonText}>Save</Text>
                 </TouchableOpacity>
             </ScrollView>
 
             {/* Add Ingredient Modal */}
-            <Modal visible={modalVisible} transparent animationType="fade">
+            <Modal visible={modalVisible && !saving} transparent animationType="fade">
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalContent}>
                         <Text style={styles.modalTitle}>Add Ingredient</Text>
@@ -397,6 +424,37 @@ const styles = StyleSheet.create({
         marginTop: 10,
         fontSize: 16,
         color: '#666'
+    },
+
+    savingOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 9999,
+    },
+
+    savingBox: {
+        backgroundColor: 'white',
+        borderRadius: 15,
+        padding: 30,
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
+        elevation: 5,
+    },
+
+    savingText: {
+        marginTop: 15,
+        fontSize: 16,
+        color: '#666',
+        fontWeight: '600',
     },
 
     header: {
@@ -545,6 +603,10 @@ const styles = StyleSheet.create({
         paddingHorizontal: 60,
         marginTop: 20,
         marginBottom: 30,
+    },
+
+    saveButtonDisabled: {
+        backgroundColor: "#CCC",
     },
 
     saveButtonText: { 
