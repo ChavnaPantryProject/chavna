@@ -227,7 +227,7 @@ export default function NewMeal() {
                     <TextInput
                         style={styles.mealNameInput}
                         placeholder="New Meal"
-                        placeholderTextColor="#2C3A2D"
+                        placeholderTextColor="#747474ff"
                         value={mealName}
                         onChangeText={setMealName}
                     />

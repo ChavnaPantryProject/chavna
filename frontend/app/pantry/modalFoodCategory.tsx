@@ -415,7 +415,7 @@ export default function ModalFoodCategory({
                             <View
                                 style={[
                                     style.specificFilterColumn,
-                                    { flex: 1.4 },
+                                    { flex: 1 },
                                 ]}
                             >
                                 <Text style={style.filterText}>

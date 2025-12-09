@@ -643,12 +643,14 @@
 
 // export default InventoryScreen;
 
-import { useState, useEffect, useMemo } from "react";
-import { Text, View, StyleSheet, TextInput, Pressable, ActivityIndicator, ScrollView, Modal } from "react-native";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { Text, View, StyleSheet, TextInput, Pressable, ActivityIndicator, ScrollView, Modal, Platform, Alert } from "react-native";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import ModalFoodCategory from "../pantry/modalFoodCategory";
 import ModalCreateFoodCategory from "../pantry/modalAddCategory";
-import Swipeable from "react-native-gesture-handler/ReanimatedSwipeable";
+import Swipeable, {
+  SwipeableMethods,
+} from "react-native-gesture-handler/ReanimatedSwipeable";
 import { API_URL, retrieveValue } from "../util";
 
 type GetCategoriesResponse = {
@@ -675,6 +677,71 @@ type FoodItem = {
     category?: string;
     unit?: string;
 };
+
+type FoodItemRowProps = {
+  foodItem: FoodItem;
+  onDelete: (id: string) => void;
+};
+
+const FoodItemRow = ({ foodItem, onDelete }: FoodItemRowProps) => {
+  const swipeableRef = useRef<SwipeableMethods | null>(null);
+
+  return (
+    <Swipeable
+      ref={swipeableRef}
+      overshootRight={false}
+      renderRightActions={() => (
+        <View style={style.swipeDeleteBackground} />
+      )}
+      onSwipeableOpen={() => {
+        Alert.alert(
+          "Delete item",
+          `Delete "${foodItem.name}" from your inventory?`,
+          [
+            {
+              text: "Cancel",
+              style: "cancel",
+              onPress: () => {
+                // snap the row back when user cancels
+                swipeableRef.current?.close();
+              },
+            },
+            {
+              text: "Delete",
+              style: "destructive",
+              onPress: () => {
+                onDelete(foodItem.id);
+                // row unmounts after deletion
+              },
+            },
+          ]
+        );
+      }}
+    >
+      <View style={style.searchResultCard}>
+        <View style={style.searchResultContent}>
+          <Text style={style.searchResultName}>{foodItem.name}</Text>
+          {foodItem.category && (
+            <Text style={style.searchResultCategory}>
+              {foodItem.category}
+            </Text>
+          )}
+          <View style={style.searchResultBottom}>
+            <Text style={style.searchResultQty}>
+              {foodItem.qty} {foodItem.unit || "None"}
+            </Text>
+            {foodItem.expDate && (
+              <Text style={style.searchResultExp}>
+                Exp: {foodItem.expDate}
+              </Text>
+            )}
+          </View>
+        </View>
+      </View>
+    </Swipeable>
+  );
+};
+
 
 const InventoryScreen = () => {
     const [searchEntry, setSearchEntry] = useState("");
@@ -929,162 +996,152 @@ const InventoryScreen = () => {
             </View>
 
             {/* search bar */}
-            <View style={style.searchBar}>
+            <View style={style.searchContainer}>
                 <Ionicons
                     name="search"
                     size={22}
                     color="#499F44"
-                    style={{ marginRight: 8 }}
+                    style={{ marginRight: 6 }}
                 />
                 <TextInput
                     value={searchEntry}
                     onChangeText={setSearchEntry}
-                    placeholder="Search items..."
-                    placeholderTextColor="#999"
+                    placeholder="Search"
+                    placeholderTextColor="#555"
                     autoCorrect={false}
                     style={style.searchInput}
                 />
                 {searchEntry.length > 0 && (
-                    <Pressable
-                        onPress={() => setSearchEntry("")}
-                        hitSlop={8}
-                        style={style.clearButton}
-                    >
-                        <Ionicons name="close-circle" size={22} color="#999" />
+                    <Pressable onPress={() => setSearchEntry("")}>
+                        <Ionicons name="close-circle" size={20} color="#499F44" />
                     </Pressable>
                 )}
             </View>
 
-            {/* Show search results or category list */}
-            <View style={style.catergoryContainer}>
-                {searchEntry.trim().length > 0 ? (
-                    // Show search results
-                    <View style={style.searchResultsContainer}>
-                        <View style={style.searchResultsHeader}>
-                            <View style={style.searchResultsTitleContainer}>
-                                <Ionicons
-                                    name="search"
-                                    size={20}
-                                    color="#499F44"
-                                    style={{ marginRight: 8 }}
-                                />
-                                <Text style={style.searchResultsTitle}>
-                                    {loadingFoodItems
-                                        ? "Searching..."
-                                        : `Found ${filteredFoodItems.length} ${filteredFoodItems.length === 1 ? "item" : "items"}`}
-                                </Text>
-                            </View>
-                            {!loadingFoodItems && filteredFoodItems.length === 0 && (
-                                <Text style={style.searchEmptyText}>
-                                    No items found matching "{searchEntry}"
-                                </Text>
-                            )}
-                        </View>
-                        <ScrollView
-                            showsVerticalScrollIndicator={false}
-                            keyboardShouldPersistTaps="handled"
-                            style={{ flex: 1, alignSelf: "stretch" }}
-                            contentContainerStyle={{
-                                paddingBottom: 24,
-                                paddingHorizontal: 16,
-                            }}
-                        >
-                            {loadingFoodItems ? (
-                                <View style={style.emptySearchContainer}>
-                                    <ActivityIndicator size="large" color="#499F44" />
-                                </View>
-                            ) : filteredFoodItems.length === 0 ? (
-                                <View style={style.emptySearchContainer}>
-                                    <Ionicons
-                                        name="search-outline"
-                                        size={64}
-                                        color="#ccc"
-                                        style={{ marginBottom: 16 }}
-                                    />
-                                    <Text style={style.emptySearchText}>
-                                        Try searching for something else
-                                    </Text>
-                                </View>
-                            ) : (
-                                <View style={style.searchResultsList}>
-                                    {filteredFoodItems.map((foodItem) => (
-                                        <Swipeable
-                                            key={foodItem.id}
-                                            renderRightActions={() => (
-                                                <View style={style.rightAction}>
-                                                    <Pressable
-                                                        style={style.deleteBtn}
-                                                        onPress={() => handleDeleteFood(foodItem.id)}
-                                                    >
-                                                        <Text style={style.deleteText}>Delete</Text>
-                                                    </Pressable>
-                                                </View>
-                                            )}
-                                        >
-                                            <View style={style.searchResultCard}>
-                                                <View style={style.searchResultContent}>
-                                                    <Text style={style.searchResultName}>
-                                                        {foodItem.name}
-                                                    </Text>
-                                                    {foodItem.category && (
-                                                        <Text style={style.searchResultCategory}>
-                                                            {foodItem.category}
-                                                        </Text>
-                                                    )}
-                                                    <View style={style.searchResultBottom}>
-                                                        <Text style={style.searchResultQty}>
-                                                            {foodItem.qty} {foodItem.unit || "None"}
-                                                        </Text>
-                                                        {foodItem.expDate && (
-                                                            <Text style={style.searchResultExp}>
-                                                                Exp: {foodItem.expDate}
-                                                            </Text>
-                                                        )}
-                                                    </View>
-                                                </View>
-                                            </View>
-                                        </Swipeable>
-                                    ))}
-                                </View>
-                            )}
-                        </ScrollView>
-                    </View>
-                ) : (
-                    // Show category cards
-                    loading ? (
-                        <ActivityIndicator size="large" color="#499F44" style={{ marginTop: 50 }} />
-                    ) : (
-                        <ScrollView
-                            showsVerticalScrollIndicator={false}
-                            keyboardShouldPersistTaps="handled"
-                            style={{ flex: 1, alignSelf: "stretch" }}
-                            contentContainerStyle={{
-                                flexDirection: "row",
-                                flexWrap: "wrap",
-                                justifyContent: "center",
-                                paddingBottom: 24,
-                            }}
-                        >
-                            {foodCategories.map((category) => (
-                                <Pressable
-                                    key={category}
-                                    style={style.card}
-                                    onPress={() => {
-                                        openCategory();
-                                        setFoodCategoryTitle(category);
-                                    }}
-                                    onLongPress={() => openMenuForCategory(category)}
-                                >
-                                    <View style={style.cardTextContainer}>
-                                        <Text>{category}</Text>
-                                    </View>
-                                </Pressable>
-                            ))}
-                        </ScrollView>
-                    )
-                )}
-            </View>
+{/* Show search results or category list */}
+<View style={style.catergoryContainer}>
+  {searchEntry.trim().length > 0 ? (
+    // Show search results
+    <View style={style.searchResultsContainer}>
+      <View style={style.searchResultsHeader}>
+        <View style={style.searchResultsTitleContainer}>
+          <Ionicons
+            name="search"
+            size={20}
+            color="#499F44"
+            style={{ marginRight: 8 }}
+          />
+          <Text style={style.searchResultsTitle}>
+            {loadingFoodItems
+              ? "Searching..."
+              : `Found ${filteredFoodItems.length} ${
+                  filteredFoodItems.length === 1 ? "item" : "items"
+                }`}
+          </Text>
+        </View>
 
+        {!loadingFoodItems && filteredFoodItems.length === 0 && (
+          <Text style={style.searchEmptyText}>
+            No items found matching "{searchEntry}"
+          </Text>
+        )}
+      </View>
+
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        style={{ flex: 1, alignSelf: "stretch" }}
+        contentContainerStyle={{
+          paddingBottom: 24,
+          paddingHorizontal: 16,
+        }}
+      >
+        {loadingFoodItems ? (
+          <View style={style.emptySearchContainer}>
+            <ActivityIndicator size="large" color="#499F44" />
+          </View>
+        ) : filteredFoodItems.length === 0 ? (
+          <View style={style.emptySearchContainer}>
+            <Ionicons
+              name="search-outline"
+              size={64}
+              color="#ccc"
+              style={{ marginBottom: 16 }}
+            />
+            <Text style={style.emptySearchText}>
+              Try searching for something else
+            </Text>
+          </View>
+        ) : (
+         <View style={style.searchResultsList}>
+        {filteredFoodItems.map((foodItem) => (
+            <FoodItemRow
+            key={foodItem.id}
+            foodItem={foodItem}
+            onDelete={handleDeleteFood}
+            />
+        ))}
+        </View>
+
+        )}
+      </ScrollView>
+    </View>
+  ) : (
+    loading ? (
+      <ActivityIndicator
+        size="large"
+        color="#499F44"
+        style={{ marginTop: 50 }}
+      />
+    ) : (
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        style={{ flex: 1, alignSelf: "stretch" }}
+        contentContainerStyle={style.categoryContent}
+        bounces={false}
+        alwaysBounceVertical={false}
+        overScrollMode="never"
+      >
+        {foodCategories.map((category) => (
+          <Pressable
+            key={category}
+            style={style.card}
+            onPress={() => {
+              openCategory();
+              setFoodCategoryTitle(category);
+            }}
+          >
+            <View style={style.cardTextContainer}>
+              <Text>{category}</Text>
+            </View>
+          </Pressable>
+        ))}
+      </ScrollView>
+    )
+  )}
+</View>
+
+{/* create category button - fixed at bottom, above list */}
+{searchEntry.trim().length === 0 && (
+    <Pressable
+        onPress={openCreateCategory}
+        style={({ pressed }) => [
+            style.addButton,
+            pressed && {
+                backgroundColor: '#CBE8CC',
+                shadowColor: '#499F44',
+                shadowOffset: { width: 0, height: 0 },
+                shadowOpacity: 0.5,
+                shadowRadius: 10,
+                transform: [{ scale: 0.95 }],
+                ...(Platform.OS === 'android' ? { elevation: 8 } : {}),
+            },
+        ]}
+    >
+        <Ionicons name="add" size={35} color="#2E7D32" />
+    </Pressable>
+)}
             {/* Category options menu modal */}
             <Modal
                 visible={menuVisible}
@@ -1168,12 +1225,29 @@ const InventoryScreen = () => {
                 foodCategories={foodCategories}
             />
 
-            {/* create category button - only show when not searching */}
+            {/* bottom add button area - only show when not searching */}
             {searchEntry.trim().length === 0 && (
-                <Pressable onPress={openCreateCategory}>
-                    <Text style={style.addButton}>+</Text>
-                </Pressable>
+                <View style={style.bottomAddContainer}>
+                    <Pressable
+                        onPress={openCreateCategory}
+                        style={({ pressed }) => [
+                            style.addButton,
+                            pressed && {
+                                backgroundColor: '#CBE8CC',
+                                shadowColor: '#499F44',
+                                shadowOffset: { width: 0, height: 0 },
+                                shadowOpacity: 0.5,
+                                shadowRadius: 10,
+                                transform: [{ scale: 0.95 }],
+                                ...(Platform.OS === 'android' ? { elevation: 8 } : {}),
+                            },
+                        ]}
+                    >
+                        <Ionicons name="add" size={35} color="#2E7D32" />
+                    </Pressable>
+                </View>
             )}
+
 
             {/* create category modal */}
             <ModalCreateFoodCategory
@@ -1192,7 +1266,7 @@ const style = StyleSheet.create({
     container: {
         flex: 1,
         alignItems: "center",
-        marginTop: 10,
+        marginTop: 0,
     },
 
     header: {
@@ -1214,26 +1288,11 @@ const style = StyleSheet.create({
         borderColor: "rgba(73,159,68,1)",
         borderRadius: 25,
         width: 350,
-        paddingHorizontal: 16,
-        paddingVertical: 12,
+        padding: 10,
         alignItems: "center",
         marginBottom: 16,
         flexDirection: "row",
         backgroundColor: "white",
-        shadowColor: "#000",
-        shadowOffset: {
-            width: 0,
-            height: 2,
-        },
-        shadowOpacity: 0.1,
-        shadowRadius: 3,
-        elevation: 3,
-    },
-
-    searchInput: {
-        flex: 1,
-        fontSize: 16,
-        color: "#333",
     },
 
     clearButton: {
@@ -1256,15 +1315,15 @@ const style = StyleSheet.create({
         margin: 10,
         alignItems: "center",
         backgroundColor: "rgba(73,159,68,0.1)",
-        shadowColor: "#000",
-        shadowOffset: {
-            width: 0,
-            height: 2,
-        },
-        shadowOpacity: 0.1,
-        shadowRadius: 3,
-        elevation: 3,
+
+        // no shadow (This fixes the gray borders I think)
+        shadowColor: "transparent",
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0,
+        shadowRadius: 0,
+        elevation: 0,
     },
+
 
     cardTextContainer: {
         alignSelf: "stretch",
@@ -1276,12 +1335,19 @@ const style = StyleSheet.create({
     },
 
     addButton: {
-        fontSize: 40,
-        color: "rgba(138, 141, 138, 1)",
-        textShadowColor: "rgba(0, 0, 0, 0.1)",
-        textShadowOffset: { width: 0, height: 1 },
-        textShadowRadius: 2,
+        position: 'absolute',
+        bottom: 12,
+        alignSelf: 'center',
+        width: 45,
+        height: 45,
+        borderRadius: 30,
+        borderWidth: 2,
+        borderColor: '#499F44',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#E6F4EA',
     },
+
 
     searchResultsContainer: {
         flex: 1,
@@ -1295,14 +1361,12 @@ const style = StyleSheet.create({
         borderBottomWidth: 2,
         borderBottomColor: "rgba(73,159,68,1)",
         backgroundColor: "white",
-        shadowColor: "#000",
-        shadowOffset: {
-            width: 0,
-            height: 1,
-        },
-        shadowOpacity: 0.05,
-        shadowRadius: 2,
-        elevation: 2,
+
+        shadowColor: "transparent",
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0,
+        shadowRadius: 0,
+        elevation: 0,
     },
 
     searchResultsTitleContainer: {
@@ -1342,23 +1406,22 @@ const style = StyleSheet.create({
         paddingBottom: 24,
     },
 
-    searchResultCard: {
-        width: "100%",
-        borderWidth: 2,
-        borderColor: "rgba(73,159,68,1)",
-        borderRadius: 15,
-        backgroundColor: "rgba(73,159,68,0.1)",
-        marginBottom: 12,
-        padding: 16,
-        shadowColor: "#000",
-        shadowOffset: {
-            width: 0,
-            height: 1,
-        },
-        shadowOpacity: 0.05,
-        shadowRadius: 2,
-        elevation: 2,
-    },
+  searchResultCard: {
+    width: "100%",
+    marginTop: 10,
+    borderWidth: 2,
+    borderColor: "rgba(73,159,68,1)",
+    borderRadius: 15,
+    backgroundColor: "rgba(73,159,68,0.1)",
+    marginBottom: 12,
+    padding: 16,
+
+    shadowColor: "transparent",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0, 
+  },
 
     searchResultContent: {
         width: "100%",
@@ -1381,7 +1444,7 @@ const style = StyleSheet.create({
     searchResultBottom: {
         flexDirection: "row",
         justifyContent: "space-between",
-        alignItems: "center",
+        alignItems: "center", 
         marginTop: 4,
     },
 
@@ -1397,18 +1460,31 @@ const style = StyleSheet.create({
     },
 
     rightAction: {
+        flex: 1,
         justifyContent: "center",
-        alignItems: "center",
+        alignItems: "flex-end",
+        paddingRight: 10,
         marginBottom: 12,
-        marginLeft: 8,
-        backgroundColor: "#DC2626",
-        borderRadius: 12,
-        paddingHorizontal: 16,
     },
 
+    deleteIconButton: {
+        backgroundColor: "#DC2626",
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+
+
+
     deleteBtn: {
-        paddingVertical: 8,
-        paddingHorizontal: 4,
+        backgroundColor: "#DC2626",
+        borderRadius: 20,
+        height: 120,
+        width: 70,
+        alignItems: "center",
+        justifyContent: "center",
     },
 
     deleteText: {
@@ -1500,6 +1576,50 @@ const style = StyleSheet.create({
         fontSize: 16,
         color: "#333",
     },
+    categoryContent: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    paddingBottom: 140, 
+},
+
+    bottomAddContainer: {
+    alignSelf: "stretch",
+    height: 70,                   
+    alignItems: "center",
+    justifyContent: "center",
+},
+searchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1.5,
+    borderColor: "#499F44",
+    borderRadius: 25,
+    paddingHorizontal: 12,
+    marginBottom: 20,
+    height: 50,
+    backgroundColor: "#FFFFFF",  
+    alignSelf: "stretch",
+    marginHorizontal: 16,
+},
+
+searchInput: {
+    flex: 1,
+    fontSize: 15,
+    color: "#333",
+},
+swipeDeleteBackground: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "flex-end",
+    marginBottom: 12,
+    borderTopRightRadius: 15,
+    borderBottomRightRadius: 15,
+    paddingRight: 16,  
+},
+
+
+
 });
 
 export default InventoryScreen;
