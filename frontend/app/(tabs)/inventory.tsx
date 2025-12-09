@@ -953,46 +953,140 @@ const InventoryScreen = () => {
 
 {/* Show search results or category list */}
 <View style={style.catergoryContainer}>
-    {searchEntry.trim().length > 0 ? (
-        // Show search results
-        <View style={style.searchResultsContainer}>
-            {/* ... keep your existing search-results JSX here unchanged ... */}
+  {searchEntry.trim().length > 0 ? (
+    // Show search results
+    <View style={style.searchResultsContainer}>
+      <View style={style.searchResultsHeader}>
+        <View style={style.searchResultsTitleContainer}>
+          <Ionicons
+            name="search"
+            size={20}
+            color="#499F44"
+            style={{ marginRight: 8 }}
+          />
+          <Text style={style.searchResultsTitle}>
+            {loadingFoodItems
+              ? "Searching..."
+              : `Found ${filteredFoodItems.length} ${
+                  filteredFoodItems.length === 1 ? "item" : "items"
+                }`}
+          </Text>
         </View>
-    ) : (
-        // Show category cards
-        loading ? (
-            <ActivityIndicator
-                size="large"
-                color="#499F44"
-                style={{ marginTop: 50 }}
+
+        {!loadingFoodItems && filteredFoodItems.length === 0 && (
+          <Text style={style.searchEmptyText}>
+            No items found matching "{searchEntry}"
+          </Text>
+        )}
+      </View>
+
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        style={{ flex: 1, alignSelf: "stretch" }}
+        contentContainerStyle={{
+          paddingBottom: 24,
+          paddingHorizontal: 16,
+        }}
+      >
+        {loadingFoodItems ? (
+          <View style={style.emptySearchContainer}>
+            <ActivityIndicator size="large" color="#499F44" />
+          </View>
+        ) : filteredFoodItems.length === 0 ? (
+          <View style={style.emptySearchContainer}>
+            <Ionicons
+              name="search-outline"
+              size={64}
+              color="#ccc"
+              style={{ marginBottom: 16 }}
             />
+            <Text style={style.emptySearchText}>
+              Try searching for something else
+            </Text>
+          </View>
         ) : (
-        <ScrollView
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            style={{ flex: 1, alignSelf: "stretch" }}
-            contentContainerStyle={style.categoryContent}
-            bounces={false}              
-            alwaysBounceVertical={false}   
-            overScrollMode="never"       
-        >
-            {foodCategories.map((category) => (
-                <Pressable
-                    key={category}
-                    style={style.card}
-                    onPress={() => {
-                        openCategory();
-                        setFoodCategoryTitle(category);
-                    }}
-                >
-                    <View style={style.cardTextContainer}>
-                        <Text>{category}</Text>
+          <View style={style.searchResultsList}>
+            {filteredFoodItems.map((foodItem) => (
+              <Swipeable
+                key={foodItem.id}
+                renderRightActions={() => (
+                  <View style={style.rightAction}>
+                    <Pressable
+                      style={style.deleteBtn}
+                      onPress={() => handleDeleteFood(foodItem.id)}
+                    >
+                      <Text style={style.deleteText}>Delete</Text>
+                    </Pressable>
+                  </View>
+                )}
+              >
+                <View style={style.searchResultCard}>
+                  <View style={style.searchResultContent}>
+                    <Text style={style.searchResultName}>
+                      {foodItem.name}
+                    </Text>
+
+                    {foodItem.category && (
+                      <Text style={style.searchResultCategory}>
+                        {foodItem.category}
+                      </Text>
+                    )}
+
+                    <View style={style.searchResultBottom}>
+                      <Text style={style.searchResultQty}>
+                        {foodItem.qty} {foodItem.unit || "None"}
+                      </Text>
+
+                      {foodItem.expDate && (
+                        <Text style={style.searchResultExp}>
+                          Exp: {foodItem.expDate}
+                        </Text>
+                      )}
                     </View>
-                </Pressable>
+                  </View>
+                </View>
+              </Swipeable>
             ))}
-        </ScrollView>
-        )
-    )}
+          </View>
+        )}
+      </ScrollView>
+    </View>
+  ) : (
+    // Show category cards (your current code)
+    loading ? (
+      <ActivityIndicator
+        size="large"
+        color="#499F44"
+        style={{ marginTop: 50 }}
+      />
+    ) : (
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        style={{ flex: 1, alignSelf: "stretch" }}
+        contentContainerStyle={style.categoryContent}
+        bounces={false}
+        alwaysBounceVertical={false}
+        overScrollMode="never"
+      >
+        {foodCategories.map((category) => (
+          <Pressable
+            key={category}
+            style={style.card}
+            onPress={() => {
+              openCategory();
+              setFoodCategoryTitle(category);
+            }}
+          >
+            <View style={style.cardTextContainer}>
+              <Text>{category}</Text>
+            </View>
+          </Pressable>
+        ))}
+      </ScrollView>
+    )
+  )}
 </View>
 
 {/* create category button - fixed at bottom, above list */}
