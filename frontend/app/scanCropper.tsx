@@ -507,7 +507,7 @@ export default function Splash() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F7F8F7",
+    backgroundColor: "#000000ff",
   },
 
   pictureContainer: {
@@ -515,7 +515,7 @@ const styles = StyleSheet.create({
     width: "100%",
     flex: 1,
     overflow: "hidden",
-    backgroundColor: "#000",
+    backgroundColor: "#bfcfbaff",
   },
 
   picture: {
@@ -527,7 +527,7 @@ const styles = StyleSheet.create({
 
   box: {
     position: "absolute",
-    outlineColor: "#00000088",
+    outlineColor: "#9ed48f9d",
     outlineWidth: 100000,
     borderColor: "#FFFFFF",
     borderWidth: 2,
