@@ -12,6 +12,7 @@ import {
     Modal,
     Pressable,
     Alert,
+    ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useLocalSearchParams } from "expo-router";
@@ -25,6 +26,7 @@ export default function MealIngredientScreen() {
     const [ingredients, setIngredients] = useState<{name: string, amount: string}[]>([])
     const [imageURL, setImageURL] = useState<string | null>(null);
     const [mealName, setMealName] = useState<string>("");
+    const [loading, setLoading] = useState(true);
 
     console.log("Meal ID:", id);
 
@@ -34,6 +36,7 @@ export default function MealIngredientScreen() {
 
     const fetchMealData = async () => {
         try {
+            setLoading(true);
             const loginToken = await retrieveValue('jwt');
     
             if (!loginToken) {
@@ -83,6 +86,8 @@ export default function MealIngredientScreen() {
         } catch (error) {
             console.error('Error fetching meals:', error);
             Alert.alert('Error', 'Failed to load meals. Please try again.');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -140,6 +145,17 @@ export default function MealIngredientScreen() {
             ]
         );
     };
+
+    if (loading) {
+        return (
+            <SafeAreaView style={styles.container}>
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color="#499F44" />
+                    <Text style={styles.loadingText}>Loading meal details...</Text>
+                </View>
+            </SafeAreaView>
+        );
+    }
 
     return (
         <SafeAreaView style={styles.container}>
@@ -242,6 +258,18 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#FFFFFF',
+    },
+
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+
+    loadingText: {
+        marginTop: 10,
+        fontSize: 16,
+        color: '#666'
     },
 
     header: {
