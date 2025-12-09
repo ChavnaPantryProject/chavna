@@ -224,8 +224,6 @@ export default function MealScreen() {
 
       // remove from local state
       setMeals(prev => prev.filter(m => m.id !== selectedMeal.id));
-
-      Alert.alert('Success', 'Meal deleted successfully');
     } catch (error) {
       console.error('Error deleting meal:', error);
       Alert.alert('Error', 'Failed to delete meal.')
@@ -367,7 +365,7 @@ export default function MealScreen() {
       {/* Bottom add area  */}
       <View style={styles.bottomAddContainer}>
         <Pressable
-          onPress={() => router.push("/meals/newmeal")}
+          onPress={() => router.push("/meals/editMeal")}
           style={({ pressed }) => [
             styles.addBtn,
             pressed && {

@@ -28,8 +28,6 @@ export default function MealIngredientScreen() {
     const [mealName, setMealName] = useState<string>("");
     const [loading, setLoading] = useState(true);
 
-    console.log("Meal ID:", id);
-
     useEffect(() => {
         fetchMealData();
     }, [id]);
@@ -187,8 +185,8 @@ export default function MealIngredientScreen() {
                             onPress={() => {
                                 setMenuVisible(false);
                                 router.push({
-                                    pathname: "/meals/editmeal",
-                                    params: { id }  // Pass the meal ID
+                                    pathname: "/meals/editMeal",
+                                    params: { mealId: id }  // Pass the meal ID
                                 });
                             }}
                         >
