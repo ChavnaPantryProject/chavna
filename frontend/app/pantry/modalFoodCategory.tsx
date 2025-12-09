@@ -49,6 +49,7 @@ type FoodItem = {
     id: string;
     name: string;
     qty: number;
+    qty_unit: string;
     expDate: string;
 };
 
@@ -126,10 +127,13 @@ export default function ModalFoodCategory({
 
                 // Map backend items to frontend format
                 const mappedItems: FoodItem[] = backendItems.map(
-                    (item) => ({
+                    (item) => (
+                        console.log(item),
+                        {
                         id: item.id,
                         name: item.name,
                         qty: item.amount,
+                        qty_unit: item.unit,
                         expDate: item.expiration
                             ? new Date(item.expiration)
                                   .toISOString()

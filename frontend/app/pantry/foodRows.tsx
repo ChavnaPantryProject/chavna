@@ -15,6 +15,7 @@ type FoodItem = {
     id: string;
     name: string;
     qty: number;
+    qty_unit: string;
     expDate: string;
 };
 
@@ -30,6 +31,7 @@ type FoodRowItemProps = {
 };
 
 const FoodRowItem = ({ foodItem, onDelete }: FoodRowItemProps) => {
+    //console.log(foodItem)
     const swipeableRef = useRef<SwipeableMethods | null>(null);
 
     return (
@@ -77,8 +79,10 @@ const FoodRowItem = ({ foodItem, onDelete }: FoodRowItemProps) => {
 
                     {/* Bottom row: qty + exp date */}
                     <View style={styles.bottomRow}>
+                    
                         <Text style={styles.qtyText}>
                             {foodItem.qty}
+                            {foodItem.qty_unit.trim() !== "None" ? ` ${foodItem.qty_unit}` : ""}
                         </Text>
 
                         {foodItem.expDate ? (
