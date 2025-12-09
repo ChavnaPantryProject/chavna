@@ -439,7 +439,7 @@ signOutButton: {
 },
 
   signOutText: {
-    color: "#fff",
+    color: "#ffffffff",
     fontSize: 16,
     fontWeight: "600",
   },
