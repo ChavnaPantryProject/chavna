@@ -578,23 +578,15 @@ export default function HomeScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.favRow}
           >
-            {favoriteMeals.length === 0 ? (
-              <>
-                <FavMeal />
-                <FavMeal />
-                <FavMeal />
-              </>
-            ) : (
-              <>
-                {favoriteMeals.map((meal) => (
-                  <FavMeal
-                    key={meal.mealId}
-                    uri={meal.mealPictureURL}
-                    mealId={meal.mealId}
-                  />
-                ))}
-             </>
-          )}
+          <>
+            {favoriteMeals.map((meal) => (
+              <FavMeal
+                key={meal.mealId}
+                uri={meal.mealPictureURL}
+                mealId={meal.mealId}
+              />
+            ))}
+          </>
           </ScrollView>
 
         </View>
