@@ -42,6 +42,62 @@ interface Meal {
   isFavorite: boolean
 }
 
+const asyncYesNo = async (title: string, text: string): Promise<boolean> => new Promise((resolve) => {
+  Alert.alert(title, text,
+    [
+      { text: "No", onPress: () => resolve(false) },
+      { text: "Yes", onPress: () => resolve(true) }
+    ],
+    { cancelable: true, onDismiss: () => resolve(false) }
+  )
+});
+
+export const cookMeal = async(mealId: string) => {
+  if (!(await asyncYesNo("Are you sure?", "Cooking this meal will remove items from your inventory.")))
+    return;
+
+  const jwt = await retrieveValue('jwt');
+
+  if (!jwt) {
+    console.error("No jwt.");
+    return;
+  }
+
+  let response;
+  try {
+    response = await fetch(`${API_URL}/cook-meal`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${jwt}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ mealId: mealId }),
+    });
+  } catch (ex) {
+    console.error("Fetch error:", ex);
+    return;
+  }
+
+  let body: Response<null>;
+  try {
+    body = await response.json();
+  } catch (ex) {
+    console.error("Error parsing response json:", ex);
+    return;
+  }
+
+  if (body.success === "error") {
+    console.error("Api error:", body);
+    return;
+  }
+
+  if (body.success === "success") {
+    Alert.alert("Success", "Inventory updated.");
+  } else {
+    Alert.alert("Error", body.message);
+  }
+};
+
 export default function MealScreen() {
   const router = useRouter(); // nav controller
   const [meals, setMeals] = useState<Meal[]>([]);
@@ -224,8 +280,6 @@ export default function MealScreen() {
 
       // remove from local state
       setMeals(prev => prev.filter(m => m.id !== selectedMeal.id));
-
-      Alert.alert('Success', 'Meal deleted successfully');
     } catch (error) {
       console.error('Error deleting meal:', error);
       Alert.alert('Error', 'Failed to delete meal.')
@@ -245,66 +299,68 @@ export default function MealScreen() {
 
   // rendering each meal card
   const renderMeal = ({ item} : { item: Meal }) => (
-    <View style={styles.card}>
+    <Pressable onPress={() => goToMealInfo(item.id)}>
+      <View style={styles.card}>
 
-      {/* Favorite Icon - top right corner */}
-      <View style={styles.favoriteIcon}>
-        <TouchableOpacity onPress={() => handleFavorite(item)}>
-          <Ionicons
-            name={item.isFavorite ? "star" : "star-outline"}
-            size={22}
-            color={item.isFavorite ? "#F89D5D" : "#5b5959ff"}
-          />
-        </TouchableOpacity>
-      </View>
+        {/* Favorite Icon - top right corner */}
+        <View style={styles.favoriteIcon}>
+          <TouchableOpacity onPress={() => handleFavorite(item)}>
+            <Ionicons
+              name={item.isFavorite ? "star" : "star-outline"}
+              size={22}
+              color={item.isFavorite ? "#F89D5D" : "#5b5959ff"}
+            />
+          </TouchableOpacity>
+        </View>
 
-      {/* Title */}
-      <Text style={styles.title}>{item.name}</Text>
+        {/* Title */}
+        <Text style={styles.title}>{item.name}</Text>
 
-      {/* Divider */}
-      <View style={styles.divider} />
+        {/* Divider */}
+        <View style={styles.divider} />
 
-      {/* Row with image and info */}
-      <View style={styles.contentRow}>
-        {/* Meal Image */}
-        {item.image ? (
-          <Image source={{uri: item.image}} style={styles.image} />
-        ) : (
-          <View style={[styles.image, styles.placeholderImage]}>
-            <Ionicons name="fast-food" size={40} color="#499F44" />
-          </View>
-        )}
-
-        {/* Meal Information */}
-        <View style={styles.info}>
-          {item.cost != null && (
-            <Text style={styles.subtitle}>
-              Cost Per Serving: ${item.cost.toFixed(2)}
-            </Text>
+        {/* Row with image and info */}
+        <View style={styles.contentRow}>
+          {/* Meal Image */}
+          {item.image ? (
+            <Image source={{uri: item.image}} style={styles.image} />
+          ) : (
+            <View style={[styles.image, styles.placeholderImage]}>
+              <Ionicons name="fast-food" size={40} color="#499F44" />
+            </View>
           )}
-     
-          {/* Action Buttons (Info + Delete) */}
-          <View style={styles.buttons}>
 
-            {/* Info Button - navigates to meal details */}
-            <TouchableOpacity
-              style={styles.actionBtn}
-              onPress={() => goToMealInfo(item.id)}
-            >
-              <Ionicons name="restaurant" size={20} color="white" />
-            </TouchableOpacity>
+          {/* Meal Information */}
+          <View style={styles.info}>
+            {item.cost != null && (
+              <Text style={styles.subtitle}>
+                Cost: ${item.cost.toFixed(2)}
+              </Text>
+            )}
+      
+            {/* Action Buttons (Info + Delete) */}
+            <View style={styles.buttons}>
 
-            {/* Delete Button */}
-            <TouchableOpacity
-              style={styles.actionBtn}
-              onPress={() => handleDelete(item)}
-            >
-              <MaterialIcons name="delete" size={20} color="white" />
-            </TouchableOpacity>
+              {/* Cook button */}
+              <TouchableOpacity
+                style={styles.actionBtn}
+                onPress={() => cookMeal(item.id)}
+              >
+                <Ionicons name="restaurant" size={20} color="white" />
+              </TouchableOpacity>
+
+              {/* Delete Button */}
+              <TouchableOpacity
+                style={styles.actionBtn}
+                onPress={() => handleDelete(item)}
+              >
+                <MaterialIcons name="delete" size={20} color="white" />
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </View>
-    </View>
+    </Pressable>
   );
 
   if (loading) {
@@ -367,7 +423,7 @@ export default function MealScreen() {
       {/* Bottom add area  */}
       <View style={styles.bottomAddContainer}>
         <Pressable
-          onPress={() => router.push("/meals/newmeal")}
+          onPress={() => router.push("/meals/editMeal")}
           style={({ pressed }) => [
             styles.addBtn,
             pressed && {

@@ -3,11 +3,11 @@
 // NOTE: this will be the default screen when a usesr decides to add a new meal/
 
 import React, { use, useEffect, useState } from "react";
-import { 
-    View, 
-    Text, 
-    Image, 
-    TouchableOpacity, 
+import {
+    View,
+    Text,
+    Image,
+    TouchableOpacity,
     StyleSheet,
     TextInput,
     Modal,
@@ -16,30 +16,30 @@ import {
     Pressable,
     Platform,
 } from "react-native";
-import DropDownPicker from "react-native-dropdown-picker";
 import * as ImagePicker from "expo-image-picker";
 import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
-import { router, useFocusEffect } from "expo-router";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { API_URL, loadFileBytes, Response, retrieveValue, uploadChunks, UploadInfo } from "../util";
 import { getSelectedTemplate, Template } from "../select-template";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function NewMeal() {
+    const { mealId } = useLocalSearchParams<{ mealId: string }>();
+
     const [mealName, setMealName] = useState("");
     const [mealImage, setMealImage] = useState<string | null>(null);
-    const [base64Image, setBase64Image] = useState<string | null>(null);
     const [ingredients, setIngredients] = useState<
         { templateId: string; name: string; amount: number; unit: string }[]
     >([]);
-    
+
     const [modalVisible, setModalVisible] = useState(false);
-    const [newIngredient, setNewIngredient] = useState("");
     const [newAmount, setNewAmount] = useState("");
-    const [newUnit, setNewUnit] = useState("g");
-    const [openUnit, setOpenUnit] = useState(false);
 
     const [template, setTemplate] = useState<Template | null>(null);
+
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
 
     const navigation = useNavigation();
 
@@ -52,9 +52,79 @@ export default function NewMeal() {
         const tmp = getSelectedTemplate();
         if (tmp != null)
             setTemplate(tmp);
-    })
-
+    });
     
+    useEffect(() => {
+        fetchMealData();
+    }, [mealId]);
+
+    const fetchMealData = async () => {
+        if (mealId === undefined)
+            return;
+
+        try {
+            setLoading(true);
+            const loginToken = await retrieveValue('jwt');
+    
+            if (!loginToken) {
+                Alert.alert('Error', 'Please log in to view meals');
+                return;
+            }
+    
+            const response = await fetch(`${API_URL}/get-meal`, {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${loginToken}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    mealId: mealId
+                })
+            });
+
+            type MealResponse = {
+                meal: {
+                    name: string,
+                    mealPictureURL: string,
+                    ingredients: [{
+                        templateId: string,
+                        name: string,
+                        amount: number,
+                        unit: string
+                    }]
+                }
+            }
+    
+            const body: Response<MealResponse> = await response.json();
+    
+            if (!response.ok) {
+                throw new Error(body.message || 'Failed to fetch meals');
+            }
+    
+            if (body.success !== 'success') {
+                throw new Error(body.message || 'Failed to fetch meals');
+            }
+
+            const meal = body.payload?.meal!;
+
+            setIngredients(meal.ingredients.map(ingredient => ({
+                templateId: ingredient.templateId,
+                name: ingredient.name,
+                unit: ingredient.unit,
+                amount: ingredient.amount
+            })));
+            setMealImage(meal.mealPictureURL);
+            setMealName(meal.name);
+        } catch (error) {
+            console.error('Error fetching meals:', error);
+            Alert.alert('Error', 'Failed to load meals. Please try again.');
+        } finally {
+            setLoading(false);
+        }
+    };
+    
+    
+
     const initializeMealPictureUpload = async (mealId: string, fileSize: number): Promise<UploadInfo> => {
         const jwt = await retrieveValue('jwt');
 
@@ -126,16 +196,14 @@ export default function NewMeal() {
         if (newAmount && template) {
             setIngredients(prev => [
                 ...prev,
-                { 
+                {
                     templateId: template!.id,
-                    name: template!.name, 
-                    amount: parseFloat(newAmount), 
-                    unit: template!.unit.trim() 
+                    name: template!.name,
+                    amount: parseFloat(newAmount),
+                    unit: template!.unit.trim()
                 },
             ]);
-            setNewIngredient("");
             setNewAmount("");
-            setNewUnit("g");
             setModalVisible(false);
         }
     };
@@ -145,9 +213,82 @@ export default function NewMeal() {
         setIngredients(updatedIngredients);
     };
 
-    const saveMeal = async () => {
-        console.log("SAVE BUTTON CLICKED");
+    type Ingredient = {
+        templateId: string,
+        amount: number
+    }
 
+    const newMeal = async (ingredients: Ingredient[]) => {
+        const token = await retrieveValue("jwt");
+
+        const requestBody = {
+            name: mealName,
+            ingredients: ingredients,
+        };
+
+        const response = await fetch(`${API_URL}/create-meal`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify(requestBody),
+        });
+
+        type CreateMealResponse = {
+            mealId: string,
+            ingredientsAdded: number
+        }
+
+        const body: Response<CreateMealResponse> = await response.json();
+
+        if (!response.ok || body.success !== "success") {
+            throw new Error(JSON.stringify(body));
+        }
+
+        if (mealImage != null)
+            await uploadMealPicture(mealImage, body.payload?.mealId!);
+
+        navigation.goBack();
+    };
+
+    const updateMeal = async (ingredients: Ingredient[]) => {
+        const token = await retrieveValue("jwt");
+
+        const requestBody = {
+            mealId: mealId,
+            meal: {
+                name: mealName,
+                ingredients: ingredients
+            }
+        };
+
+        const response = await fetch(`${API_URL}/update-meal`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify(requestBody),
+        });
+
+        type UpdateMealResponse = {
+            ingredientsAdded: number
+        }
+
+        const body: Response<UpdateMealResponse> = await response.json();
+
+        if (!response.ok || body.success !== "success") {
+            throw new Error(JSON.stringify(body));
+        }
+
+        if (body.payload?.ingredientsAdded! < ingredients.length)
+            throw "Not all ingredients added."
+
+        navigation.goBack();
+    };
+
+    const saveMeal = async () => {
         if (!mealName.trim()) {
             Alert.alert("Missing Information", "Please enter a meal name.");
             return;
@@ -164,57 +305,26 @@ export default function NewMeal() {
             amount: ing.amount, // MUST be a number
         }));
 
-        const token = await retrieveValue("jwt");
-
-        const requestBody = {
-            name: mealName,
-            ingredients: formattedIngredients,
-        };
-
-        console.log(requestBody);
-
+        setSaving(true);
         try {
-            const response = await fetch(`${API_URL}/create-meal`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify(requestBody),
-            });
-
-            type CreateMealResponse = {
-                mealId: string,
-                ingredientsAdded: number
-            }
-
-            const body: Response<CreateMealResponse> = await response.json();
-
-            if (!response.ok || body.success !== "success") {
-                throw new Error(JSON.stringify(body));
-            }
-
-            if (mealImage != null)
-                await uploadMealPicture(mealImage, body.payload?.mealId!);
-
-            Alert.alert("Meal Saved!", `${mealName} has been saved successfully.`, [
-                {
-                    text: "OK",
-                    onPress: () => navigation.goBack(),
-                },
-            ]);
-        } catch (error) {
-            console.error("ERROR SAVING MEAL:", error);
-            Alert.alert("Error", "Could not save meal.");
+            if (mealId === undefined)
+                await newMeal(formattedIngredients);
+            else
+                await updateMeal(formattedIngredients);
+        } catch (ex) {
+            console.error("ERROR SAVING MEAL:", ex);
+            Alert.alert("Error", "Could not save meal.");   
+        } finally {
+            setSaving(false);
         }
     };
 
-        return (
-            <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
+    return (
+        <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
 
 
             {/* back button */}
-            <TouchableOpacity 
+            <TouchableOpacity
                 onPress={() => navigation.goBack()}
                 style={styles.backButton}
             >
@@ -233,7 +343,7 @@ export default function NewMeal() {
                     />
                 </View>
 
-            {/* image picker */}
+                {/* image picker */}
                 <TouchableOpacity onPress={pickImage}>
                     {mealImage ? (
                         <Image source={{ uri: mealImage }} style={styles.mealImage} />
@@ -291,41 +401,41 @@ export default function NewMeal() {
 
                 {/* add ingredient button */}
                 <Pressable
-                onPress={() => setModalVisible(true)}
-                style={({ pressed }) => [
-                    styles.addBtn,
-                    pressed && {
-                    backgroundColor: '#CBE8CC', // On press glow
-                    shadowColor: '#499F44',
-                    shadowOffset: { width: 0, height: 0 },
-                    shadowOpacity: 0.5,
-                    shadowRadius: 10,
-                    transform: [{ scale: 0.95 }],
-                    ...(Platform.OS === 'android' ? { elevation: 8 } : {}),
-                    },
-                ]}
+                    onPress={() => setModalVisible(true)}
+                    style={({ pressed }) => [
+                        styles.addBtn,
+                        pressed && {
+                            backgroundColor: '#CBE8CC', // On press glow
+                            shadowColor: '#499F44',
+                            shadowOffset: { width: 0, height: 0 },
+                            shadowOpacity: 0.5,
+                            shadowRadius: 10,
+                            transform: [{ scale: 0.95 }],
+                            ...(Platform.OS === 'android' ? { elevation: 8 } : {}),
+                        },
+                    ]}
                 >
-                <Ionicons name="add" size={35} color="#2E7D32" />
+                    <Ionicons name="add" size={35} color="#2E7D32" />
                 </Pressable>
 
 
                 {/* save button */}
-                <TouchableOpacity style={styles.saveButton} onPress={saveMeal}>
-                    <Text style={styles.saveButtonText}>Save</Text>
+                <TouchableOpacity style={[styles.saveButton, saving && {opacity: .75}]} disabled={saving} onPress={saveMeal}>
+                    <Text style={styles.saveButtonText}>{saving? "Saving..." : "Save"}</Text>
                 </TouchableOpacity>
             </ScrollView>
 
             {/* add ingredient modal */}
-            <Modal 
-                visible={modalVisible} 
-                transparent 
+            <Modal
+                visible={modalVisible}
+                transparent
                 animationType="fade"
             >
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalContent}>
                         <View style={styles.modalTitleWrap}>
-                        <Text style={styles.modalTitle}>Add Ingredient</Text>
-                        <View style={styles.modalTitleUnderline} />
+                            <Text style={styles.modalTitle}>Add Ingredient</Text>
+                            <View style={styles.modalTitleUnderline} />
                         </View>
 
 
@@ -336,7 +446,7 @@ export default function NewMeal() {
                                 router.push("/select-template");
                             }}
                         >
-                            <Text style={[styles.ingredientInput, template == null && {color: "#888"}]}>{template? template.name : "Tap to Set Ingredient"}</Text>
+                            <Text style={[styles.ingredientInput, template == null && { color: "#888" }]}>{template ? template.name : "Tap to Set Ingredient"}</Text>
                         </Pressable>
 
                         <View style={styles.amountRow}>
@@ -348,28 +458,26 @@ export default function NewMeal() {
                                 value={newAmount}
                                 onChangeText={setNewAmount}
                             />
-                            <Text style={styles.unit}>{template? template.unit.trim() : "Unit"}</Text>
+                            <Text style={styles.unit}>{template ? template.unit.trim() : "Unit"}</Text>
                         </View>
 
                         <View style={styles.modalButtons}>
-                        <TouchableOpacity
-                            style={[styles.pillButton, styles.cancelPill]}
-                            onPress={() => {
-                            setModalVisible(false);
-                            setNewIngredient("");
-                            setNewAmount("");
-                            setNewUnit("g");
-                            }}
-                        >
-                            <Text style={styles.cancelPillText}>Cancel</Text>
-                        </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.pillButton, styles.cancelPill]}
+                                onPress={() => {
+                                    setModalVisible(false);
+                                    setNewAmount("");
+                                }}
+                            >
+                                <Text style={styles.cancelPillText}>Cancel</Text>
+                            </TouchableOpacity>
 
-                        <TouchableOpacity 
-                            style={[styles.pillButton, styles.addPill]}
-                            onPress={addIngredient}
-                        >
-                            <Text style={styles.addPillText}>Add</Text>
-                        </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.pillButton, styles.addPill]}
+                                onPress={addIngredient}
+                            >
+                                <Text style={styles.addPillText}>Add</Text>
+                            </TouchableOpacity>
                         </View>
 
                     </View>
@@ -531,14 +639,14 @@ const styles = StyleSheet.create({
 
     saveButton: {
         alignSelf: "center",
-        backgroundColor: "#F3A261", 
+        backgroundColor: "#F3A261",
         borderRadius: 10,
         paddingVertical: 12,
         paddingHorizontal: 60,
         marginTop: 20,
         marginBottom: 30,
         borderWidth: 2,
-        borderColor: "#d9893c", 
+        borderColor: "#d9893c",
     },
 
     saveButtonText: {
@@ -560,7 +668,7 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         width: "85%",
     },
-    
+
     input: {
         borderWidth: 1,
         borderColor: "#ccc",
@@ -588,9 +696,9 @@ const styles = StyleSheet.create({
         marginBottom: -8,
     },
     modalButtons: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 20,
+        flexDirection: "row",
+        justifyContent: "space-between",
+        marginTop: 20,
     },
     addModalButton: {
         flex: 1,
@@ -618,79 +726,79 @@ const styles = StyleSheet.create({
         fontSize: 16,
     },
     pillButton: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 25,       
-    alignItems: "center",
-    marginHorizontal: 5,
-    borderWidth: 2,
+        flex: 1,
+        paddingVertical: 12,
+        borderRadius: 25,
+        alignItems: "center",
+        marginHorizontal: 5,
+        borderWidth: 2,
     },
 
     cancelPill: {
-    backgroundColor: "#fff",
-    borderColor: "#ccc",
+        backgroundColor: "#fff",
+        borderColor: "#ccc",
     },
 
     addPill: {
-    backgroundColor: "#E3F7E3",
-    borderColor: "#499F44",
+        backgroundColor: "#E3F7E3",
+        borderColor: "#499F44",
     },
 
     cancelPillText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#666",
+        fontSize: 16,
+        fontWeight: "600",
+        color: "#666",
     },
 
     addPillText: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#2E7D32",
+        fontSize: 16,
+        fontWeight: "700",
+        color: "#2E7D32",
     },
     addBtn: {
-    marginBottom: 12,
-    marginTop: 15,
-    alignSelf: 'center',
-    width: 45,
-    height: 45,
-    borderRadius: 30,
-    borderWidth: 2,
-    borderColor: '#499F44',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#E6F4EA',
+        marginBottom: 12,
+        marginTop: 15,
+        alignSelf: 'center',
+        width: 45,
+        height: 45,
+        borderRadius: 30,
+        borderWidth: 2,
+        borderColor: '#499F44',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#E6F4EA',
     },
     headerCell: {
-    flex: 1,
-    alignItems: "center",
-},
+        flex: 1,
+        alignItems: "center",
+    },
 
-headerUnderline: {
-    width: "50%",   
-    height: 1.5,
-    backgroundColor: "#499F44",
-    borderRadius: 1,
-    marginTop: 4,
-},
-modalTitleWrap: {
-    alignItems: "center",
-    marginBottom: 12, 
-},
+    headerUnderline: {
+        width: "50%",
+        height: 1.5,
+        backgroundColor: "#499F44",
+        borderRadius: 1,
+        marginTop: 4,
+    },
+    modalTitleWrap: {
+        alignItems: "center",
+        marginBottom: 12,
+    },
 
-modalTitle: {
-    fontWeight: "700",
-    fontSize: 18,
-    textAlign: "center",
-    marginBottom: 2, 
-    lineHeight: 22,    
-},
+    modalTitle: {
+        fontWeight: "700",
+        fontSize: 18,
+        textAlign: "center",
+        marginBottom: 2,
+        lineHeight: 22,
+    },
 
-modalTitleUnderline: {
-    width: 300,
-    height: 1.5,
-    backgroundColor: "#499F44",
-    borderRadius: 2,
-    marginTop: 2,    
-},
+    modalTitleUnderline: {
+        width: 300,
+        height: 1.5,
+        backgroundColor: "#499F44",
+        borderRadius: 2,
+        marginTop: 2,
+    },
 
-    });
+});
