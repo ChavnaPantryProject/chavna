@@ -1,4 +1,4 @@
-import React, { Dispatch, SetStateAction, useState} from "react";
+import React, { Dispatch, SetStateAction, useCallback, useState} from "react";
 import {
   Modal,
   View,
@@ -68,7 +68,7 @@ const PopupMenu: React.FC<PopupMenuProps> = ({
     setState(newState);
   }
 
-  useFocusEffect(() => {
+  useFocusEffect(useCallback(() => {
     const template = getSelectedTemplate();
     if (template != null) {
       const newState = {...state};
@@ -79,7 +79,7 @@ const PopupMenu: React.FC<PopupMenuProps> = ({
 
       setState(newState);
     }
-  });
+  },[]));
 
   const saveScanKey = async () => {
     const jwt = await retrieveValue('jwt');
