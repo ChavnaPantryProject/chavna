@@ -8,7 +8,7 @@ import {
     Pressable
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Stack, router, useFocusEffect } from "expo-router";
+import { Stack, router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
 import { API_URL, retrieveValue, Response } from "./util";
@@ -97,6 +97,7 @@ function filterTemplates(filter: string, templates: Template[]): Template[] {
 }
 
 export default function main() {
+    const { category } = useLocalSearchParams<{category: string}>();
     const [templates, setTemplates] = useState<Template[]>([]);
     const [filteredTemplates, setFilteredTemplates] = useState<Template[]>([]);
     const [filter, setFilter] = useState<string>("");
@@ -119,7 +120,8 @@ export default function main() {
 
     useEffect(() => {
         (async () => {
-            setTemplates(await getTemplates())
+            const templates = await getTemplates();
+            setTemplates(templates.filter(template => (category === undefined || template.category === category)));
         })();
     }, []);
 
@@ -180,7 +182,15 @@ export default function main() {
                         styles.saveButton,
                         (pressed) && { opacity: 0.85 },
                     ]}
-                    onPress={() => router.push('/addTemplate')}
+                    onPress={() => {
+                        if (category === undefined )
+                            router.push('/addTemplate')
+                        else
+                            router.push({
+                                pathname: '/addTemplate',
+                                params: { categoryHint: category }
+                            })
+                    }}
                     // disabled={loading}
                 >
                     <View style={styles.saveContent}>
