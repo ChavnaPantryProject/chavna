@@ -51,6 +51,7 @@ type FoodItem = {
     id: string;
     name: string;
     qty: number;
+    qty_unit: string;
     expDate: string;
 };
 
@@ -66,7 +67,6 @@ export default function ModalFoodCategory({
     // States for sorting direction arrow
     //            ALL ARROWS WITH TRUE ARE THE DEFAULT, TRUE POINTS ARROW DOWN, FALSE POINTS ARROW UP
     const [nameArrow, setNameArrow] = useState<boolean>(true);
-    const [qtyArrow, setQtyArrow] = useState<boolean>(true);
     const [expDateArrow, setExpDateArrow] = useState<boolean>(true);
 
     //color scheme for active an dnon active filters
@@ -88,7 +88,6 @@ export default function ModalFoodCategory({
     //function to reset all arrrows to defualt
     function resetAllArrows() {
         setNameArrow(true);
-        setQtyArrow(true);
         setExpDateArrow(true);
     }
 
@@ -143,6 +142,7 @@ export default function ModalFoodCategory({
                         id: item.id,
                         name: item.name,
                         qty: item.amount,
+                        qty_unit: item.unit,
                         expDate: item.expiration
                             ? new Date(item.expiration)
                                   .toISOString()
@@ -226,19 +226,7 @@ export default function ModalFoodCategory({
             b.name.localeCompare(a.name)
         );
     }
-    //qty ascending
-    function sortAscQty() {
-        resetAllArrows();
-        setActiveFilter("qty");
-        return [...arrOfFood].sort((a, b) => a.qty - b.qty);
-    }
-    //qty descending
-    function sortDescQty() {
-        resetAllArrows();
-        setActiveFilter("qty");
-        setQtyArrow(false); //make arrow point up
-        return [...arrOfFood].sort((a, b) => b.qty - a.qty);
-    }
+
     //exp date ascending
     function sortAscExpDate() {
         resetAllArrows();
@@ -363,45 +351,10 @@ export default function ModalFoodCategory({
                                 </Pressable>
                             </View>
 
-                            {/* Qty */}
-                            <View
-                                style={[
-                                    style.specificFilterColumn,
-                                    { flex: 0.9 },
-                                ]}
-                            >
-                                <Text style={style.filterText}>Qty</Text>
-
-                                <Pressable
-                                    onPress={() =>
-                                        setDisplayArr(
-                                            qtyArrow
-                                                ? sortDescQty()
-                                                : sortAscQty()
-                                        )
-                                    }
-                                >
-                                    <Entypo
-                                        name={
-                                            qtyArrow
-                                                ? "triangle-down"
-                                                : "triangle-up"
-                                        }
-                                        size={15}
-                                        color={
-                                            activeFilter == "qty"
-                                                ? ACTIVEFILTERCOLOR
-                                                : NONACTIVEFILTERCOLOR
-                                        }
-                                    />
-                                </Pressable>
-                            </View>
-
                             {/* Exp Date – more space */}
                             <View
                                 style={[
                                     style.specificFilterColumn,
-                                    { flex: 1 },
                                 ]}
                             >
                                 <Text style={style.filterText}>
@@ -482,7 +435,8 @@ const style = StyleSheet.create({
         justifyContent: "center",
         alignItems: "center",
         padding: 20,
-        marginTop: 80,
+        paddingTop: "15%",
+         backgroundColor: "rgba(0,0,0,0.2)",
     },
 
     // area that holds the rows & scroll
