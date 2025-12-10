@@ -61,7 +61,7 @@ const PopupMenu: React.FC<PopupMenuProps> = ({
 
   const setPrice = (price: string) => {
     const newState = { ...state };
-    newState.price = price;
+    newState.price = price; 
 
     setState(newState);
   }
