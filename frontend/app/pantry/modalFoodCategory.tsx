@@ -296,7 +296,7 @@ export default function ModalFoodCategory({
             animationType="fade"
             onRequestClose={onClose}
         >
-            <GestureHandlerRootView style={{ flex: 1 }}>
+            {!popupVisible && <GestureHandlerRootView style={{ flex: 1 }}>
                 {/* Outer container for backdrop + sheet */}
                 <View style={style.backdrop}>
                     {/* Backdrop touch area (outside the sheet) */}
@@ -414,7 +414,7 @@ export default function ModalFoodCategory({
                         />
                     </View>
                 </View>
-            </GestureHandlerRootView>
+            </GestureHandlerRootView>}
             <PopupForm
                 visible={popupVisible}
                 onClose={() => {setPopupVisible(false)}}

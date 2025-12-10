@@ -1,4 +1,4 @@
-import React, { Dispatch, SetStateAction} from "react";
+import React, { Dispatch, SetStateAction, useState} from "react";
 import {
   Modal,
   View,
@@ -52,6 +52,8 @@ const PopupMenu: React.FC<PopupMenuProps> = ({
   updateIndex,
   categoryFilter
 }) => {
+  const [hidden, setHidden] = useState(false);
+
   const setQuantity = (quantity: string) => {
     const newState = { ...state };
     newState.quantity = quantity;
@@ -61,7 +63,7 @@ const PopupMenu: React.FC<PopupMenuProps> = ({
 
   const setPrice = (price: string) => {
     const newState = { ...state };
-    newState.price = price; 
+    newState.price = price;
 
     setState(newState);
   }
@@ -73,6 +75,7 @@ const PopupMenu: React.FC<PopupMenuProps> = ({
       newState.displayName = template.name;
       newState.template = template;
       newState.quantity = state.quantity;
+      setHidden(false);
 
       setState(newState);
     }
@@ -143,7 +146,7 @@ const PopupMenu: React.FC<PopupMenuProps> = ({
   }
 
   return (
-    <Modal visible={visible} transparent animationType="fade">
+    <Modal visible={visible && !hidden} transparent animationType="fade">
       <View style={styles.overlay}>
         <View style={styles.container}>
           <Text style={styles.title}>Add Item</Text>
@@ -152,6 +155,7 @@ const PopupMenu: React.FC<PopupMenuProps> = ({
           <Pressable
             style={styles.itemPicker}
             onPress={() => {
+              setHidden(true);
               if (categoryFilter === undefined)
                 router.push('/select-template');
               else
