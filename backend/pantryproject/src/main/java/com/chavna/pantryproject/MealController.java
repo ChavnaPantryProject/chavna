@@ -660,7 +660,7 @@ public class MealController {
                 """, FOOD_ITEMS_TABLE));
 
                 deleteStatement.executeUpdate();
-                
+
                 con.commit();
             } catch (SQLException ex) {
                 con.rollback();
@@ -673,6 +673,6 @@ public class MealController {
         .throwIfError()
         .throwResponse();
 
-        return null;
+        return Response.Success("Inventory updated.");
     }
 }
