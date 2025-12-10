@@ -82,7 +82,6 @@ export default function AuthScreen() {
             return !!(loginEmail.trim() && isLoginEmailValid && loginPw.trim());
         }
         return !!(
-            signupName.trim() &&
             signupEmail.trim() && isSignupEmailValid &&
             signupPw.trim() &&
             signupPw2.trim() &&
