@@ -82,7 +82,7 @@ async function checkLogin(): Promise<boolean> {
 
 export default function Splash() {
     const [login, setLogin] = useState<boolean | null>(null);
-    NavigationBar.setVisibilityAsync("hidden");
+    NavigationBar.setVisibilityAsync("hidden"); 
 
     useEffect(() => {
         (async () => {
