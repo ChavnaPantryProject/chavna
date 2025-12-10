@@ -19,7 +19,11 @@ Description
 - 
 
 ### Backend
-- 
+- Spring Boot: A java framework that we used to create a REST api that recieves api calls and makes the appropriate queries to our database.
+- Neon: A serverless postgres platform that we use to host our database.
+- AWS Elastic Beanstalk: AWS service for hosting automatically scaling servers.
+- AWS SES: AWS service for sending emails.
+- AWS Textract: A machine learning OCR service used to extract text from images. We use this for scanning receipts.
 
 ---
 ## CHAVNA Creators
@@ -27,8 +31,8 @@ Description
 - 
 ### Brandon Huett
 - 
-### Brian Amsler
-- 
+### Brian Amsler - Lead Developer / Backend Engineer
+Brian has extensive experience with various different programming languages and frameworks. Brian's main role was to design and implement the backend, including the database and REST API. He also helped by assisting in integrating the frontend with the backend.
 ### Daniella Vargas
 - 
 ### Thanh Nguyen
