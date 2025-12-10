@@ -315,19 +315,6 @@ export default function AuthScreen() {
                             </>
                         ) : (
                             <>
-                                {/* Name (signup) */}
-                                <Text style={styles.label}>Name</Text>
-                                <TextInput
-                                    value={signupName}
-                                    onChangeText={setSignupName}
-                                    placeholder="Your full name"
-                                    style={[styles.input, inputBorder('name')]}
-                                    onFocus={() => setFocusedField('name')}
-                                    onBlur={() => setFocusedField(null)}
-                                    autoCapitalize="words"
-                                    placeholderTextColor="#BDBDBD"
-                                    editable={!loading}
-                                />
 
                                 {/* Email (signup) */}
                                 <Text style={styles.label}>Email Address</Text>
