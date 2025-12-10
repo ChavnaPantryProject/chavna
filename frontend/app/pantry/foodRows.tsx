@@ -1,18 +1,21 @@
 // pantry/foodRows.tsx
-import React from "react";
+import React, { useRef } from "react";
 import {
     View,
     Text,
     StyleSheet,
     ActivityIndicator,
-    Pressable,
+    Alert,
 } from "react-native";
-import Swipeable from "react-native-gesture-handler/ReanimatedSwipeable";
+import Swipeable, {
+    SwipeableMethods,
+} from "react-native-gesture-handler/ReanimatedSwipeable";
 
 type FoodItem = {
     id: string;
     name: string;
     qty: number;
+    qty_unit: string;
     expDate: string;
 };
 
@@ -20,6 +23,78 @@ type Props = {
     loading: boolean;
     displayArr: FoodItem[];
     onDelete: (id: string) => void;
+};
+
+type FoodRowItemProps = {
+    foodItem: FoodItem;
+    onDelete: (id: string) => void;
+};
+
+const FoodRowItem = ({ foodItem, onDelete }: FoodRowItemProps) => {
+    //console.log(foodItem)
+    const swipeableRef = useRef<SwipeableMethods | null>(null);
+
+    return (
+        <Swipeable
+            ref={swipeableRef}
+            overshootRight={false}
+            renderRightActions={() => (
+                <View style={styles.rightAction} />
+            )}
+            onSwipeableOpen={() => {
+                Alert.alert(
+                    "Delete item",
+                    `Delete "${foodItem.name}" from this category?`,
+                    [
+                        {
+                            text: "Cancel",
+                            style: "cancel",
+                            onPress: () => {
+                                // snap the row back when user cancels
+                                swipeableRef.current?.close();
+                            },
+                        },
+                        {
+                            text: "Delete",
+                            style: "destructive",
+                            onPress: () => {
+                                onDelete(foodItem.id);
+                                // row unmounts after deletion
+                            },
+                        },
+                    ]
+                );
+            }}
+        >
+            <View style={styles.card}>
+                <View style={styles.cardContent}>
+                    {/* Name */}
+                    <Text
+                        style={styles.nameText}
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
+                    >
+                        {foodItem.name}
+                    </Text>
+
+                    {/* Bottom row: qty + exp date */}
+                    <View style={styles.bottomRow}>
+                    
+                        <Text style={styles.qtyText}>
+                            {foodItem.qty}
+                            {foodItem.qty_unit.trim() !== "None" ? ` ${foodItem.qty_unit}` : ""}
+                        </Text>
+
+                        {foodItem.expDate ? (
+                            <Text style={styles.expText}>
+                                Exp: {foodItem.expDate}
+                            </Text>
+                        ) : null}
+                    </View>
+                </View>
+            </View>
+        </Swipeable>
+    );
 };
 
 const FoodRows = ({ loading, displayArr, onDelete }: Props) => {
@@ -42,56 +117,11 @@ const FoodRows = ({ loading, displayArr, onDelete }: Props) => {
     return (
         <View style={styles.listContainer}>
             {displayArr.map((foodItem) => (
-                <Swipeable
+                <FoodRowItem
                     key={foodItem.id}
-                    renderRightActions={() => (
-                        <View style={styles.rightAction}>
-                            <Pressable
-                                style={styles.deleteBtn}
-                                onPress={() => onDelete(foodItem.id)}
-                            >
-                                <Text style={styles.deleteText}>Delete</Text>
-                            </Pressable>
-                        </View>
-                    )}
-                >
-                    <View style={styles.entryOfFood}>
-                        {/* Name – left aligned, most space */}
-                        <Text
-                            style={[
-                                styles.baseText,
-                                styles.nameText,
-                                styles.flexName,
-                            ]}
-                            numberOfLines={1}
-                            ellipsizeMode="tail"
-                        >
-                            {foodItem.name}
-                        </Text>
-
-                        {/* Qty – centered */}
-                        <Text
-                            style={[
-                                styles.baseText,
-                                styles.qtyText,
-                                styles.flexQty,
-                            ]}
-                        >
-                            {foodItem.qty}
-                        </Text>
-
-                        {/* Exp Date – right aligned, more room & inset a bit */}
-                        <Text
-                            style={[
-                                styles.baseText,
-                                styles.dateText,
-                                styles.flexDate,
-                            ]}
-                        >
-                            {foodItem.expDate}
-                        </Text>
-                    </View>
-                </Swipeable>
+                    foodItem={foodItem}
+                    onDelete={onDelete}
+                />
             ))}
         </View>
     );
@@ -116,64 +146,57 @@ const styles = StyleSheet.create({
         color: "gray",
     },
 
-    baseText: {
-        fontSize: 17,
+    card: {
+        width: "100%",
+        borderWidth: 2,
+        borderColor: "rgba(73,159,68,1)",
+        borderRadius: 15,
+        backgroundColor: "#f6f4eaff", // color of the card
+        marginBottom: 12,
+        padding: 12,
+    },
+
+    cardContent: {
+        width: "100%",
     },
 
     nameText: {
-        textAlign: "left",
-        paddingLeft: 8,
+        fontSize: 18,
+        fontWeight: "700",
+        color: "#000",
+        marginBottom: 6,
     },
 
-    qtyText: {
-        textAlign: "center",
-    },
-
-    dateText: {
-        textAlign: "right",
-        paddingRight: 4, // small inset so it doesn’t touch the border
-    },
-
-    // Name gets the most space
-    flexName: {
-        flex: 1.7,
-    },
-
-    // Qty is smaller in the middle
-    flexQty: {
-        flex: 0.9,
-    },
-
-    // Exp date gets more space than before so it fits nicely
-    flexDate: {
-        flex: 1.6,
-    },
-
-    entryOfFood: {
-        width: "96%",                     // slight inset from the green border
-        alignSelf: "center",
-        borderWidth: 2,
-        borderColor: "rgba(73,159,68,1)",
-        borderRadius: 5,
-        backgroundColor: "white",
-        marginTop: 5,
-        paddingVertical: 6,
-        paddingHorizontal: 6,
+    bottomRow: {
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "center",
+        marginTop: 4,
     },
 
+    qtyText: {
+        fontSize: 14,
+        color: "#333",
+    },
+
+    expText: {
+        fontSize: 14,
+        color: "#333",
+        textAlign: "right",
+    },
+
+    // updated to act like the swipe background (no button press, just visual area)
     rightAction: {
+        flex: 1,
         justifyContent: "center",
-        alignItems: "center",
-        marginTop: 5,
-        marginLeft: 8,
-        backgroundColor: "#DC2626",
-        borderRadius: 5,
-        paddingHorizontal: 16,
+        alignItems: "flex-end",
+        marginBottom: 12,
+        borderTopRightRadius: 15,
+        borderBottomRightRadius: 15,
+        paddingRight: 16,
     },
 
+    // kept from original file (no longer used, but left to avoid unnecessary changes)
     deleteBtn: {
         paddingVertical: 8,
         paddingHorizontal: 4,
