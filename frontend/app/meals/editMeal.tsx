@@ -226,8 +226,6 @@ export default function NewMeal() {
             ingredients: ingredients,
         };
 
-        console.log(requestBody);
-
         const response = await fetch(`${API_URL}/create-meal`, {
             method: "POST",
             headers: {
@@ -255,7 +253,39 @@ export default function NewMeal() {
     };
 
     const updateMeal = async (ingredients: Ingredient[]) => {
+        const token = await retrieveValue("jwt");
 
+        const requestBody = {
+            mealId: mealId,
+            meal: {
+                name: mealName,
+                ingredients: ingredients
+            }
+        };
+
+        const response = await fetch(`${API_URL}/update-meal`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify(requestBody),
+        });
+
+        type UpdateMealResponse = {
+            ingredientsAdded: number
+        }
+
+        const body: Response<UpdateMealResponse> = await response.json();
+
+        if (!response.ok || body.success !== "success") {
+            throw new Error(JSON.stringify(body));
+        }
+
+        if (body.payload?.ingredientsAdded! < ingredients.length)
+            throw "Not all ingredients added."
+
+        navigation.goBack();
     };
 
     const saveMeal = async () => {

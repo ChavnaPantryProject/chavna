@@ -550,11 +550,13 @@ public class MealController {
         Database.openConnection((Connection con) -> {
             // Fetch necessary templates
             PreparedStatement templateStatement = con.prepareStatement(String.format("""
-                SELECT template_id, %1$s.amount FROM %1$s
+                SELECT template_id, %1$s.amount, %3$s.name FROM %1$s
                 INNER JOIN %2$s
                 ON meal_id = %2$s.id
-                WHERE meal_id = ? AND owner = ?;
-            """, MEAL_INGREDIENTS_TABLE, MEALS_TABLE));
+                INNER JOIN %3$s
+                ON %1$s.template_id = %3$s.id
+                WHERE meal_id = ? AND %2$s.owner = ?;
+            """, MEAL_INGREDIENTS_TABLE, MEALS_TABLE, FOOD_ITEM_TEMPLATES_TABLE));
 
             templateStatement.setObject(1, requestBody.mealId);
             templateStatement.setObject(2, familyOwner);
@@ -565,20 +567,25 @@ public class MealController {
             class MealTemplate {
                 UUID templateId;
                 double amount;
+                String name;
             }
 
             List<MealTemplate> templates = new ArrayList<>();
             while (templateResult.next())
-                templates.add(new MealTemplate((UUID) templateResult.getObject(1), templateResult.getDouble(2)));
+                templates.add(new MealTemplate(
+                    (UUID) templateResult.getObject(1),
+                    templateResult.getDouble(2),
+                    templateResult.getString(3)
+                ));
 
             if (templates.size() == 0)
                 return Response.Fail("No ingredients found.");
 
             // Get ingredients in meal
             PreparedStatement ingredientStatement = con.prepareStatement(String.format("""
-                SELECT %1$s.id, %1$s.template_id %1$s.amount FROM %1$s
+                SELECT %1$s.id, %1$s.template_id, %1$s.amount FROM %1$s
                 INNER JOIN %2$s
-                ON %1$s.template_id = %1$s.id
+                ON %1$s.template_id = %2$s.id
                 INNER JOIN %3$s
                 ON %3$s.template_id = %1$s.template_id
                 WHERE %3$s.meal_id = ?
@@ -604,6 +611,7 @@ public class MealController {
             while (ingredientResult.next()) {
                 UUID templateId = (UUID) ingredientResult.getObject(2);
                 FoodItem foodItem = new FoodItem((UUID) ingredientResult.getObject(1), ingredientResult.getDouble(3));
+                System.err.println(templateId.toString());
 
                 if (!foodItems.containsKey(templateId))
                     foodItems.put(templateId, new ArrayList<>());
@@ -612,12 +620,16 @@ public class MealController {
                 likeFoodItems.add(foodItem);
             }
 
+            List<String> insufficient = new ArrayList<>();
+
             // Attempt to cook the meal
             for (MealTemplate template : templates) {
                 List<FoodItem> likeFoodItems = foodItems.get(template.templateId);
 
-                if (likeFoodItems == null)
-                    return Response.Fail("Insufficient ingredients.");
+                if (likeFoodItems == null) {
+                    insufficient.add(template.name);
+                    continue;
+                }
 
                 double amountLeft = template.amount;
                 for (FoodItem foodItem : likeFoodItems) {
@@ -631,7 +643,19 @@ public class MealController {
                 }
 
                 if (amountLeft > 0.001)
-                    return Response.Fail("Insufficient ingredients.");
+                    insufficient.add(template.name);
+            }
+
+            if (insufficient.size() > 0) {
+                StringBuilder message = new StringBuilder("Insufficent ingredients: ");
+
+                for (String ingredient : insufficient)
+                    message.append(ingredient + ", ");
+
+                message.delete(message.length() - 2, message.length());
+                message.append(".");
+
+                return Response.Fail(message.toString());
             }
 
             try {
