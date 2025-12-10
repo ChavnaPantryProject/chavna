@@ -18,17 +18,16 @@ import { useRouter } from "expo-router";
 import { useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { API_URL, Response, retrieveValue } from "../util";
+import { cookMeal } from "../(tabs)/meal";
 
 export default function MealIngredientScreen() {
     const router = useRouter();
-    const { id } = useLocalSearchParams();
+    const { id } = useLocalSearchParams<{id: string}>();
     const [menuVisible, setMenuVisible] = useState(false);
     const [ingredients, setIngredients] = useState<{name: string, amount: string}[]>([])
     const [imageURL, setImageURL] = useState<string | null>(null);
     const [mealName, setMealName] = useState<string>("");
     const [loading, setLoading] = useState(true);
-
-    console.log("Meal ID:", id);
 
     useEffect(() => {
         fetchMealData();
@@ -187,8 +186,8 @@ export default function MealIngredientScreen() {
                             onPress={() => {
                                 setMenuVisible(false);
                                 router.push({
-                                    pathname: "/meals/editmeal",
-                                    params: { id }  // Pass the meal ID
+                                    pathname: "/meals/editMeal",
+                                    params: { mealId: id }  // Pass the meal ID
                                 });
                             }}
                         >
@@ -249,6 +248,10 @@ export default function MealIngredientScreen() {
                         {index < ingredients.length - 1 && <View style={styles.divider} />}
                     </View>
                 ))}
+
+                <TouchableOpacity style={styles.cookButton} onPress={() => cookMeal(id)}>
+                    <Text style={styles.cookButtonText}>Cook Meal</Text>
+                </TouchableOpacity>
             </ScrollView>
         </SafeAreaView>
     );
@@ -403,5 +406,23 @@ const styles = StyleSheet.create({
         height: 1,
         backgroundColor: "#E8E8E8",
         marginHorizontal: 10,
+    },
+
+    cookButton: {
+        alignSelf: "center",
+        backgroundColor: "#F3A261",
+        borderRadius: 10,
+        paddingVertical: 12,
+        paddingHorizontal: 60,
+        marginTop: 20,
+        marginBottom: 30,
+        borderWidth: 2,
+        borderColor: "#d9893c",
+    },
+
+    cookButtonText: {
+        color: "#fff",
+        fontWeight: "700",
+        fontSize: 16,
     },
 });
