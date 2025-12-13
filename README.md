@@ -16,7 +16,17 @@ Description
 Description
 
 ### Frontend
-- 
+-  Pantry
+    -- search for all food regardless of category
+    -- option to delete category
+    -- add food category
+    -- able to swipe through all categories if needed
+    -- open specific food category
+    -- filter through food in category
+        -- desc/asc alphabetically
+        -- desc/asc expiration date
+    -- add food to category
+    -- delete food
 
 ### Backend
 - 
@@ -34,7 +44,8 @@ Description
 ### Thanh Nguyen
 - 
 ### Reza Amraei
-- 
+- Wrote most of the inventory section, created the UI for pantry screen, modal for create category, modal for opening food category, 
+  filtering within food category, swiping food entry left to delete, connecting template for frontend to add food to the database.
 
 ---
 ## Notes
