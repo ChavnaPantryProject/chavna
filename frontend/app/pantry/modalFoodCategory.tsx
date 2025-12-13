@@ -24,6 +24,8 @@ import {
     getSelectedTemplate,
     Template,
 } from "../select-template";
+import PopupForm, { PopupState } from "../PopupForm";
+import { ConfirmationItem } from "../scannerConfirmation";
 
 type Props = {
     visible: boolean;
@@ -73,6 +75,15 @@ export default function ModalFoodCategory({
 
     //state for the active filter
     const [activeFilter, setActiveFilter] = useState<string>("");
+
+    const [popupState, setPopupState] = useState<PopupState>({
+        quantity: "",
+        price: "",
+        displayName: null,
+        scanName: "New Item",
+        template: null
+    });
+    const [popupVisible, setPopupVisible] = useState(false);
 
     //function to reset all arrrows to defualt
     function resetAllArrows() {
@@ -239,69 +250,44 @@ export default function ModalFoodCategory({
     }
     // --------------------------End of sorting functions ----------------------------------------
 
-    // add new food item to pantry using template
-    const addFoodItemToPantry = useCallback(
-        async (template: Template) => {
-            try {
-                const token = await retrieveValue("jwt");
-                if (!token) {
-                    console.error("No authentication token found");
-                    return;
-                }
+    const addItem = async (data: ConfirmationItem) => {
+        const token = await retrieveValue("jwt")
+        if (!token) {
+            console.error("No authentication token found")
+            return
+        }
 
-                const response = await fetch(`${API_URL}/add-food-items`, {
-                    method: "POST",
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({
-                        items: [
-                            {
-                                templateId: template.id,
-                                amount: template.amount ?? 1,
-                                unitPrice: 0,
-                            },
-                        ],
-                    }),
-                });
+        type Item = {
+            templateId: string,
+            amount: number,
+            unitPrice: number
+        }
 
-                const data = await response.json();
+        const actualAmount = data.qty! * data.template?.amount!;
+        let addItems: Item[] = [{
+            templateId: data.template?.id!,
+            amount: actualAmount,
+            unitPrice: data.price! / actualAmount
+        }]
 
-                if (response.ok && data.success === "success") {
-                    console.log("Food item added from template:", template);
-                    // refresh the list so the new item appears
-                    fetchFoodItems();
-                } else {
-                    console.error(
-                        "Failed to add food items:",
-                        data.message || data
-                    );
-                }
-            } catch (error) {
-                console.error("Error adding food items:", error);
-            }
-        },
-        [title]
-    );
+        const response = await fetch(`${API_URL}/add-food-items`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                items: addItems
+            })
+        });
 
-    // use focus effect
-    useFocusEffect(
-        useCallback(() => {
-            const template = getSelectedTemplate();
+        const body = await response.json();
 
-            if (!template) {
-                return;
-            }
+        if (!response.ok || body.success === "fail")
+            throw body;
 
-            console.log(
-                "Template received from select-template:",
-                template
-            );
-
-            addFoodItemToPantry(template);
-        }, [addFoodItemToPantry])
-    );
+        fetchFoodItems();
+    };
 
     return (
         <Modal
@@ -310,7 +296,7 @@ export default function ModalFoodCategory({
             animationType="fade"
             onRequestClose={onClose}
         >
-            <GestureHandlerRootView style={{ flex: 1 }}>
+            {!popupVisible && <GestureHandlerRootView style={{ flex: 1 }}>
                 {/* Outer container for backdrop + sheet */}
                 <View style={style.backdrop}>
                     {/* Backdrop touch area (outside the sheet) */}
@@ -421,13 +407,24 @@ export default function ModalFoodCategory({
                         {/* plus icon to add another category (hook up later) */}
                         <AddFoodButton
                             onPress={() => {
-                                onClose();
-                                router.push("/select-template");
+                                // onClose();
+                                // router.push("/select-template");
+                                setPopupVisible(true);
                             }}
                         />
                     </View>
                 </View>
-            </GestureHandlerRootView>
+            </GestureHandlerRootView>}
+            <PopupForm
+                visible={popupVisible}
+                onClose={() => {setPopupVisible(false)}}
+                onSave={(data) => {addItem(data)}}
+                onDelete={() => {}}
+                state={popupState}
+                setState={setPopupState}
+                updateIndex={-1}
+                categoryFilter={title}
+            ></PopupForm>
         </Modal>
     );
 }

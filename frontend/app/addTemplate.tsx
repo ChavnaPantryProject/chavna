@@ -11,7 +11,7 @@ import {
     Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Stack, router } from "expo-router";
+import { Stack, router, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
 import { API_URL, retrieveValue, Response } from "./util";
@@ -19,6 +19,8 @@ import { Picker } from "@react-native-picker/picker";
 import { setSelectedTemplate, Template } from "./select-template";
 
 export default function AddTemplateScreen() {
+    const { categoryHint } = useLocalSearchParams<{categoryHint: string}>();
+
     // Template fields
     const [name, setName] = useState("");
     const [amount, setAmount] = useState("");
@@ -28,6 +30,11 @@ export default function AddTemplateScreen() {
     const [loading, setLoading] = useState(false);
 
     const [categories, setCategories] = useState<string[]>([]);
+
+    useEffect(() => {
+        if (categoryHint !== undefined)
+            setCategory(categoryHint);
+    }, [categoryHint])
 
     // Load categories + templates once
     useEffect(() => {
@@ -303,17 +310,21 @@ export default function AddTemplateScreen() {
                     placeholder="12"
                 />
 
-                <Text style={styles.label}>Category</Text>
-                <View style={styles.picker}>
-                    <Picker<string>
-                        selectedValue={categories[0]}
-                        onValueChange={(value) => setCategory(value)}
-                    >
-                        {categories.map(category => (
-                            <Picker.Item label={category} value={category}/>
-                        ))}
-                    </Picker>
-                </View>
+                { categoryHint === undefined &&
+                    <View>
+                        <Text style={styles.label}>Category</Text>
+                        <View style={styles.picker}>
+                            <Picker<string>
+                                selectedValue={categories[0]}
+                                onValueChange={(value) => setCategory(value)}
+                            >
+                                {categories.map(category => (
+                                    <Picker.Item label={category} value={category}/>
+                                ))}
+                            </Picker>
+                        </View>
+                    </View>
+                }
 
                 <View style={styles.divider} />
                 <Pressable

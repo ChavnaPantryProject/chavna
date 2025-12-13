@@ -4,6 +4,7 @@ import { View, StyleSheet, Image } from 'react-native';
 import { router, type Href } from 'expo-router';
 import { retrieveValue, storeValue, API_URL, Response } from './util';
 import { jwtDecode } from 'jwt-decode';
+import * as NavigationBar from 'expo-navigation-bar';
 
 const TIMEOUT_DURATION = 10000;
 
@@ -81,6 +82,7 @@ async function checkLogin(): Promise<boolean> {
 
 export default function Splash() {
     const [login, setLogin] = useState<boolean | null>(null);
+    NavigationBar.setVisibilityAsync("hidden"); 
 
     useEffect(() => {
         (async () => {

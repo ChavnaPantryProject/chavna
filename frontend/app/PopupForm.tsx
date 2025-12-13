@@ -1,4 +1,4 @@
-import React, { Dispatch, SetStateAction} from "react";
+import React, { Dispatch, SetStateAction, useState} from "react";
 import {
   Modal,
   View,
@@ -27,6 +27,7 @@ interface PopupMenuProps {
   state: PopupState;
   setState: Dispatch<SetStateAction<PopupState>>;
   updateIndex: number;
+  categoryFilter?: string
 }
 
 export type PopupState = {
@@ -48,8 +49,11 @@ const PopupMenu: React.FC<PopupMenuProps> = ({
   onDelete,
   state,
   setState,
-  updateIndex
+  updateIndex,
+  categoryFilter
 }) => {
+  const [hidden, setHidden] = useState(false);
+
   const setQuantity = (quantity: string) => {
     const newState = { ...state };
     newState.quantity = quantity;
@@ -71,6 +75,7 @@ const PopupMenu: React.FC<PopupMenuProps> = ({
       newState.displayName = template.name;
       newState.template = template;
       newState.quantity = state.quantity;
+      setHidden(false);
 
       setState(newState);
     }
@@ -117,10 +122,12 @@ const PopupMenu: React.FC<PopupMenuProps> = ({
       template: state.template
     };
 
-    Alert.alert("Confirmation", "Would you like to remember this scan?", [
-      { text: "No" },
-      { text: "Yes", onPress: saveScanKey }
-    ])
+    if (updateIndex >= 0) {
+      Alert.alert("Confirmation", "Would you like to remember this scan?", [
+        { text: "No" },
+        { text: "Yes", onPress: saveScanKey }
+      ])
+    }
 
     onSave(data);
     close();
@@ -139,7 +146,7 @@ const PopupMenu: React.FC<PopupMenuProps> = ({
   }
 
   return (
-    <Modal visible={visible} transparent animationType="fade">
+    <Modal visible={visible && !hidden} transparent animationType="fade">
       <View style={styles.overlay}>
         <View style={styles.container}>
           <Text style={styles.title}>Add Item</Text>
@@ -147,7 +154,16 @@ const PopupMenu: React.FC<PopupMenuProps> = ({
           {/* Item Selection */}
           <Pressable
             style={styles.itemPicker}
-            onPress={() => router.push('/select-template')}
+            onPress={() => {
+              setHidden(true);
+              if (categoryFilter === undefined)
+                router.push('/select-template');
+              else
+                router.push({
+                  pathname: '/select-template',
+                  params: { category: categoryFilter }
+                })
+            }}
           >
             <Text style={state.template == null && {color: "#AAAAAA"}}>{state.displayName? state.displayName : state.scanName}</Text>
           </Pressable>

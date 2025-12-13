@@ -3,6 +3,7 @@ package com.chavna.pantryproject;
 import static com.chavna.pantryproject.Database.FOOD_ITEMS_TABLE;
 import static com.chavna.pantryproject.Database.FOOD_ITEM_TEMPLATES_TABLE;
 import static com.chavna.pantryproject.Database.MEALS_TABLE;
+import static com.chavna.pantryproject.Database.MEAL_INGREDIENTS_TABLE;
 
 import java.awt.image.BufferedImage;
 import java.io.IOException;
@@ -11,7 +12,9 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
@@ -532,5 +535,168 @@ public class MealController {
         Upload upload = UploadController.uploader.initializeUpload(UploadController.UPLOAD_CHUNK_SIZE, requestBody.fileSize, s3Upload);
 
         return Response.Success(new InitializeMealPictureUploadResponse(upload.getUploadId(), upload.getChunkCount(), upload.getChunkSize()));
+    }
+
+    public static class CookMealRequest {
+        @NotNull
+        public UUID mealId;
+    }
+
+    @PostMapping("/cook-meal")
+    public Response cookMeal(@RequestHeader("Authorization") String authorizationHeader, @Valid @RequestBody CookMealRequest requestBody) {
+        Login login = Authorization.authorize(authorizationHeader);
+        UUID familyOwner = Authorization.getFamilyOwnerId(login);
+
+        Database.openConnection((Connection con) -> {
+            // Fetch necessary templates
+            PreparedStatement templateStatement = con.prepareStatement(String.format("""
+                SELECT template_id, %1$s.amount, %3$s.name FROM %1$s
+                INNER JOIN %2$s
+                ON meal_id = %2$s.id
+                INNER JOIN %3$s
+                ON %1$s.template_id = %3$s.id
+                WHERE meal_id = ? AND %2$s.owner = ?;
+            """, MEAL_INGREDIENTS_TABLE, MEALS_TABLE, FOOD_ITEM_TEMPLATES_TABLE));
+
+            templateStatement.setObject(1, requestBody.mealId);
+            templateStatement.setObject(2, familyOwner);
+
+            ResultSet templateResult = templateStatement.executeQuery();
+
+            @AllArgsConstructor
+            class MealTemplate {
+                UUID templateId;
+                double amount;
+                String name;
+            }
+
+            List<MealTemplate> templates = new ArrayList<>();
+            while (templateResult.next())
+                templates.add(new MealTemplate(
+                    (UUID) templateResult.getObject(1),
+                    templateResult.getDouble(2),
+                    templateResult.getString(3)
+                ));
+
+            if (templates.size() == 0)
+                return Response.Fail("No ingredients found.");
+
+            // Get ingredients in meal
+            PreparedStatement ingredientStatement = con.prepareStatement(String.format("""
+                SELECT %1$s.id, %1$s.template_id, %1$s.amount FROM %1$s
+                INNER JOIN %2$s
+                ON %1$s.template_id = %2$s.id
+                INNER JOIN %3$s
+                ON %3$s.template_id = %1$s.template_id
+                WHERE %3$s.meal_id = ?
+                ORDER BY %1$s.add_date
+            """, FOOD_ITEMS_TABLE, FOOD_ITEM_TEMPLATES_TABLE, MEAL_INGREDIENTS_TABLE));
+
+            ingredientStatement.setObject(1, requestBody.mealId);
+
+            ResultSet ingredientResult = ingredientStatement.executeQuery();
+
+            class FoodItem {
+                UUID id;
+                double amount;
+                Double newAmount = null;
+
+                public FoodItem(UUID id, double amount) {
+                    this.id = id;
+                    this.amount = amount;
+                }
+            }
+
+            Map<UUID, List<FoodItem>> foodItems = new HashMap<>();
+            while (ingredientResult.next()) {
+                UUID templateId = (UUID) ingredientResult.getObject(2);
+                FoodItem foodItem = new FoodItem((UUID) ingredientResult.getObject(1), ingredientResult.getDouble(3));
+                System.err.println(templateId.toString());
+
+                if (!foodItems.containsKey(templateId))
+                    foodItems.put(templateId, new ArrayList<>());
+
+                List<FoodItem> likeFoodItems = foodItems.get(templateId);
+                likeFoodItems.add(foodItem);
+            }
+
+            List<String> insufficient = new ArrayList<>();
+
+            // Attempt to cook the meal
+            for (MealTemplate template : templates) {
+                List<FoodItem> likeFoodItems = foodItems.get(template.templateId);
+
+                if (likeFoodItems == null) {
+                    insufficient.add(template.name);
+                    continue;
+                }
+
+                double amountLeft = template.amount;
+                for (FoodItem foodItem : likeFoodItems) {
+                    double used = Math.min(amountLeft, foodItem.amount);
+
+                    foodItem.newAmount = foodItem.amount - used;
+                    amountLeft -= used;
+
+                    if (amountLeft == 0)
+                        break;
+                }
+
+                if (amountLeft > 0.001)
+                    insufficient.add(template.name);
+            }
+
+            if (insufficient.size() > 0) {
+                StringBuilder message = new StringBuilder("Insufficent ingredients: ");
+
+                for (String ingredient : insufficient)
+                    message.append(ingredient + ", ");
+
+                message.delete(message.length() - 2, message.length());
+                message.append(".");
+
+                return Response.Fail(message.toString());
+            }
+
+            try {
+                // Update ingredients
+                con.setAutoCommit(false);
+                for (List<FoodItem> likeFoodItems : foodItems.values()) {
+                    for (FoodItem foodItem : likeFoodItems) {
+                        if (foodItem.newAmount != null) {
+                            PreparedStatement updateStatement = con.prepareStatement(String.format("""
+                                UPDATE %s
+                                SET amount = ?
+                                WHERE id = ?;
+                            """, FOOD_ITEMS_TABLE));
+
+                            updateStatement.setDouble(1, foodItem.newAmount);
+                            updateStatement.setObject(2, foodItem.id);
+
+                            updateStatement.executeUpdate();
+                        }
+                    }
+                }
+
+                PreparedStatement deleteStatement = con.prepareStatement(String.format("""
+                    DELETE FROM %s
+                    WHERE amount <= 0;
+                """, FOOD_ITEMS_TABLE));
+
+                deleteStatement.executeUpdate();
+
+                con.commit();
+            } catch (SQLException ex) {
+                con.rollback();
+
+                throw ex;
+            }
+
+            return null;
+        })
+        .throwIfError()
+        .throwResponse();
+
+        return Response.Success("Inventory updated.");
     }
 }
