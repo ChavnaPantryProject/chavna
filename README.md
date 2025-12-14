@@ -14,7 +14,17 @@ We are a dedicated team of college students who experienced firsthand how diffic
 ## Languages and Technology Used
 
 ### Frontend
-- 
+-  Pantry
+    -- search for all food regardless of category
+    -- option to delete category
+    -- add food category
+    -- able to swipe through all categories if needed
+    -- open specific food category
+    -- filter through food in category
+        -- desc/asc alphabetically
+        -- desc/asc expiration date
+    -- add food to category
+    -- delete food
 
 ### Backend
 - **Spring Boot**: A java framework that we used to create a REST api that recieves api calls and makes the appropriate queries to our database.
@@ -36,7 +46,8 @@ Daniella Vargas has experience with various programming languages and frameworks
 ### Thanh Nguyen
 - 
 ### Reza Amraei
-- 
+- Wrote most of the inventory section, created the UI for pantry screen, modal for create category, modal for opening food category, 
+  filtering within food category, swiping food entry left to delete, connecting template for frontend to add food to the database.
 
 ---
 ## Disclaimer
