@@ -44,7 +44,7 @@ Brian Amsler has extensive experience with various different programming languag
 ### Daniella Vargas
 Daniella Vargas has experience with various programming languages and frameworks. Daniella's main role was in the frontend and creating the meal page design. She has helped with the integration of the frontend with the backend for the meal and home screens.
 ### Thanh Nguyen
-- 
+- Thanh Nguyen has experience with various programming languages and frameworks. Thanh's main role was in the frontend and creating the setting and inventory design. He has helped with the integration of the frontend with the backend for the settings and pantry screens.
 ### Reza Amraei
 - Wrote most of the inventory section, created the UI for pantry screen, modal for create category, modal for opening food category, 
   filtering within food category, swiping food entry left to delete, connecting template for frontend to add food to the database.
