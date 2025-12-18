@@ -38,7 +38,7 @@ We are a dedicated team of college students who experienced firsthand how diffic
 ### Harry Cho
 - 
 ### Brandon Huett
-- 
+Brandon Huett worked primarily on the frontend, where he designed most of the user interface and implemented the majority of the Home Screen. He also integrated the backend with the frontend to ensure data was properly connected and displayed throughout the application.
 ### Brian Amsler - Lead Developer / Backend Engineer
 Brian Amsler has extensive experience with various different programming languages and frameworks. Brian's main role was to design and implement the backend, including the database and REST API. He also helped by assisting in integrating the frontend with the backend.
 ### Daniella Vargas
