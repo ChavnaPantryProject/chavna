@@ -11,20 +11,27 @@ We are a dedicated team of college students who experienced firsthand how diffic
 - **Household Collaboration**: Users join a household to share pantries, along with getting notifications on which items were used or purchased.
 - **Unique and Modern UX/UI**: Engaging user interface design to enhance user experience.
 
-## Languages and Technology Used
+## Technology Used
 
 ### Frontend
--  Pantry
-    -- search for all food regardless of category
-    -- option to delete category
-    -- add food category
-    -- able to swipe through all categories if needed
-    -- open specific food category
-    -- filter through food in category
-        -- desc/asc alphabetically
-        -- desc/asc expiration date
-    -- add food to category
-    -- delete food
+#### Languages
+- **TypeScript**: A statically typed superset of JavaScript that improves code reliability and maintainability. Used to define interfaces and types for API responses, food items, meals, and component props.
+- **JavaScript**: Used to build the application logic and UI behavior.
+
+#### Frameworks & Platforms
+- **React Native**: A cross-platform framework for building native mobile applications using JavaScript/TypeScript and React.
+- **Expo**: A development platform built on top of React Native that simplifies setup and access to native device features.
+
+#### Routing & Navigation
+- **Expo Router**: A file-based routing system for React Native apps. It enables declarative navigation between screens using URL-like paths, simplifying navigation logic.
+
+#### UI Components & Styling
+- **React Native StyleSheet**: A styling system that allows developers to define layout, colors, spacing, and typography in JavaScript while optimizing performance.
+- **React Native Safe Area Context**: Ensures that UI elements render within safe screen boundaries, avoiding notches, status bars, and system UI elements on modern devices.
+- **Expo Vector Icons**: A comprehensive icon library that includes Ionicons, Feather, and MaterialIcons, used throughout the app for visual clarity and interaction cues.
+
+#### Device & Native Features
+- **Expo Camera**: Provides access to the device camera, including permission handling, autofocus, and image capture functionality for scanning features.
 
 ### Backend
 - **Spring Boot**: A java framework that we used to create a REST api that recieves api calls and makes the appropriate queries to our database.
@@ -44,10 +51,10 @@ Brian Amsler has extensive experience with various different programming languag
 ### Daniella Vargas
 Daniella Vargas has experience with various programming languages and frameworks. Daniella's main role was in the frontend and creating the meal page design. She has helped with the integration of the frontend with the backend for the meal and home screens.
 ### Thanh Nguyen
-- Thanh Nguyen has experience with various programming languages and frameworks. Thanh's main role was in the frontend and creating the setting and inventory design. He has helped with the integration of the frontend with the backend for the settings and pantry screens.
+Thanh Nguyen has experience with various programming languages and frameworks. Thanh's main role was in the frontend and creating the setting and inventory design. He has helped with the integration of the frontend with the backend for the settings and pantry screens.
 ### Reza Amraei
-- Wrote most of the inventory section, created the UI for pantry screen, modal for create category, modal for opening food category, 
-  filtering within food category, swiping food entry left to delete, connecting template for frontend to add food to the database.
+Reza Amraei wrote most of the inventory section, created the UI for pantry screen, modal for create category, modal for opening food category, 
+filtering within food category, swiping food entry left to delete, connecting template for frontend to add food to the database.
 
 ---
 ## Disclaimer
